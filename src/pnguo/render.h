@@ -13,8 +13,7 @@
 #include "vkvg.h"
 #include "vg.h"
 
-#include <clipper2/clipper.h> 
-using namespace Clipper2Lib;
+#include <clipper2/clipper.h>  
 
 #ifndef GLM_FORCE_XYZW_ONLY
 #define GLM_ENABLE_EXPERIMENTAL 
@@ -672,7 +671,7 @@ public:
 	void add_triangle(const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
 	// 折线,polygon=closed
 	void draw_polyline(const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness);
-	void add_polyline(const PathsD* p, bool closed);
+	void add_polyline(const Clipper2Lib::PathsD* p, bool closed);
 	void add_polyline(const glm::vec2* p, size_t count);
 	// 渲染索引多段线，索引-1则跳过
 	void draw_polylines(const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness);

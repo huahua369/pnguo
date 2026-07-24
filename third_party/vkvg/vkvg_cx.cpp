@@ -46,6 +46,7 @@ extern "C" {
 #include <array> 
 #include <pnguo/print_time.h> 
 #include <vg.h> 
+#include <render.h>
 #include <clipper2/clipper.h> 
 
 #include <font_core.h>
@@ -140,12 +141,17 @@ public:
 	void clip_preserve(paths_t* ctx);
 	void fill_preserve(paths_t* p);
 	void stroke_preserve(paths_t* p);
+	void clip(paths_t* ctx);
+	void fill(paths_t* p);
+	void stroke(paths_t* p);
 	void* draw(VkvgContext ctx, void** waitSemaphore);
 	void begin_frame();
 	void end_frame();
 	void set_glutess(bool b);
 	paths_t* get_path();
 	state_save_t* cp_save(state_save_t* src);
+
+	void set_dash(const float* dashes, uint32_t num_dashes, float offset);
 private:
 	void poly_fill(paths_t* ctx, vec4* bounds, cmd_t& c);
 	void _fill_non_zero(paths_t*);
@@ -8967,16 +8973,42 @@ state_save_t* vgdev_ctx::cp_save(state_save_t* src)
 	state_save_t* dst = (state_save_t*)ac.allocate(sizeof(state_save_t) * 1);
 	if (!dst)return dst;
 	if (src)
+	{
 		*dst = *src;
+		if (src->dashes && src->dashCount > 0) {
+			if (dst->dashes && dst->afree)
+				ac.free_mem(dst->dashes, src->dashCount);
+			dst->dashes = (float*)ac.allocate(sizeof(float) * src->dashCount);
+			dst->afree = true;
+			if (dst->dashes)
+				memcpy(dst->dashes, src->dashes, sizeof(float) * src->dashCount);
+			else
+				dst->dashCount = 0;
+		}
+	}
 	else
 		*dst = {};
-	if (src->dashes && src->dashCount > 0) {
-		dst->dashes = (float*)ac.allocate(sizeof(float) * src->dashCount);
-		if (dst->dashes)
-			memcpy(dst->dashes, src->dashes, sizeof(float) * src->dashCount);
-		else
-			dst->dashCount = 0;
+	return dst;
+}
+void vgdev_ctx::set_dash(const float* dashes, uint32_t num_dashes, float offset)
+{
+	if (!t)
+		return;
+	if (!dashes || !num_dashes) {
+		t->dashCount = 0;
 	}
+	if (t->dashes && t->dashCount != num_dashes)
+	{
+		if (t->afree)
+			ac.free_mem(t->dashes, t->dashCount);
+		t->dashes = (float*)ac.allocate(sizeof(float) * num_dashes);
+		t->afree = true;
+	}
+	t->dashOffset = offset;
+	if (t->dashes)
+		memcpy(t->dashes, dashes, sizeof(float) * t->dashCount);
+	else
+		t->dashCount = 0;
 }
 void vgdev_ctx::fill_preserve(paths_t* ctx)
 {
@@ -9529,6 +9561,32 @@ void vgdev_ctx::stroke_preserve(paths_t* ctx) {
 	c.vertex.y = _vertex.size() - c.vertex.x;
 	c.index.y = _indices.size() - c.index.x;
 	cmdlist.push_back(c);
+}
+
+void vgdev_ctx::clip(paths_t* p)
+{
+	if (p) {
+		clip_preserve(p);
+		dc_clear_path(p);
+	}
+}
+
+void vgdev_ctx::fill(paths_t* p)
+{
+	if (p)
+	{
+		fill_preserve(p);
+		dc_clear_path(p);
+	}
+}
+
+void vgdev_ctx::stroke(paths_t* p)
+{
+	if (p)
+	{
+		stroke_preserve(p);
+		dc_clear_path(p);
+	}
 }
 
 void bind_draw_pipeline(VkvgContext ctx, state_save_t* t) {
@@ -10188,12 +10246,171 @@ void dc_move_to(paths_t* ctx, float x, float y) {
 	dc_finish_path(ctx);
 	dc_add_point(ctx, x, y);
 }
-bool dc_current_path_is_empty(path_pri* ctx) {
-	return ctx->pathes.empty() || ctx->pathes[ctx->pathPtr] == 0;
+
+
+void dc_recursive_bezier(paths_t* ctx, float distanceTolerance, float x1, float y1, float x2, float y2, float x3,
+	float y3, float x4, float y4, unsigned level) {
+	if (level > CURVE_RECURSION_LIMIT) {
+		return;
+	}
+
+	// Calculate all the mid-points of the line segments
+	//----------------------
+	float x12 = (x1 + x2) / 2;
+	float y12 = (y1 + y2) / 2;
+	float x23 = (x2 + x3) / 2;
+	float y23 = (y2 + y3) / 2;
+	float x34 = (x3 + x4) / 2;
+	float y34 = (y3 + y4) / 2;
+	float x123 = (x12 + x23) / 2;
+	float y123 = (y12 + y23) / 2;
+	float x234 = (x23 + x34) / 2;
+	float y234 = (y23 + y34) / 2;
+	float x1234 = (x123 + x234) / 2;
+	float y1234 = (y123 + y234) / 2;
+
+	if (level > 0) // Enforce subdivision first time
+	{
+		// Try to approximate the full cubic curve by a single straight line
+		//------------------
+		float dx = x4 - x1;
+		float dy = y4 - y1;
+
+		float d2 = fabsf(((x2 - x4) * dy - (y2 - y4) * dx));
+		float d3 = fabsf(((x3 - x4) * dy - (y3 - y4) * dx));
+
+		float da1, da2;
+
+		if (d2 > CURVE_COLLINEARITY_EPSILON && d3 > CURVE_COLLINEARITY_EPSILON) {
+			// Regular care
+			//-----------------
+			if ((d2 + d3) * (d2 + d3) <= (dx * dx + dy * dy) * distanceTolerance) {
+				// If the curvature doesn't exceed the distance_tolerance value
+				// we tend to finish subdivisions.
+				//----------------------
+				if (M_ANGLE_TOLERANCE < CURVE_ANGLE_TOLERANCE_EPSILON) {
+					dc_add_point(ctx, x1234, y1234);
+					return;
+				}
+
+				// Angle & Cusp Condition
+				//----------------------
+				float a23 = atan2f(y3 - y2, x3 - x2);
+				da1 = fabsf(a23 - atan2f(y2 - y1, x2 - x1));
+				da2 = fabsf(atan2f(y4 - y3, x4 - x3) - a23);
+				if (da1 >= M_PIF)
+					da1 = M_2_PIF - da1;
+				if (da2 >= M_PIF)
+					da2 = M_2_PIF - da2;
+
+				if (da1 + da2 < (float)M_ANGLE_TOLERANCE) {
+					// Finally we can stop the recursion
+					//----------------------
+					dc_add_point(ctx, x1234, y1234);
+					return;
+				}
+
+				if (M_CUSP_LIMIT != 0.0) {
+					if (da1 > M_CUSP_LIMIT) {
+						dc_add_point(ctx, x2, y2);
+						return;
+					}
+
+					if (da2 > M_CUSP_LIMIT) {
+						dc_add_point(ctx, x3, y3);
+						return;
+					}
+				}
+			}
+		}
+		else {
+			if (d2 > CURVE_COLLINEARITY_EPSILON) {
+				// p1,p3,p4 are collinear, p2 is considerable
+				//----------------------
+				if (d2 * d2 <= distanceTolerance * (dx * dx + dy * dy)) {
+					if (M_ANGLE_TOLERANCE < CURVE_ANGLE_TOLERANCE_EPSILON) {
+						dc_add_point(ctx, x1234, y1234);
+						return;
+					}
+
+					// Angle Condition
+					//----------------------
+					da1 = fabsf(atan2f(y3 - y2, x3 - x2) - atan2f(y2 - y1, x2 - x1));
+					if (da1 >= M_PIF)
+						da1 = M_2_PIF - da1;
+
+					if (da1 < M_ANGLE_TOLERANCE) {
+						dc_add_point(ctx, x2, y2);
+						dc_add_point(ctx, x3, y3);
+						return;
+					}
+
+					if (M_CUSP_LIMIT != 0.0) {
+						if (da1 > M_CUSP_LIMIT) {
+							dc_add_point(ctx, x2, y2);
+							return;
+						}
+					}
+				}
+			}
+			else if (d3 > CURVE_COLLINEARITY_EPSILON) {
+				// p1,p2,p4 are collinear, p3 is considerable
+				//----------------------
+				if (d3 * d3 <= distanceTolerance * (dx * dx + dy * dy)) {
+					if (M_ANGLE_TOLERANCE < CURVE_ANGLE_TOLERANCE_EPSILON) {
+						dc_add_point(ctx, x1234, y1234);
+						return;
+					}
+
+					// Angle Condition
+					//----------------------
+					da1 = fabsf(atan2f(y4 - y3, x4 - x3) - atan2f(y3 - y2, x3 - x2));
+					if (da1 >= M_PIF)
+						da1 = M_2_PIF - da1;
+
+					if (da1 < M_ANGLE_TOLERANCE) {
+						dc_add_point(ctx, x2, y2);
+						dc_add_point(ctx, x3, y3);
+						return;
+					}
+
+					if (M_CUSP_LIMIT != 0.0) {
+						if (da1 > M_CUSP_LIMIT) {
+							dc_add_point(ctx, x3, y3);
+							return;
+						}
+					}
+				}
+			}
+			else {
+				// Collinear case
+				//-----------------
+				dx = x1234 - (x1 + x4) / 2;
+				dy = y1234 - (y1 + y4) / 2;
+				if (dx * dx + dy * dy <= distanceTolerance) {
+					dc_add_point(ctx, x1234, y1234);
+					return;
+				}
+			}
+		}
+	}
+
+	// Continue subdivision
+	//----------------------
+	dc_recursive_bezier(ctx, distanceTolerance, x1, y1, x12, y12, x123, y123, x1234, y1234, level + 1);
+	dc_recursive_bezier(ctx, distanceTolerance, x1234, y1234, x234, y234, x34, y34, x4, y4, level + 1);
+}
+
+
+
+
+bool dc_current_path_is_empty(paths_t* ctx) {
+	auto x = ctx ? ((path_pri*)ctx) : nullptr;
+	return x && (x->pathes.empty() || x->pathes[x->pathPtr] == 0);
 }
 // this function expect that current point exists
-vec2 dc_get_current_position(path_pri* ctx) {
-	return ctx->points.back();
+vec2 dc_get_current_position(paths_t* ctx) {
+	return ((path_pri*)ctx)->points.back();
 }
 void dc0_line_to(path_pri* ctx, float x, float y) {
 	vec2 p = { x, y };
@@ -10211,7 +10428,8 @@ void dc_line_to(paths_t* ctx, float x, float y) {
 	dc0_line_to((path_pri*)ctx, x, y);
 }
 
-void dc_close_path(path_pri* ctx) {
+void dc_close_path(paths_t* p) {
+	path_pri* ctx = (path_pri*)p;
 	if (!ctx)
 		return;
 	if (ctx->pathes[ctx->pathPtr] & PATH_CLOSED_BIT) // already closed
@@ -10231,7 +10449,49 @@ void dc_close_path(path_pri* ctx) {
 
 	dc_finish_path(ctx);
 }
+void dc_curve_to(paths_t* ctx, float x1, float y1, float x2, float y2, float x3, float y3) {
+	// prevent running _recursive_bezier when all 4 curve points are equal
+	if (EQUF(x1, x2) && EQUF(x2, x3) && EQUF(y1, y2) && EQUF(y2, y3)) {
+		if (dc_current_path_is_empty(ctx) ||
+			(EQUF(dc_get_current_position(ctx).x, x1) && EQUF(dc_get_current_position(ctx).y, y1)))
+			return;
+	}
+	auto pr = ((path_pri*)ctx);
+	pr->simpleConvex = false;
+	dc_set_curve_start((path_pri*)ctx);
+	if (dc_current_path_is_empty(ctx))
+		dc_add_point(ctx, x1, y1);
 
+	vec2 cp = dc_get_current_position(ctx);
+	float sx = 1, sy = 1;
+	//vkvg_matrix_get_scale(&ctx->pushConsts.mat, &sx, &sy);
+	float distanceTolerance = fabs(0.25f / fmaxf(sx, sy));
+	dc_recursive_bezier(ctx, distanceTolerance, cp.x, cp.y, x1, y1, x2, y2, x3, y3, 0);
+	dc_add_point(ctx, x3, y3);
+	dc_set_curve_end(pr);
+}
+void dc_quadratic_to(paths_t* ctx, float x1, float y1, float x2, float y2) {
+	float x0, y0;
+	if (dc_current_path_is_empty(ctx)) {
+		x0 = x1;
+		y0 = y1;
+	}
+	else
+	{
+		vec2 cp = dc_get_current_position(ctx);
+		x0 = cp.x; y0 = cp.y;
+	}
+	dc_curve_to(ctx, x0 + (x1 - x0) * quadraticFact, y0 + (y1 - y0) * quadraticFact, x2 + (x1 - x2) * quadraticFact,
+		y2 + (y1 - y2) * quadraticFact, x2, y2);
+}
+void dc_rel_quadratic_to(VkvgContext ctx, float x1, float y1, float x2, float y2) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_REL_QUADRATIC_TO, x1, y1, x2, y2);
+	LOG(VKVG_LOG_INFO_CMD, "\tCMD: rel_quadratic_to: %f, %f, %f, %f\n", x1, y1, x2, y2);
+	vec2 cp = _get_current_position(ctx);
+	_quadratic_to(ctx, cp.x + x1, cp.y + y1, cp.x + x2, cp.y + y2);
+}
 float dc_get_arc_step(path_pri* ctx, float radius) {
 	float sx = 1.0, sy = 1.0;
 	//vkvg_matrix_get_scale(&ctx->pushConsts.mat, &sx, &sy);
@@ -10410,6 +10670,42 @@ int dc_rectangle(paths_t* ctx, float x, float y, float w, float h, float r) {
 	return VKVG_STATUS_SUCCESS;
 }
 
+void dc_ellipse(paths_t* ctx, float radiusX, float radiusY, float x, float y, float rotationAngle) {
+	if (!ctx)
+		return;
+	float width_two_thirds = radiusX * 4 / 3;
+
+	float dx1 = sinf(rotationAngle) * radiusY;
+	float dy1 = cosf(rotationAngle) * radiusY;
+	float dx2 = cosf(rotationAngle) * width_two_thirds;
+	float dy2 = sinf(rotationAngle) * width_two_thirds;
+
+	float topCenterX = x - dx1;
+	float topCenterY = y + dy1;
+	float topRightX = topCenterX + dx2;
+	float topRightY = topCenterY + dy2;
+	float topLeftX = topCenterX - dx2;
+	float topLeftY = topCenterY - dy2;
+
+	float bottomCenterX = x + dx1;
+	float bottomCenterY = y - dy1;
+	float bottomRightX = bottomCenterX + dx2;
+	float bottomRightY = bottomCenterY + dy2;
+	float bottomLeftX = bottomCenterX - dx2;
+	float bottomLeftY = bottomCenterY - dy2;
+
+	dc_finish_path(ctx);
+	dc_add_point(ctx, bottomCenterX, bottomCenterY);
+
+	dc_curve_to(ctx, bottomRightX, bottomRightY, topRightX, topRightY, topCenterX, topCenterY);
+	dc_curve_to(ctx, topLeftX, topLeftY, bottomLeftX, bottomLeftY, bottomCenterX, bottomCenterY);
+
+	ctx->pathes[ctx->pathPtr] |= PATH_CLOSED_BIT;
+	dc_finish_path(ctx);
+}
+
+
+
 state_save_t* dc_new_state(vgdev_ctx* ctx) {
 	auto t = (state_save_t*)ctx->mac.allocate(sizeof(state_save_t));
 	*t = {};
@@ -10534,6 +10830,32 @@ void dc_translate(vgdev_ctx* ctx, float dx, float dy)
 		dc_set_mat_inv_and_vkCmdPush(t);
 	}
 }
+
+void dc_scale(vgdev_ctx* ctx, float sx, float sy) {
+	auto t = ctx ? ctx->t : nullptr;
+	vkvg_matrix_scale(&t->pushConsts.mat, sx, sy);
+	dc_set_mat_inv_and_vkCmdPush(t);
+}
+void dc_rotate(vgdev_ctx* ctx, float radians) {
+	auto t = ctx ? ctx->t : nullptr;
+	vkvg_matrix_rotate(&t->pushConsts.mat, radians);
+	dc_set_mat_inv_and_vkCmdPush(t);
+}
+void dc_transform(vgdev_ctx* ctx, const vkvg_matrix_t* matrix) {
+	auto t = ctx ? ctx->t : nullptr;
+	vkvg_matrix_t res;
+	vkvg_matrix_multiply(&res, &t->pushConsts.mat, matrix);
+	t->pushConsts.mat = res;
+	dc_set_mat_inv_and_vkCmdPush(t);
+}
+void dc_set_matrix(vgdev_ctx* ctx, const vkvg_matrix_t* matrix) {
+	if (!ctx || !ctx->t)
+		return;
+	ctx->t->pushConsts.mat = (*matrix);
+	dc_set_mat_inv_and_vkCmdPush(ctx->t);
+}
+
+
 void dc_set_source_rgba(vgdev_ctx* ctx, float r, float g, float b, float a) {
 	auto t = ctx ? ctx->t : nullptr;
 	if (!t)
@@ -10677,28 +10999,304 @@ void rvg_x::clear()
 	pos = {};
 	ctx->begin_frame();
 }
-void rvg_x::submit(fill_style_d* st) {}
-void rvg_x::submit(uint32_t fill, uint32_t color, int linewidth) {}
+
+void rvg_x::submit(fill_style_d* st)
+{
+	bool stroke = st && st->thickness > 0 && st->color > 0;
+	if (!ctx || !st || !ctx->t)return;
+	auto cr = ctx;
+	auto path = ctx->get_path();
+	if (st->fill)
+	{
+		dc_set_color(ctx, st->fill);
+		ctx->fill_preserve(path);
+		if (!stroke)
+			dc_clear_path(path);
+	}
+	if (stroke)
+	{
+		dc_set_line_width(cr, st->thickness);
+		if (st->cap > 0)
+			dc_set_line_cap(cr, (vkvg_line_cap_t)st->cap);
+		if (st->join > 0)
+			dc_set_line_join(cr, (vkvg_line_join_t)st->join);
+		if (st->dash.v > 0 || st->dash_p)
+		{
+			float dashes[64] = {};
+			uint64_t x = 1;
+			auto t = dashes;
+			int num_dashes = st->dash_num;
+			if (num_dashes > 64)num_dashes = 64;
+			if (st->dash_p)
+			{
+				cr->set_dash(st->dash_p, st->dash_num, st->dash_offset);
+			}
+			else
+			{
+				if (num_dashes > 8)num_dashes = 8;
+				for (size_t i = 0; i < num_dashes; i++)
+				{
+					*t = st->dash.v8[i]; t++;
+				}
+				if (num_dashes > 0)
+					cr->set_dash(dashes, num_dashes, st->dash_offset);
+			}
+		}
+		dc_set_color(cr, st->color);
+		dc_stroke(cr, path);
+	}
+}
+void rvg_x::submit(uint32_t fill, uint32_t color, int linewidth) {
+
+	bool stroke = linewidth > 0 && color > 0;
+	if (!ctx || !ctx->t)return;
+	auto cr = ctx;
+	auto path = ctx->get_path();
+	if (fill)
+	{
+		dc_set_color(ctx, fill);
+		ctx->fill_preserve(path);
+		if (!stroke)
+			dc_clear_path(path);
+	}
+	if (stroke)
+	{
+		dc_set_line_width(cr, linewidth);
+		dc_set_color(cr, color);
+		dc_stroke(cr, path);
+	}
+}
 // 填充网格
 void rvg_x::grid_fill(const glm::vec2& size, const glm::ivec2& cols, int width) {
 	dc_grid_fill(ctx, size, cols, width);
 }
 // 线性渐变填充
-void rvg_x::linear_fill(const glm::vec2& size, const glm::vec4* cols, int count) {}
+void rvg_x::linear_fill(const glm::vec2& size, const glm::vec4* cols, int count) {
+	auto cr = ctx->get_path();
+	VkvgPattern gr = dc_pattern_create_linear(ctx, 0, 0, size.x, size.y);// 渲染结束自动释放
+	double n = count - 1;
+	for (size_t i = 0; i < count; i++)
+	{
+		auto color = cols[i];
+		vkvg_pattern_add_color_stop(gr, i / n, color.x, color.y, color.z, color.w);
+	}
+	dc_rectangle(cr, 0, 0, size.x, size.y, 0);
+	dc_set_source(ctx, gr);
+	dc_fill(ctx, cr);
+}
+
+glm::vec2 avec2_perp(glm::vec2 a);// { return  glm::vec2(a.y, -a.x); }
 // 画2d箭头type=0线终点在三角形中间
-void rvg_x::add_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type) {}
+void rvg_x::add_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type) {
+	auto path = ctx ? ctx->get_path() : nullptr;
+	if (path)
+	{
+		glm::vec2 dir = (p0 - p1);
+		glm::vec2 n = glm::normalize(dir);
+		glm::vec2 perp = avec2_perp(n) * arrow_hwidth;
+		auto dir1 = p1 - p0;
+		float len = glm::length(dir1);
+		dc_move_to(path, p0.x, p0.y);
+		float e = arrow_size * 0.5;
+		if (len > e && type == 0) {
+			dir1 = glm::normalize(dir1);
+			glm::vec2 e2 = { e, arrow_hwidth };
+			float newLength = len - e;
+			glm::vec2 p1n = p0 + dir1 * newLength;
+			dc_line_to(path, p1n.x, p1n.y);
+		}
+		else {
+			dc_line_to(path, p1.x, p1.y);
+		}
+		ctx->stroke(path);
+		dc_move_to(path, p1.x, p1.y);
+		glm::vec2 p = (p1 + (n * arrow_size));
+		glm::vec2 a = (p + perp);
+		dc_line_to(path, a.x, a.y);
+		a = (p + (perp * -1));
+		dc_line_to(path, a.x, a.y);
+		dc_close_path((path_pri*)path);
+		ctx->fill(path);
+	}
+
+}
 // 批量渲染同样式的块(圆或矩形)
-void rvg_x::draw_block(dblock_d* p, fill_style_d* st) {}
+void rvg_x::draw_block(dblock_d* p, fill_style_d* style)
+{
+	if (!ctx || !p || !p->points || p->count == 0 || p->rc.x <= 0 || p->rc.y < 0 || !style)return;
+
+	save();
+	dc_set_fill_rule(ctx, VKVG_FILL_RULE_NON_ZERO);
+	auto ph = ctx->get_path();
+	if (p->scale_pos > 0)
+	{
+		auto sp = p->scale_pos;
+		dc_translate(ctx, p->pos.x * sp, p->pos.y * sp);
+		dc_translate(ctx, p->view_pos.x, p->view_pos.y);
+		for (size_t i = 0; i < p->count; i++)
+		{
+			auto pt = p->points[i];
+			if (pt.y > 0)
+			{
+				dc_rectangle(ph, pt.x * sp, pt.y * sp, p->rc.x * sp, p->rc.y * sp, 0);
+			}
+			else {
+				dc_ellipse(ph, p->rc.x * sp, p->rc.x * sp, pt.x * sp, pt.y * sp, 0);
+			}
+		}
+	}
+	else
+	{
+		dc_translate(ctx, p->pos.x, p->pos.y);
+		dc_translate(ctx, p->view_pos.x, p->view_pos.y);
+		for (size_t i = 0; i < p->count; i++)
+		{
+			auto pt = p->points[i];
+			if (pt.y > 0)
+			{
+				dc_rectangle(ph, pt.x, pt.y, p->rc.x, p->rc.y, 0);
+			}
+			else {
+				dc_ellipse(ph, p->rc.x, p->rc.x, pt.x, pt.y, 0);
+			}
+		}
+	}
+	submit(style);
+	ctx->restore();
+}
 // 描边或填充路径
-void rvg_x::draw_path(path_d* path, fill_style_d* style) {}
+void rvg_x::draw_path(path_d* path, fill_style_d* style)
+{
+	if (!ctx || !path || path->count == 0 || !path->v || !style)return;
+
+	auto t = path->v;
+	bool stroke = false;
+	save();
+	dc_set_fill_rule(ctx, VKVG_FILL_RULE_NON_ZERO);
+	glm::vec2 pos, scale = {};
+	pos += path->pos;
+	auto ph = ctx->get_path();
+	if (path->flip_y)
+	{
+		vkvg_matrix_t flip_y = {};
+		vkvg_matrix_init(&flip_y, 1, 0, 0, -1, 0, 0); // 垂直翻转
+		dc_set_matrix(ctx, &flip_y);
+		pos.y = -pos.y;
+	}
+	dc_translate(ctx, pos.x, pos.y);
+	if (path->scale > 0)
+	{
+		dc_scale(ctx, path->scale, path->scale);
+	}
+	auto cr = ph;
+	float scale_pos = 1.0;
+	auto mt = *t;
+	auto xt = *t;
+	if (path->scale_pos > 0)
+	{
+		scale_pos = path->scale_pos;
+		for (size_t i = 0; i < path->count; i++, t++)
+		{
+			switch ((path_type_e)t->type)
+			{
+			case path_type_e::e_vmove:
+			{
+				if (i > 0)
+				{
+					if (xt.p.x == mt.p.x && xt.p.y == mt.p.y)
+						dc_close_path(cr);
+				}
+				mt = *t;
+				dc_move_to(cr, t->p.x * scale_pos, t->p.y * scale_pos);
+			}break;
+			case path_type_e::e_vline:
+			{
+				dc_line_to(cr, t->p.x * scale_pos, t->p.y * scale_pos);
+			}break;
+			case path_type_e::e_vcurve:
+			{
+				dc_quadratic_to(cr, t->c.x * scale_pos, t->c.y * scale_pos, t->p.x * scale_pos, t->p.y * scale_pos);
+			}break;
+			case path_type_e::e_vcubic:
+			{
+				dc_curve_to(cr, t->c.x * scale_pos, t->c.y * scale_pos, t->c1.x * scale_pos, t->c1.y * scale_pos, t->p.x * scale_pos, t->p.y * scale_pos);
+
+			}break;
+			default:
+				break;
+			}
+			xt = *t;
+		}
+	}
+	else
+	{
+		for (size_t i = 0; i < path->count; i++, t++)
+		{
+			switch ((path_type_e)t->type)
+			{
+			case path_type_e::e_vmove:
+			{
+				if (i > 0)
+				{
+					if (xt.p.x == mt.p.x && xt.p.y == mt.p.y)
+						dc_close_path(cr);
+				}
+				mt = *t;
+				dc_move_to(cr, t->p.x, t->p.y);
+			}break;
+			case path_type_e::e_vline:
+			{
+				dc_line_to(cr, t->p.x, t->p.y);
+			}break;
+			case path_type_e::e_vcurve:
+			{
+				//static double dv = 2.0 / 3.0;
+				//auto p0 = glm::vec2(xt.p.x, xt.p.y);
+				//auto p1 = glm::vec2(t->c.x, t->c.y);
+				//auto p2 = glm::vec2(t->p.x, t->p.y);
+				//glm::vec2 c1, c2;
+				//c1 = p1 - p0; c1 *= dv; c1 += p0;
+				//c2 = p1 - p2; c2 *= dv; c2 += p2;
+				////	C0 = Q0
+				////	C1 = Q0 + (2 / 3) (Q1 - Q0)
+				////	C2 = Q2 + (2 / 3) (Q1 - Q2)
+				////	C3 = Q2
+				//vkvg_curve_to(cr, c1.x, c1.y, c2.x, c2.y, t->p.x, t->p.y);
+				dc_quadratic_to(ph, t->c.x, t->c.y, t->p.x, t->p.y);
+			}break;
+			case path_type_e::e_vcubic:
+			{
+				dc_curve_to(ph, t->c.x, t->c.y, t->c1.x, t->c1.y, t->p.x, t->p.y);
+
+			}break;
+			default:
+				break;
+			}
+			xt = *t;
+		}
+	}
+	if (path->count > 2)
+	{
+		if (xt.p.x == mt.p.x && xt.p.y == mt.p.y)
+			dc_close_path(ph);
+	}
+	submit(style);
+	restore();
+}
+
 // 批量画单条线
 void rvg_x::add_line(glm::vec4* p, size_t count) {}
 void rvg_x::add_line(const glm::vec2& ps0, const glm::vec2& ps1) {}
 
 void rvg_x::add_rect(const glm::vec4& rc, double r) {}
 void rvg_x::add_rect(const glm::vec4& rc, const glm::vec4& r) {}
-void rvg_x::add_circle(const glm::vec2& pos, float r) {}
-void rvg_x::add_ellipse(const glm::vec2& pos, const glm::vec2& r, float rotationAngle) {}
+void rvg_x::add_circle(const glm::vec2& pos, float r) {
+	auto path = ctx->get_path();
+	dc_arc(path, pos.x, pos.y, r, 0, 2 * glm::pi<float>());
+}
+void rvg_x::add_ellipse(const glm::vec2& pos, const glm::vec2& r, float rotationAngle) {
+	dc_ellipse(ctx->get_path(), r.x, r.y, pos.x, pos.y, rotationAngle);
+}
 // 三角形基于矩形内 
 //	 dir = 0{}		// 尖角方向，0上，1右，2下，3左
 //	 spos = 50{}		// 尖角点位置0-1，中间就是0.5
@@ -10720,7 +11318,8 @@ void rvg_x::paint_shadow(double size_x, double size_y, double width, double heig
 
 void rvg_x::clip()
 {
-	dc_clip(ctx, ctx->get_path());
+	_clip = {};
+	ctx->clip(ctx->get_path());
 }
 void rvg_x::clip(const glm::ivec4& c)
 {

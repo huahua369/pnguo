@@ -1088,13 +1088,13 @@ void _font_cache_update_context_descset(VkvgContext ctx);
     (((int)(a * 255.0f) << 24) | ((int)(b * 255.0f) << 16) | ((int)(g * 255.0f) << 8) | (int)(r * 255.0f))
 #endif
 
-typedef struct {
+typedef struct Vertex_c {
 	vec2     pos;
 	uint32_t color;
 	vec3     uv;
 } Vertex;
 
-typedef struct {
+typedef struct push_constants {
 	vec4          source;
 	vec2          size;
 	uint32_t      fsq_patternType;
@@ -1469,5 +1469,6 @@ struct state_save_t {
 	int					clip_idx = -1;		// 裁剪的命令索引,小于0无
 	uint32_t			references = 1;
 	bool aa = true;
+	bool afree = false;
 };
 
