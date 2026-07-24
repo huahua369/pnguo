@@ -128,8 +128,10 @@ public:
 	state_save_t* t = 0;
 	paths_t* _dpath = 0;		// 默认路径缓存
 	std::stack<state_save_t*> _cst;	// 保存栈
+	int  cmdidx = 0;
 	bool is_glutess = false;
 	bool is_fence = true;
+
 public:
 	vgdev_ctx();
 	~vgdev_ctx();
@@ -8657,7 +8659,7 @@ void vgdev_ctx::_fill_non_zero(paths_t* ctx)
 	curColor = ctx->curColor;
 	uint32_t ptrPath = 0;
 	uint32_t firstPtIdx = 0;
-	_curVertOffset = _vertex.size();
+	_curVertOffset = ctx->curVertOffset;
 	if (ctx->pathPtr == 1 && ctx->pathes[0] & PATH_IS_CONVEX_BIT) {
 		// simple concave rectangle or circle
 		uint32_t firstVertIdx = (uint32_t)(_vertex.size() - ctx->curVertOffset);
@@ -9908,13 +9910,12 @@ void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 	ctx->gxCount = 0;
 	memcpy(vkh_buffer_get_mapped_pointer(&ctx->vertices), _vertex.data(), _vertex.size() * sizeof(Vertex));
 	memcpy(vkh_buffer_get_mapped_pointer(&ctx->indices), _indices.data(), _indices.size() * sizeof(uint32_t));
-	if (ctx->cmdStarted)
+	//if (ctx->cmdStarted)
 	{
-		if (ctx->cmd == ctx->cmdBuffers[0])
-			ctx->cmd = ctx->cmdBuffers[1];
-		else
-			ctx->cmd = ctx->cmdBuffers[0];
+		ctx->cmd = ctx->cmdBuffers[cmdidx];
 		ResetCommandBuffer(ctx->cmd, 0);
+		cmdidx++;
+		if (cmdidx > 1)cmdidx = 0;
 	}
 	ctx->cmdStarted = false;
 	dc_clear(ctx);
@@ -11670,6 +11671,7 @@ void rvg_x::set_color(const glm::vec4& rgba) {
 }
 void rvg_x::translate(const glm::vec2& offset)
 {
+	_translate += offset;
 	dc_translate(ctx, offset.x, offset.y);
 }
 void rvg_x::scale(float sx, float sy) {

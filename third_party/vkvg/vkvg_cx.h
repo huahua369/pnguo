@@ -42,8 +42,8 @@ private:
 	//stack_item _cur = {};				// 当前状态
 	//glm::ivec4 _tem_clip = {};
 	//glm::ivec4 _tview = {};				// 当前渲染区域 
-	//glm::ivec4 _clip = {};
-	//glm::vec2 _translate = {};
+	glm::ivec4 _clip = {};
+	glm::vec2 _translate = {};
 public:
 	rvg_x();
 	~rvg_x();
