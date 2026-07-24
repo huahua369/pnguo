@@ -265,7 +265,7 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 	}
 #endif
 }
-void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) {
+void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize, bool wait) {
 	const char* filename = "temp/vkvg_gradient.png";
 	static auto dctx = new_vgctx();
 	//free_vgctx(dctx);
@@ -274,6 +274,7 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	auto cr = vkvg_create(surf);
 
 #if 1
+	dcb.set_fence(dctx, wait);
 	dcb.begin_frame(dctx);
 	paths_t* path = dcb.get_paths(dctx);
 	dcb.set_fill_rule(dctx, VKVG_FILL_RULE_NON_ZERO);
@@ -350,7 +351,7 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	//vkvg_rectangle(cr, 0, 0, 256, 256);
 	dcb.fill(dctx, path);
 
-	dcb.draw(dctx, (VkvgContext)cr, nullptr);//批量执行
+	auto sem = dcb.draw(dctx, (VkvgContext)cr, 0);//批量执行
 	dcb.end_frame(dctx);
 #else 
 	vkvg_set_source_color(cr, 0xff0020ff);
@@ -374,9 +375,14 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	vkvg_flush(cr);
 	vkvg_surface_resolve(surf);//msaa采样转换输出
 #endif
-
-	vkvg_surface_write_to_png(surf, filename);
+	static bool save = true;
+	if (save)
+	{
+		save = false;
+		vkvg_surface_write_to_png(surf, filename);
+	}
 	vkvg_destroy(cr);
+	return sem;
 }
 class A
 {
@@ -507,12 +513,7 @@ void testgui() {
 	}
 
 	//dom_cx* dom0 = view->get_dom(form0);
-	glm::ivec2 surfsize = { 260 * 3,256 };
-	VkvgSurface surf = view->_vgdev->new_surface(surfsize.x, surfsize.y);
-	auto img = view->_vgdev->new_surface(R"(E:\za\noto-emoji-2.042\third_party\region-flags\png\GB-WLS.png)");
-	if (surf) {
-		draw_vgtest(surf, img, surfsize);
-	}
+
 	auto dvv = new div_cx();
 	dvv->set_size({ 500,400 });
 	dvv->set_pos({ 100,60 });
@@ -772,9 +773,11 @@ void testgui() {
 	}
 	view->push_m(dvv);
 	auto colorpicker = new div_cx();
+	glm::ivec2 surfsize = { 260 * 3,256 };
+	VkvgSurface surf = view->_vgdev->new_surface(surfsize.x, surfsize.y);
+	auto img = view->_vgdev->new_surface(R"(E:\za\noto-emoji-2.042\third_party\region-flags\png\GB-WLS.png)");
+	// 调色板 
 	{
-		// 调色板
-
 		auto dvv = colorpicker;
 		view->push_m(dvv);
 		dvv->set_size({ 1028,728 });
@@ -808,9 +811,12 @@ void testgui() {
 
 		std::string json_str = save_flex_data(data);
 		//r->set_text(json_str.c_str(), json_str.length());
-	//flex_data loaded = load_flex_data(json_str);
+		//flex_data loaded = load_flex_data(json_str);
 
-	//dvv->add_widget(r);
+		//dvv->add_widget(r);
+		if (surf) {
+			draw_vgtest(surf, img, surfsize, 1);
+		}
 
 		auto ibtn = new image_btn();
 		if (ibtn) {
@@ -851,10 +857,15 @@ void testgui() {
 	size_t frame_count = 0;
 	appx->app->set_fps(60);
 	appx->fpslab = fpslab;
+	{
+		appx->draw2d = [=](app_x* ptr, float delta)
+			{
+				return draw_vgtest(surf, img, surfsize, 0);
+			};
+	}
 
 	do {
 		frame_count = appx->run();
-		draw_vgtest(surf, img, surfsize);
 	} while (frame_count);
 
 	view->_vgdev->free_surface(surf);

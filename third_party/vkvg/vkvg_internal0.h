@@ -1395,6 +1395,7 @@ typedef struct _vkvg_surface_t {
 	VkFence flushFence; // unsignaled idle.
 #endif
 	VkSemaphore sem;
+	VkSemaphore sem0;
 } vkvg_surface;
 
 #define LOCK_SURFACE(surf)                                                                                             \

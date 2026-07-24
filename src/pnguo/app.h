@@ -109,6 +109,8 @@ public:
 	std::string gpustr;
 	glm::ivec4 rc3d = {};
 	void* dtex3d = 0;
+	std::function<void* (app_x* ptr, float delta)> draw2d;
+	void* (*draw2dc)(app_x* ptr, float delta) = 0;
 	font_family_t* family = 0;
 	int uims = 0, ms3d = 0, SDLms = 0, cpums = 0;
 	glm::ivec2 font_csize = { 1024,1024 };

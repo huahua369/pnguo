@@ -813,7 +813,6 @@ size_t app_x::run()
 			ms3d = rtc.end();
 			app->main->uct++;
 		}
-		app->main->add_vk_semaphores(sem3d, (int64_t)0, 0);
 		{
 			rtc.begin();		// 开始计时录制SDL渲染命令
 			for (auto p : app->forms)
@@ -822,6 +821,14 @@ size_t app_x::run()
 				{
 					p->set_state();	// 清空/设置交换链接状态 
 					if (p->is_render) {
+						if (app->main == p) {
+							if (draw2d)
+							{
+								auto sem = (int64_t)draw2d(this, delta);
+								p->add_vk_semaphores(sem, (int64_t)0, 0);
+							}
+							p->add_vk_semaphores(sem3d, (int64_t)0, 0);
+						}
 						if (dtex3d) {
 							texture_dt tdt = {};
 							tdt.src_rect = { 0,0,vkd->width,vkd->height };

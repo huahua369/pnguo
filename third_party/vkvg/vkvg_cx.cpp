@@ -140,7 +140,7 @@ public:
 	void clip_preserve(paths_t* ctx);
 	void fill_preserve(paths_t* p);
 	void stroke_preserve(paths_t* p);
-	void draw(VkvgContext ctx, void* waitSemaphore);
+	void* draw(VkvgContext ctx, void** waitSemaphore);
 	void begin_frame();
 	void end_frame();
 	void set_glutess(bool b);
@@ -6382,6 +6382,8 @@ void vkvg_surface_destroy(VkvgSurface surf) {
 #endif
 	if (surf->sem)
 		vkDestroySemaphore(surf->dev->vkDev, surf->sem, NULL);
+	if (surf->sem0)
+		vkDestroySemaphore(surf->dev->vkDev, surf->sem0, NULL);
 	vkvg_device_destroy(surf->dev);
 	free(surf);
 	surf = NULL;
@@ -6843,6 +6845,7 @@ VkvgSurface _create_surface(VkvgDevice dev, VkFormat format) {
 	surf->flushFence = vkh_fence_create(vkhd);
 #endif
 	surf->sem = vkh_semaphore_create(vkhd);
+	surf->sem0 = vkh_semaphore_create(vkhd);
 #if defined(DEBUG) && defined(VKVG_DBG_UTILS)
 	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)surf->cmd, "vkvgSurfCmd");
 #endif
@@ -9770,10 +9773,38 @@ void dc_clear(VkvgContext ctx) {
 	vkCmdClearAttachments(ctx->cmd, 2, ca, 1, &ctx->clearRect);
 }
 
+bool dc_wait_ctx_flush_end(VkvgContext ctx) {
+	LOG(VKVG_LOG_INFO, "CTX: _wait_flush_fence\n");
+	bool ret = false;
+	c_runtime_cx rtc;
+	rtc.begin();
+	VkResult st = {};
+#ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+	ret = (vkh_timeline_wait((VkhDevice)&ctx->dev->vkDev, ctx->pSurf->timeline, ctx->timelineStep) == VK_SUCCESS);
+#else
+	do
+	{
+		st = vkGetFenceStatus(ctx->dev->vkDev, ctx->flushFence);
+	} while (0);
+	ret = !st;
+	if (st)
+		ret = (WaitForFences(ctx->dev->vkDev, 1, &ctx->flushFence, VK_TRUE, VKVG_FENCE_TIMEOUT) == VK_SUCCESS);
+#endif
+	int ms = rtc.end();
+#ifdef PWAIT_MS
+	if (ms > 0)
+		printf("dc wait ms: %d\n", ms);
+#endif
+	if (!ret) {
+		LOG(VKVG_LOG_DEBUG, "CTX: _wait_flush_fence timeout\n");
+		ctx->status = VKVG_STATUS_TIMEOUT;
+	}
+	return ret;
+}
 
-void vgdev_ctx::draw(VkvgContext ctx, void* waitSemaphore)
+void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 {
-	if (!ctx || cmdlist.empty() || _vertex.empty())return;// 填充0、描边1、裁剪2
+	if (!ctx || cmdlist.empty() || _vertex.empty())return 0;// 填充0、描边1、裁剪2
 	check_vao_size(ctx, _vertex.size(), _indices.size());
 	_resize_ubo(ctx, gCount);
 	ctx->gxCount = 0;
@@ -9879,19 +9910,29 @@ void vgdev_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 	vkh_cmd_end(ctx->cmd);
 	ctx->pattern = 0;
 	if (!ctx->cmdStarted) // current cmd buff is empty, be aware that wait is also canceled!!
-		return;
+		return 0;
+	void* sem = 0;
 	if (is_fence)
 	{
 		vkResetFences(ctx->dev->vkDev, 1, &ctx->flushFence);
 		_device_submit_cmd(ctx->dev, &ctx->cmd, ctx->flushFence);
-		if (!_wait_ctx_flush_end(ctx))
-			return;
+		if (!dc_wait_ctx_flush_end(ctx))
+			return 0;
 	}
 	else
 	{
-		_device_submit_cmd_sem(ctx->dev, &ctx->cmd, (VkSemaphore)waitSemaphore, ctx->pSurf->sem, VK_NULL_HANDLE);
+		void* ws = 0;
+		if (waitSemaphore)
+		{
+			if (!(*waitSemaphore))
+				*waitSemaphore = ctx->pSurf->sem0;
+			ws = *waitSemaphore;
+		}
+		_device_submit_cmd_sem(ctx->dev, &ctx->cmd, (VkSemaphore)ws, ctx->pSurf->sem, VK_NULL_HANDLE);
+		sem = ctx->pSurf->sem;
 	}
 	ctx->cmdStarted = false;
+	return sem;
 }
 
 void _device_submit_cmd_sem(VkvgDevice dev, VkCommandBuffer* cmd, VkSemaphore waitSemaphore, VkSemaphore signalSemaphore, VkFence fence)
@@ -9973,9 +10014,8 @@ void dc_stroke_preserve(vgdev_ctx* ctx, paths_t* p) {
 		ctx->stroke_preserve(p);
 }
 
-void dc_draw(vgdev_ctx* ctx, VkvgContext ctxvg, void* waitSemaphore) {
-	if (ctx && ctxvg)
-		ctx->draw(ctxvg, waitSemaphore);
+void* dc_draw(vgdev_ctx* ctx, VkvgContext ctxvg, void** waitSemaphore) {
+	return (ctx && ctxvg) ? ctx->draw(ctxvg, waitSemaphore) : nullptr;
 }
 void dc_begin_frame(vgdev_ctx* ctx) {
 	if (ctx)ctx->begin_frame();
@@ -10344,7 +10384,7 @@ int dc_rounded_rectangle(paths_t* ctx, float x, float y, float w, float h, float
 	dc_line_to(ctx, x + radius, y + h);
 	dc_arc(ctx, x + radius, y + h - radius, radius, M_PIF_2, M_PIF);
 	dc_line_to(ctx, x, y + radius);
-	dc_close_path((path_pri*)ctx); 
+	dc_close_path((path_pri*)ctx);
 	dc_finish_path(ctx);
 	return VKVG_STATUS_SUCCESS;
 }
@@ -10572,12 +10612,16 @@ void dc_grid_fill(vgdev_ctx* cr, glm::vec2 size, glm::ivec2 cols, int width)
 	dc_set_color(cr, c);
 	dc_fill(cr, path);
 }
+void dc_set_fence(vgdev_ctx* ctx, bool enable) {
+	if (ctx)ctx->is_fence = enable;
+}
 
 drawctx_t get_drawctx(vgdev_ctx* p)
 {
 	drawctx_t r = {};
 	if (p) {
 		r.ptr = p;
+		r.set_fence = dc_set_fence;
 		r.set_glutess = dc_set_glutess;
 		r.clip_preserve = dc_clip_preserve;
 		r.fill_preserve = dc_fill_preserve;

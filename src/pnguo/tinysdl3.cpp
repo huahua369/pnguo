@@ -2328,10 +2328,13 @@ void* form_x::get_nptr()
 
 void form_x::add_vk_semaphores(int64_t wait_semaphore, int64_t signal_semaphore, uint32_t wait_stage_mask)
 {
-	if (!wait_stage_mask)
-		wait_stage_mask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-	if (renderer)
-		SDL_AddVulkanRenderSemaphores(renderer, wait_stage_mask, wait_semaphore, signal_semaphore);
+	if (wait_semaphore || signal_semaphore)
+	{
+		if (!wait_stage_mask)
+			wait_stage_mask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+		if (renderer)
+			SDL_AddVulkanRenderSemaphores(renderer, wait_stage_mask, wait_semaphore, signal_semaphore);
+	}
 }
 
 mouse_state_t* form_x::get_io()

@@ -161,6 +161,8 @@ extern "C" {
 #endif
 struct drawctx_t {
 	vgdev_ctx* ptr;
+	void (*set_fence)(vgdev_ctx* ctx, bool enable);
+	void* (*get_signal_sem)(vgdev_ctx* ctx);//signal_semaphore
 	void (*set_glutess)(vgdev_ctx* ctx, bool enable);
 	void (*clip_preserve)(vgdev_ctx* ctx, paths_t* p);
 	void (*fill_preserve)(vgdev_ctx* ctx, paths_t* p);
@@ -171,7 +173,7 @@ struct drawctx_t {
 	void (*fill)(vgdev_ctx* ctx, paths_t* p);
 	void (*stroke)(vgdev_ctx* ctx, paths_t* p);
 	void (*clear_path)(paths_t* ctx);
-	void (*draw)(vgdev_ctx* ctx, VkvgContext ctxvg, void* waitSemaphore);
+	void* (*draw)(vgdev_ctx* ctx, VkvgContext ctxvg, void** waitSemaphore);
 	void (*begin_frame)(vgdev_ctx* ctx);
 	void (*end_frame)(vgdev_ctx* ctx);
 
@@ -201,6 +203,7 @@ struct drawctx_t {
 
 	void(*set_line_width)(vgdev_ctx* ctx, float width);
 	int (*rectangle)(paths_t* ctx, float x, float y, float w, float h, float r);
+
 };
 
 vgdev_ctx* new_vgctx();
