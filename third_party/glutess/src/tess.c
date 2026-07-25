@@ -452,11 +452,11 @@ void GLAPIENTRY gluTessEndContour(GLUtesselator *tess) {
 void GLAPIENTRY gluTessEndPolygon(GLUtesselator *tess) {
     GLUmesh *mesh;
 
-    //if (setjmp(tess->env) != 0) {
-    //    /* come back here if out of memory */
-    //    CALL_ERROR_OR_ERROR_DATA(GLU_OUT_OF_MEMORY);
-    //    return;
-    //}
+    if (setjmp(tess->env) != 0) {
+        /* come back here if out of memory */
+        CALL_ERROR_OR_ERROR_DATA(GLU_OUT_OF_MEMORY);
+        return;
+    }
 
     RequireState(tess, T_IN_POLYGON);
     tess->state = T_DORMANT;
@@ -475,7 +475,7 @@ void GLAPIENTRY gluTessEndPolygon(GLUtesselator *tess) {
             }
         }
         if (!EmptyCache(tess)) {
-            //longjmp(tess->env, 1); /* could've used a label*/
+            longjmp(tess->env, 1); /* could've used a label*/
         }
     }
 
@@ -491,7 +491,7 @@ void GLAPIENTRY gluTessEndPolygon(GLUtesselator *tess) {
      * Each interior region is guaranteed be monotone.
      */
     if (!__gl_computeInterior(tess)) {
-        //longjmp(tess->env, 1); /* could've used a label */
+        longjmp(tess->env, 1); /* could've used a label */
     }
 
     mesh = tess->mesh;
@@ -508,7 +508,7 @@ void GLAPIENTRY gluTessEndPolygon(GLUtesselator *tess) {
             rc = __gl_meshTessellateInterior(mesh);
         }
         if (rc == 0) {
-            // longjmp(tess->env, 1); /* could've used a label */
+            longjmp(tess->env, 1); /* could've used a label */
         }
 
         __gl_meshCheckMesh(mesh);

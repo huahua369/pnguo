@@ -25,6 +25,15 @@
 #undef min
 #endif
 namespace hz {
+
+
+	template<typename T> inline T alignUp(const T& val, T alignment)
+	{
+		T r = (val + alignment - (T)1) & ~(alignment - (T)1);
+		//val = r;
+		return r;
+	}
+
 #if (__has_include(<memory_resource>))
 #include <memory_resource>
 	//__cplusplus >= 201703L
@@ -263,12 +272,6 @@ namespace hz {
 			}
 		}
 
-		template<typename T> inline T alignUp(const T& val, T alignment)
-		{
-			T r = (val + alignment - (T)1) & ~(alignment - (T)1);
-			//val = r;
-			return r;
-		}
 	};
 
 

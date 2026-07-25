@@ -46,5 +46,5 @@ int __gl_memInit(size_t maxFast) {
 }
 
 #ifdef MEMORY_DEBUG
-void *__gl_memAlloc(size_t n) { return memset(malloc_u(n), 0xa5, n); }
+void *__gl_memAlloc(size_t n) { return memset(malloc(n), 0xa5, n); }
 #endif

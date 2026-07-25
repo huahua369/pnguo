@@ -46,15 +46,15 @@ void *realloc_u(void *p, size_t s);
 }
 #endif
 
-#define memRealloc realloc_u
-#define memFree    free_u
+#define memRealloc realloc
+#define memFree    free
 
 #define memInit    __gl_memInit
 /*extern void		__gl_memInit( size_t );*/
 extern int __gl_memInit(size_t);
 
 #ifndef MEMORY_DEBUG
-#define memAlloc malloc_u
+#define memAlloc malloc
 #else
 #define memAlloc __gl_memAlloc
 extern void *__gl_memAlloc(size_t);

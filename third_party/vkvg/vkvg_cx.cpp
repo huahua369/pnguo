@@ -2828,20 +2828,25 @@ void _set_vertex(VkvgContext ctx, uint32_t idx, Vertex v) { ctx->vertexCache[idx
 #ifdef VKVG_FILL_NZ_GLUTESS
 
 static USP_CX* _g_ac = 0;
-void* malloc_u(size_t size) {
-	if (!size)return nullptr;
-	auto p = (size_t*)(_g_ac ? _g_ac->allocate(size + sizeof(size_t)) : nullptr);
-	if (p) {
-		*p = size;
-		p++;
-	}
-	return p;
+struct ms_as {
+	size_t cap, size;
+};
+#if 1
+void free_u(void* p) {
+	if (p)free(p);
 }
+void* realloc_u(void* p, size_t s) {
+	return realloc(p, s);
+}
+void* malloc_u(size_t s) {
+	return malloc(s);
+}
+#else
 void free_u(void* p) {
 	if (!p || !_g_ac)return;
-	auto n = (size_t*)p;
+	auto n = (ms_as*)p;
 	n--;
-	_g_ac->free_mem0(n, *n);
+	_g_ac->free_mem0(n, n->cap + sizeof(size_t) * 2);
 }
 void* realloc_u(void* p, size_t s) {
 	auto p1 = p;
@@ -2849,18 +2854,34 @@ void* realloc_u(void* p, size_t s) {
 	do {
 		if (p)
 		{
-			auto t = (size_t*)p;
+			auto t = (ms_as*)p;
 			t--;
-			ts = *t - sizeof(size_t);
-			if (ts > s)
+			ts = t->size;// 实际大小
+			auto cap = t->cap;// 分配大小
+			if (cap >= s)
+			{
+				t->size = s;
 				break;
+			}
 		}
-		p1 = malloc_u(s);
-		memcpy(p1, p, ts);
-		free_u(p);
+		auto newsize = hz::alignUp(s, (size_t)1024);
+		auto nm = (ms_as*)_g_ac->allocate(newsize + sizeof(size_t) * 2);
+		p1 = nm + 1;
+		nm->size = s;
+		nm->cap = newsize;
+		if (p)
+		{
+			memcpy(p1, p, ts);
+			free_u(p);
+		}
 	} while (0);
 	return p1;
 }
+void* malloc_u(size_t size) {
+	if (!size)return nullptr;
+	return realloc_u(0, size);
+}
+#endif
 
 void _add_indice(VkvgContext ctx, VKVG_IBO_INDEX_TYPE i) {
 	ctx->indexCache[ctx->indCount++] = i;
