@@ -311,8 +311,11 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	dcb.rectangle(path, 12, 12, 232, 70, 0);
 	dcb.new_sub_path(path); dcb.arc(path, 64, 64, 40, 0, 2 * M_PI);
 	dcb.new_sub_path(path); dcb.arc_negative(path, 192, 64, 40, 0, -2 * M_PI);
-	dcb.set_glutess(dctx, true);	dcb.set_fill_rule(dctx, VKVG_FILL_RULE_NON_ZERO);
+	dcb.set_glutess(dctx, true);
+	dcb.set_fill_rule(dctx, VKVG_FILL_RULE_NON_ZERO);
 	dcb.set_source_rgba(dctx, 0, 0, 0.9, 1);	dcb.fill_preserve(dctx, path);// 填充
+
+	dcb.set_glutess(dctx, false);
 	dcb.set_source_rgba(dctx, 0, 0, 0, 1);	dcb.stroke(dctx, path); //描边
 	dcb.translate(dctx, 0, -128);
 	

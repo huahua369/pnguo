@@ -842,7 +842,7 @@ size_t app_x::run()
 				}
 			}
 			if (view)
-				view->wait_dev();//!r3d &&
+				view->wait_dev();
 			SDLms = rtc.end();
 		}
 	} while (0);

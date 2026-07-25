@@ -36,16 +36,25 @@
 #define __memalloc_simple_h_
 
 #include <stdlib.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
+void *malloc_u(size_t size);
+void  free_u(void *p);
+void *realloc_u(void *p, size_t s);
+#ifdef __cplusplus
+}
+#endif
 
-#define memRealloc realloc
-#define memFree    free
+#define memRealloc realloc_u
+#define memFree    free_u
 
 #define memInit    __gl_memInit
 /*extern void		__gl_memInit( size_t );*/
 extern int __gl_memInit(size_t);
 
 #ifndef MEMORY_DEBUG
-#define memAlloc malloc
+#define memAlloc malloc_u
 #else
 #define memAlloc __gl_memAlloc
 extern void *__gl_memAlloc(size_t);

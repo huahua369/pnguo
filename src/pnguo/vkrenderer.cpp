@@ -7264,7 +7264,7 @@ namespace vkr
 			// skinning matrices constant buffer
 			VkDescriptorBufferInfo* pPerSkeleton = _ptb->GetSkinningMatricesBuffer(sm);
 			DepthMesh* pMesh = &m_meshes[pNode->meshIndex];
-			auto mesh = pm->meshes[pNode->meshIndex];
+			//auto mesh = pm->meshes[pNode->meshIndex];
 			for (int p = 0; p < pMesh->m_pPrimitives.size(); p++)
 			{
 				DepthPrimitives* pPrimitive = &pMesh->m_pPrimitives[p];

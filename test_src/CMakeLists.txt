@@ -88,7 +88,18 @@ list(APPEND src_vkvg
     "../src/pnguo/gui.cpp"
     "../src/pnguo/app.cpp"
     "../third_party/vkvg/vkvg_cx.cpp"
-    "../third_party/stb_src/stb_src.c" 
+    "../third_party/glutess/src/dict.c"
+    "../third_party/glutess/src/geom.c"
+    "../third_party/glutess/src/memalloc.c"
+    "../third_party/glutess/src/mesh.c"
+    "../third_party/glutess/src/normal.c"
+    "../third_party/glutess/src/priorityq.c"
+    "../third_party/glutess/src/render.c"
+    "../third_party/glutess/src/sweep.c"
+    "../third_party/glutess/src/tess.c"
+    "../third_party/glutess/src/tessmono.c"
+
+    "../third_party/stb_src/stb_src.c"
     "../third_party/mcut/bvh.cpp"  
     "../third_party/mcut/frontend.cpp"  
     "../third_party/mcut/hmesh.cpp"  
@@ -210,7 +221,7 @@ list(APPEND vkvglib
  draco::draco
  FFTW3::fftw3 FFTW3::fftw3f FFTW3::fftw3l
  FLAC::FLAC MPG123::libmpg123
- glutess
+ #glutess
 )
 #include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
 #target_link_libraries(tcmp PRIVATE ${lklib})

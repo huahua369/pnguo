@@ -88,6 +88,18 @@ glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_mai
 #endif
 
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+	void* malloc_u(size_t size);
+	void  free_u(void* p);
+	void* realloc_u(void* p, size_t s);
+#ifdef __cplusplus
+}
+#endif
+
+
 void _device_submit_cmd_sem(VkvgDevice dev, VkCommandBuffer* cmd, VkSemaphore waitSemaphore, VkSemaphore signalSemaphore, VkFence fence);
 
 
@@ -898,6 +910,8 @@ VkvgContext vkvg_create(VkvgSurface surf) {
 #ifndef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
 	ctx->flushFence = vkh_fence_create_signaled((VkhDevice)&ctx->dev->vkDev);
 #endif
+	ctx->cmdFence[0] = vkh_fence_create_signaled((VkhDevice)&ctx->dev->vkDev);
+	ctx->cmdFence[1] = vkh_fence_create_signaled((VkhDevice)&ctx->dev->vkDev);
 	ctx->d_img = 0;
 	ctx->d_offset = 0;
 	ctx->isdset = false;
@@ -2808,7 +2822,46 @@ void _add_vertex(VkvgContext ctx, Vertex v) {
 	_check_vertex_cache_size(ctx);
 }
 void _set_vertex(VkvgContext ctx, uint32_t idx, Vertex v) { ctx->vertexCache[idx] = v; }
+
+
+
 #ifdef VKVG_FILL_NZ_GLUTESS
+
+static USP_CX* _g_ac = 0;
+void* malloc_u(size_t size) {
+	if (!size)return nullptr;
+	auto p = (size_t*)(_g_ac ? _g_ac->allocate(size + sizeof(size_t)) : nullptr);
+	if (p) {
+		*p = size;
+		p++;
+	}
+	return p;
+}
+void free_u(void* p) {
+	if (!p || !_g_ac)return;
+	auto n = (size_t*)p;
+	n--;
+	_g_ac->free_mem0(n, *n);
+}
+void* realloc_u(void* p, size_t s) {
+	auto p1 = p;
+	size_t ts = 0;
+	do {
+		if (p)
+		{
+			auto t = (size_t*)p;
+			t--;
+			ts = *t - sizeof(size_t);
+			if (ts > s)
+				break;
+		}
+		p1 = malloc_u(s);
+		memcpy(p1, p, ts);
+		free_u(p);
+	} while (0);
+	return p1;
+}
+
 void _add_indice(VkvgContext ctx, VKVG_IBO_INDEX_TYPE i) {
 	ctx->indexCache[ctx->indCount++] = i;
 	_check_index_cache_size(ctx);
@@ -3492,6 +3545,8 @@ void _release_context_ressources(VkvgContext ctx) {
 #ifndef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
 	vkDestroyFence(dev, ctx->flushFence, NULL);
 #endif
+	vkDestroyFence(dev, ctx->cmdFence[0], NULL);
+	vkDestroyFence(dev, ctx->cmdFence[1], NULL);
 	vkFreeCommandBuffers(dev, ctx->cmdPool, 2, ctx->cmdBuffers);
 	vkDestroyCommandPool(dev, ctx->cmdPool, NULL);
 	VkDescriptorSet dss[] = { ctx->dsFont, ctx->dsSrc, ctx->dsGrad };
@@ -8655,6 +8710,7 @@ void vertex2a(void* vertex_data, void* poly_data) {
 }
 void vgdev_ctx::_fill_non_zero(paths_t* ctx)
 {
+	_g_ac = &ac;
 	Vertex v = { {0}, ctx->curColor, {0, 0, -1} };
 	curColor = ctx->curColor;
 	uint32_t ptrPath = 0;
@@ -9902,6 +9958,31 @@ bool dc_wait_ctx_flush_end(VkvgContext ctx) {
 	return ret;
 }
 
+bool dc_wait_fence(VkvgContext ctx, VkFence fence) {
+	bool ret = false;
+	c_runtime_cx rtc;
+	rtc.begin();
+	VkResult st = {};
+	do
+	{
+		st = vkGetFenceStatus(ctx->dev->vkDev, fence);
+	} while (0);
+	ret = !st;
+	if (st)
+		ret = vkWaitForFences(ctx->dev->vkDev, 1, &fence, VK_TRUE, VKVG_FENCE_TIMEOUT) == VK_SUCCESS;
+
+	int ms = rtc.end();
+#ifdef PWAIT_MS
+	if (ms > 0)
+		printf("dc wait fence ms: %d\n", ms);
+#endif
+	if (!ret) {
+		LOG(VKVG_LOG_DEBUG, "CTX: _wait_flush_fence timeout\n");
+		ctx->status = VKVG_STATUS_TIMEOUT;
+	}
+	return ret;
+}
+
 void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 {
 	if (!ctx || cmdlist.empty() || _vertex.empty())return 0;// 填充0、描边1、裁剪2
@@ -9910,6 +9991,7 @@ void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 	ctx->gxCount = 0;
 	memcpy(vkh_buffer_get_mapped_pointer(&ctx->vertices), _vertex.data(), _vertex.size() * sizeof(Vertex));
 	memcpy(vkh_buffer_get_mapped_pointer(&ctx->indices), _indices.data(), _indices.size() * sizeof(uint32_t));
+	auto cwait = ctx->cmdFence[cmdidx];
 	//if (ctx->cmdStarted)
 	{
 		ctx->cmd = ctx->cmdBuffers[cmdidx];
@@ -9917,10 +9999,9 @@ void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 		cmdidx++;
 		if (cmdidx > 1)cmdidx = 0;
 	}
+	auto cwait_last = ctx->cmdFence[cmdidx];
 	ctx->cmdStarted = false;
 	dc_clear(ctx);
-	VkClearAttachment ca[2] = { clearColorAttach, clearStencil };
-	vkCmdClearAttachments(ctx->cmd, 2, ca, 1, &ctx->clearRect);
 	for (auto& it : cmdlist)
 	{
 		auto t = it.state;
@@ -10027,9 +10108,11 @@ void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 				*waitSemaphore = ctx->pSurf->sem0;
 			ws = *waitSemaphore;
 		}
-		_device_submit_cmd_sem(ctx->dev, &ctx->cmd, (VkSemaphore)ws, ctx->pSurf->sem, VK_NULL_HANDLE);
+		vkResetFences(ctx->dev->vkDev, 1, &cwait);
+		_device_submit_cmd_sem(ctx->dev, &ctx->cmd, (VkSemaphore)ws, ctx->pSurf->sem, cwait);
 		sem = ctx->pSurf->sem;
-	}
+		dc_wait_fence(ctx, cwait_last);
+	};
 	ctx->cmdStarted = false;
 	return sem;
 }
