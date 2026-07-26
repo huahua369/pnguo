@@ -315,7 +315,7 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	dcb.set_fill_rule(dctx, VKVG_FILL_RULE_NON_ZERO);
 	dcb.set_source_rgba(dctx, 0, 0, 0.9, 1);	dcb.fill_preserve(dctx, path);// 填充
 
-	//dcb.set_glutess(dctx, false);
+	dcb.set_glutess(dctx, false);
 	dcb.set_source_rgba(dctx, 0, 0, 0, 1);	dcb.stroke(dctx, path); //描边
 	dcb.translate(dctx, 0, -128);
 	
@@ -446,7 +446,7 @@ void testgui() {
 	};
 	auto appx = new app_x();
 	std::shared_ptr<app_x> spappx(appx);
-	bool has3d = true;
+	bool has3d = false;
 	appx->init(has3d);
 	glm::ivec2 ws = dpis[4];// { 1280, 860 };
 	const char* wtitle = (char*)u8"窗口0";

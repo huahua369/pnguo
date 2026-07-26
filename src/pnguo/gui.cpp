@@ -1557,10 +1557,7 @@ void scroll_bar::set_posv(const glm::ivec2& poss)
 
 void draw_color_btn(rvg_cx* rv, color_style* t, const glm::ivec2& pos, const glm::ivec2& size)
 {
-	auto ns = size;
-	auto ss = size;
-	int thickness = t->thickness;
-	auto psv = pos;
+	auto ns = size;	auto ss = size;	int thickness = t->thickness;	auto psv = pos;
 	auto view = glm::ivec4(psv, ns + thickness);
 	rv->push_view(view, t);
 	rv->translate(psv);
@@ -1569,15 +1566,13 @@ void draw_color_btn(rvg_cx* rv, color_style* t, const glm::ivec2& pos, const glm
 		if (t->circle)
 		{
 			glm::vec2 sp = {};
-			auto r = lround(ss.y * 0.5);
+			int r = lround(ss.y * 0.5);
 			sp += r;
 			rv->add_circle(sp, r);
 		}
-		else
-		{
-			rv->add_rect({ 0.,0., ss }, t->rounding);
-		}
-		rv->submit(t->dfill, 0, 0);
+		else { rv->add_rect({ 0.,0., ss }, t->rounding); }
+		rv->set_color(t->dfill);
+		rv->fill();
 	}
 	// 渲染标签
 	glm::vec2 ps = { thickness * 2, thickness * 2 };
@@ -1585,21 +1580,21 @@ void draw_color_btn(rvg_cx* rv, color_style* t, const glm::ivec2& pos, const glm
 		ps += t->pushedps;
 	}
 	ns -= thickness * 4;
+	float padding = thickness == 1 ? 0.5f : 0.0f;
 	glm::vec4 rc = { ps, ns };
 	if (t->dcol)
 	{
 		if (t->circle)
 		{
 			glm::vec2 sp = {};
-			auto r = lround(ss.y * 0.5);
+			int r = lround(ss.y * 0.5);
 			sp += r;
 			rv->add_circle(sp, r);
 		}
-		else
-		{
-			rv->add_rect({ 0.5,0.5, ss }, t->rounding);
-		}
-		rv->submit(0, t->dcol, thickness);
+		else { rv->add_rect({ padding,padding, ss }, t->rounding); }
+		rv->set_color(t->dcol);
+		rv->set_line_width(thickness);
+		rv->stroke();
 	}
 	text_st tx = {};
 	tx.pos = ps;
@@ -1615,12 +1610,10 @@ void widget_t::draw(rvg_cx* rv)
 
 void image_btn::draw(rvg_cx* rv) {
 	auto ss = get_size();
-	auto psv = get_spos(); psv += _pos; //auto psv = get_ppos();
+	auto psv = get_spos(); psv += _pos;
 	auto view = glm::ivec4(psv, ss);
 	rv->push_view(view, this);
 	rv->translate(psv);
-	//rv->add_rect({ 0.,0., ss }, rounding);
-	//rv->submit(0x80ffffff, 0, 0); 
 	auto p = &state_img[show_idx];
 	image_r r = {};
 	r.img = (image_ptr_t*)(imgptr.img);
@@ -1671,8 +1664,8 @@ void gradient_btn::draw(rvg_cx* rv)
 	{
 		rounding = nr;
 	}
-	glm::vec2 tps = { 0.5,0.5 };
-
+	glm::vec2 tps = { 0.5,0.5 };	// thickness等于1时需要偏移0.5才能正常渲染线框
+	if (thickness > 1)tps *= 0.0;
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view, this);
 	//rv->save();
@@ -1728,8 +1721,7 @@ void gradient_btn::draw(rvg_cx* rv)
 	ns -= thickness * 4;
 	glm::vec4 rc = { ps, ns };
 	// 边框
-	w -= 1;
-	h -= 1;
+	w -= 1;	h -= 1;
 	rv->set_line_width(thickness);
 	rv->set_color(borderLight);
 	rv->add_rect({ tps.x,tps.y + (p->mPushed ? 0.f : 1.0f), w, h - (p->mPushed ? 0.0f : 1.0f) }, rounding);
