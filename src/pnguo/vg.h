@@ -612,6 +612,82 @@ struct texture_cb
 typedef struct texture_cb texture_cb;
 #endif
 
+// 路径填充描边
+
+struct fill_style_d {
+	uint32_t fill = 0;		// 填充颜色
+	uint32_t color = 0;		// 线颜色stroke
+	float thickness = 1;	// 线宽
+	glm::ivec4 round = {};	// 圆角
+	int cap = -1, join = -1;
+	int dash_offset = 0;
+	int dash_num = 0;		// 虚线计数 dash最大8、dash_p建议最大64
+	union {
+		uint64_t v = 0;
+		uint8_t v8[8];
+	}dash = {};		// ink  skip  ink  skip
+	float* dash_p = 0;		// 虚线逗号/空格分隔的数字
+};
+
+
+struct rvg_cb {
+	void* ctx = 0;
+	// 路径操作
+	void* (*new_path)(void* ctx);
+	void(*clear_path)(void* path);
+	void(*close_path)(void* path);
+	void(*new_sub_path)(void* path);
+	void(*path_extents)(void* path, float* x1, float* y1, float* x2, float* y2);
+	void(*get_current_point)(void* path, float* x, float* y);
+	// 添加数据到当前路径，参考path_type_e
+	void(*add_path)(void* path, float* data, size_t count);
+	void(*line_to)(void* path, float x, float y);
+	void(*rel_line_to)(void* path, float dx, float dy);
+	void(*move_to)(void* path, float x, float y);
+	void(*rel_move_to)(void* path, float x, float y);
+	void(*arc)(void* path, float xc, float yc, float radius, float a1, float a2);
+	void(*arc_negative)(void* path, float xc, float yc, float radius, float a1, float a2);
+	void(*curve_to)(void* path, float x1, float y1, float x2, float y2, float x3, float y3);
+	void(*rel_curve_to)(void* path, float x1, float y1, float x2, float y2, float x3, float y3);
+	void(*quadratic_to)(void* path, float x1, float y1, float x2, float y2);
+	void(*rel_quadratic_to)(void* path, float x1, float y1, float x2, float y2);
+	void(*rectangle)(void* path, float x, float y, float w, float h);
+	void(*rounded_rectangle)(void* path, float x, float y, float w, float h, float radius);
+	void(*rounded_rectangle2)(void* path, float x, float y, float w, float h, float rx, float ry);
+	void(*ellipse)(void* path, float radiusX, float radiusY, float x, float y, float rotationAngle);
+	void(*elliptic_arc_to)(void* path, float x, float y, bool large_arc_flag, bool sweep_flag, float rx, float ry, float phi);
+	void(*rel_elliptic_arc_to)(void* path, float x, float y, bool large_arc_flag, bool sweep_flag, float rx, float ry, float phi);
+
+	// 渲染操作
+	void(*stroke)(void* ctx);
+	void(*stroke_preserve)(void* ctx);
+	void(*fill)(void* ctx);
+	void(*fill_preserve)(void* ctx);
+	void(*paint)(void* ctx);			// 全屏渲染
+	void(*clear)(void* ctx);			// 清空画布
+	void(*reset_clip)(void* ctx);		// 重置裁剪
+	void(*clip)(void* ctx);				// 路径裁剪，清空当前路径
+	void(*clip_preserve)(void* ctx);	// 路径裁剪
+	void(*scissor)(void* ctx, int x, int y, int width, int height);	// 矩形裁剪
+	// 配置
+	void(*set_opacity)(void* ctx, float opacity);
+	void(*set_source_color)(void* ctx, uint32_t c);
+	void(*set_source_rgba)(void* ctx, float r, float g, float b, float a);
+	void(*set_source_rgb)(void* ctx, float r, float g, float b);
+	void(*set_line_width)(void* ctx, float width);
+	void(*set_miter_limit)(void* ctx, float limit);
+	void(*set_line_cap)(void* ctx, int cap);
+	void(*set_line_join)(void* ctx, int join);
+	void(*set_source_surface)(void* ctx, void* surf, float x, float y);
+	void(*set_source)(void* ctx, void* pat);
+	void(*set_operator)(void* ctx, int op);
+	void(*set_fill_rule)(void* ctx, int fr);
+	void(*set_dash)(void* ctx, const float* dashes, uint32_t num_dashes, float offset);		// 虚线
+	void(*set_dash8)(void* ctx, uint64_t dashes, float offset);		// 虚线,用uint8_t v8[8]表示
+};
+
+
+
 #endif // !VG_H
 
 
