@@ -278,7 +278,7 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	dcb.begin_frame(dctx);
 	paths_t* path = dcb.get_paths(dctx);
 	dcb.set_fill_rule(dctx, VKVG_FILL_RULE_NON_ZERO);
-	
+
 	//dcb.clip0(dctx);
 	//dcb.rectangle(path, 200, 0, 300, 200, 10);
 	//dcb.clip(dctx, path);// 圆角矩形裁剪
@@ -318,7 +318,7 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	dcb.set_glutess(dctx, false);
 	dcb.set_source_rgba(dctx, 0, 0, 0, 1);	dcb.stroke(dctx, path); //描边
 	dcb.translate(dctx, 0, -128);
-	
+
 	dcb.clip0(dctx);
 	dcb.translate(dctx, 300, 0);
 	auto sg = dcb.new_pattern_sweep(dctx, 128, 128, 0, 2);
@@ -562,13 +562,15 @@ void testgui() {
 		}
 	}
 	auto gr = new group_radio_t();
+	const char* cstr[] = { (char*)u8"橙子aag",(char*)u8"葡萄bb",(char*)u8"桃子aag",(char*)u8"西瓜bb",(char*)u8"荔枝bb" };
 	for (int i = 0; i < 5; i++) {
 		auto r = new radio_tl();
 		r->set_group(gr);
-		r->set_size({ 36,36 });
-		r->style.line_col = 0xffff8020;
-		r->style.thickness = 1;
-		r->style.radius = 7;
+		r->set_size({ 136,36 });
+		r->_style.line_col = 0xffff8020;
+		r->_style.thickness = 1;
+		r->_style.radius = 7;
+		r->v.text = cstr[i];
 		dvv->add_widget(r);
 	}
 	for (int i = 0; i < 7; i++) {
@@ -589,18 +591,21 @@ void testgui() {
 
 		btn->str = (char*)u8"🍕按钮 " + std::to_string(5 + i);
 	}
+
 	for (int i = 0; i < 4; i++) {
 		auto r = new checkbox_tl();
-		r->set_size({ 36,36 });
-		r->style.line_col = 0xffff8020;
-		r->style.thickness = 1;
+		r->set_size({ 136,36 });
+		r->_style.line_col = 0xffff8020;
+		r->_style.thickness = 1;
+		r->v.text = cstr[i];
 		dvv->add_widget(r);
 	}
 	{
 		auto r = new checkbox_tl();
-		r->set_size({ 36,36 });
-		r->style.line_col = 0xffff8020;
-		r->style.thickness = 1;
+		r->set_size({ 136,36 });
+		r->_style.line_col = 0xffff8020;
+		r->_style.thickness = 1;
+		r->v.text = cstr[4];
 		r->v.mixed = true;
 		dvv->add_widget(r);
 	}
@@ -664,8 +669,8 @@ void testgui() {
 			{
 				auto r = new checkbox_tl();
 				r->set_size({ 36,36 });
-				r->style.line_col = 0xffff8020;
-				r->style.thickness = 1;
+				r->_style.line_col = 0xffff8020;
+				r->_style.thickness = 1;
 				r->v.mixed = true;
 				dvv1->add_widget(r);
 			}

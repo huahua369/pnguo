@@ -434,7 +434,7 @@ struct group_radio_t
 // 单选
 struct radio_tl :public widget_t
 {
-	radio_style_t style = {};	// 风格id
+	radio_style_t _style = {};	// 风格id
 	radio_info_t v = {};
 private:
 	group_radio_t* gr = 0;		// 组 
@@ -455,7 +455,7 @@ public:
 // 复选
 struct checkbox_tl :public widget_t
 {
-	check_style_t style = {};	// 风格id
+	check_style_t _style = {};	// 风格id
 	checkbox_info_t v = {};
 public:
 	checkbox_tl();

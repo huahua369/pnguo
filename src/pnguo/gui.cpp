@@ -277,9 +277,13 @@ menu_btn::menu_btn() :widget_t(WIDGET_TYPE::WT_MENU_BTN)
 menu_btn::~menu_btn()
 {}
 radio_tl::radio_tl() :widget_t(WIDGET_TYPE::WT_RADIO)
-{}
+{
+	style.align.x = 0;
+}
 checkbox_tl::checkbox_tl() :widget_t(WIDGET_TYPE::WT_CHECKBOX)
-{}
+{
+	style.align.x = 0;
+}
 checkbox_tl::~checkbox_tl()
 {}
 switch_tl::switch_tl() :widget_t(WIDGET_TYPE::WT_SWITCH)
@@ -444,12 +448,12 @@ inline glm::vec4 to_c4(uint32_t c)
 
 bool update_color_btn(color_style* p, float delta)
 {
-	p->dtime += delta;
-	auto dt = p->dtime;
-	if (dt > 0.150) {
-		p->dtime = 0;
-	}
-	if (p->_bst == p->_old_bst)return false;
+	//p->dtime += delta;
+	//auto dt = p->dtime;
+	//if (dt > 0.150) {
+	//	p->dtime = 0;
+	//}
+	if (p->_bst == p->_old_bst)return false;	// 状态不变时退出
 	p->_old_bst = p->_bst;
 	btn_cols_t* pdc = &p->pdc;
 	p->_disabled = (p->_bst & (int)BTN_STATE::STATE_DISABLE);
@@ -706,20 +710,20 @@ bool radio_tl::update(float delta)
 	{
 		auto& it = v;
 		if (_size.x <= 0) {
-			_size.x = style.radius * 2;
+			_size.x = _style.radius * 2;
 		}
 		if (_size.y <= 0) {
-			_size.y = style.radius * 2;
+			_size.y = _style.radius * 2;
 		}
 		if (cks > 0 && v.value == v.value1) {
 			cks = 0; set_value();
 		}
 		if (it.value != it.value1)
 		{
-			auto dt = fmod(delta, style.duration);
-			if (style.duration > 0) {
+			auto dt = fmod(delta, _style.duration);
+			if (_style.duration > 0) {
 				it.dt += delta;
-				if (it.dt >= style.duration) {
+				if (it.dt >= _style.duration) {
 					it.value1 = it.value; it.dt = 0;
 					dt = 1.0;
 
@@ -727,13 +731,13 @@ bool radio_tl::update(float delta)
 				}
 				else
 				{
-					dt = it.dt / style.duration;
+					dt = it.dt / _style.duration;
 				}
 			}
 			else {
 				dt = 1.0;
 			}
-			float t = it.value ? glm::mix(style.radius - style.thickness, style.thickness * 2.0f, dt) : glm::mix(style.thickness * 2.0f, style.radius - style.thickness, dt);
+			float t = it.value ? glm::mix(_style.radius - _style.thickness, _style.thickness * 2.0f, dt) : glm::mix(_style.thickness * 2.0f, _style.radius - _style.thickness, dt);
 			it.swidth = t;
 			if (!it.value && it.dt == 0)it.swidth = 0;
 			ic++;
@@ -784,16 +788,16 @@ bool checkbox_tl::update(float delta)
 	{
 		auto& it = v;
 		if (_size.x <= 0) {
-			_size.x = style.square_sz;
+			_size.x = _style.square_sz;
 		}
 		if (_size.y <= 0) {
-			_size.y = style.square_sz;
+			_size.y = _style.square_sz;
 		}
 
 		if (cks > 0 && v.value == v.value1) {
 			cks = 0; set_value();
 		}
-		auto duration = it.duration > 0 ? it.duration : style.duration;
+		auto duration = it.duration > 0 ? it.duration : _style.duration;
 		if (it.value != it.value1)
 		{
 			auto dt = fmod(delta, duration);
@@ -1827,17 +1831,24 @@ void radio_tl::draw(rvg_cx* rv)
 
 		//rv->save();
 		rv->translate((glm::vec2)psv);
+		if (p->v.text.size()) {
+			text_st tx = {};
+			tx.pos = { _style.radius * 0.5 + _style.radius * 3,thickness * .5 };
+			tx.size = get_size();
+			tx.text = p->v.text.c_str(); tx.text_len = p->v.text.size();
+			rv->add_text(&tx, &style);
+		}
 		//rv->add_rect({ 0,0,get_size() }, 0);
 		//rv->set_color(0);
-		//rv->fill();
-		rv->translate(glm::vec2(_size.x * 0.5 - style.radius, _size.y * 0.5 - style.radius));//+ glm::vec2(0.5f, 0.5f)
+		//rv->fill(); 
+		rv->translate(glm::vec2(p->v.text.empty() ? _size.x * 0.5 - _style.radius : _style.radius * 0.5, _size.y * 0.5 - _style.radius));//+ glm::vec2(0.5f, 0.5f)
 		int x = 0;
 		{
 			auto& it = v;
 			it.pos = {};
-			it.pos.x = x * style.radius * 0.5;
-			it.pos += style.radius;
-			draw_radios(rv, &it, &style);
+			it.pos.x = x * _style.radius * 0.5;
+			it.pos += _style.radius;
+			draw_radios(rv, &it, &_style);
 			x++;
 		}
 		//rv->restore();
@@ -1857,16 +1868,26 @@ void checkbox_tl::draw(rvg_cx* rv)
 		auto view = glm::ivec4(psv, get_size());
 		rv->push_view(view, this);
 
+		rv->translate((glm::vec2)psv);
+		if (p->v.text.size()) {
+			text_st tx = {};
+			tx.pos = { _style.square_sz * 2,thickness * .5 };
+			tx.size = get_size();
+			tx.text = p->v.text.c_str(); tx.text_len = p->v.text.size();
+			rv->add_text(&tx, &style);
+		}
 		//rv->save();
-		glm::ivec2 poss = psv;
-		poss.x += (_size.x - style.square_sz) * 0.5;
-		poss.y += (_size.y - style.square_sz) * 0.5;
+		glm::ivec2 poss = {};
+		poss.x += (_size.x - _style.square_sz) * 0.5;
+		if (p->v.text.size())
+			poss.x = (_style.square_sz) * 0.5;
+		poss.y += (_size.y - _style.square_sz) * 0.5;
 		rv->translate((glm::vec2)poss + glm::vec2(0.5f, 0.5f));
 		int x = 0;
 		{
 			auto& it = v;
-			it.pos.x = x * p->style.square_sz * 2.5;
-			draw_checkbox(rv, &p->style, &it);
+			it.pos.x = x * p->_style.square_sz * 2.5;
+			draw_checkbox(rv, &p->_style, &it);
 			x++;
 		}
 		//rv->restore();

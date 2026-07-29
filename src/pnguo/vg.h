@@ -564,6 +564,7 @@ enum class BLENDMODE_E :int {
 	modulate,
 	screen
 };
+// 纹理渲染接口
 #ifndef TEX_CB
 #define TEX_CB
 struct texture_cb
@@ -612,24 +613,7 @@ struct texture_cb
 typedef struct texture_cb texture_cb;
 #endif
 
-// 路径填充描边
-
-struct fill_style_d {
-	uint32_t fill = 0;		// 填充颜色
-	uint32_t color = 0;		// 线颜色stroke
-	float thickness = 1;	// 线宽
-	glm::ivec4 round = {};	// 圆角
-	int cap = -1, join = -1;
-	int dash_offset = 0;
-	int dash_num = 0;		// 虚线计数 dash最大8、dash_p建议最大64
-	union {
-		uint64_t v = 0;
-		uint8_t v8[8];
-	}dash = {};		// ink  skip  ink  skip
-	float* dash_p = 0;		// 虚线逗号/空格分隔的数字
-};
-
-
+// 矢量接口
 struct rvg_cb {
 	void* ctx = 0;
 	// 路径操作
@@ -684,6 +668,18 @@ struct rvg_cb {
 	void(*set_fill_rule)(void* ctx, int fr);
 	void(*set_dash)(void* ctx, const float* dashes, uint32_t num_dashes, float offset);		// 虚线
 	void(*set_dash8)(void* ctx, uint64_t dashes, float offset);		// 虚线,用uint8_t v8[8]表示
+	// 图案：渐变/图片
+	void* (*new_surface)(void* ctx, int width, int height, uint32_t* data, int stride, int type);	// stride宽度，type: 0 rgba, 1 bgra
+	void* (*new_surface)(void* ctx, int width, int height, void* vkimage);					// 输入vkimage做源
+	void* (*new_pattern_linear)(void* ctx, float x0, float y0, float x1, float y1);
+	void* (*new_pattern_radial)(void* ctx, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
+	void* (*new_pattern_sweep)(void* ctx, float cx, float cy, float start_angle, float end_angle);
+	int (*pattern_set_color_stop)(void* pat, int idx, float r, float g, float b, float a);
+	void(*pattern_set_matrix)(void* pat, const void* matrix);	// mat3x2
+	void(*pattern_set_extend)(void* pat, int extend);
+	void(*pattern_set_filter)(void* pat, int filter);
+	void(*surface_destroy)(void* surf);
+	void(*pattern_destroy)(void* pat);
 };
 
 
