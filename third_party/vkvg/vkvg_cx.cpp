@@ -10100,7 +10100,6 @@ void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 				auto cs = clearStencil;
 				cs.clearValue.depthStencil.stencil = 0;
 				vkCmdClearAttachments(ctx->cmd, 1, &cs, 1, &ctx->clearRect);
-				dc_scissor(ctx, nullptr);
 			}
 		}
 		break;
