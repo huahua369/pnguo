@@ -565,8 +565,7 @@ enum class BLENDMODE_E :int {
 	screen
 };
 // 纹理渲染接口
-#ifndef TEX_CB
-#define TEX_CB
+
 struct texture_cb
 {
 	void* renderer = 0;
@@ -609,13 +608,13 @@ struct texture_cb
 	bool (*get_viewport)(void* renderer, glm::ivec4* rect);
 	bool (*get_cliprect)(void* renderer, glm::ivec4* rect);
 };
-#else
-typedef struct texture_cb texture_cb;
-#endif
 
 // 矢量接口
 struct rvg_cb {
 	void* ctx = 0;
+	// 视图
+	size_t(*new_view)(void* ctx, int x, int y, int width, int height);
+	size_t(*get_view)(void* ctx, int* width, int* height);	// 获取当前视图宽高可空，返回idx
 	// 路径操作
 	void* (*new_path)(void* ctx);
 	void(*clear_path)(void* path);
@@ -667,10 +666,10 @@ struct rvg_cb {
 	void(*set_operator)(void* ctx, int op);
 	void(*set_fill_rule)(void* ctx, int fr);
 	void(*set_dash)(void* ctx, const float* dashes, uint32_t num_dashes, float offset);		// 虚线
-	void(*set_dash8)(void* ctx, uint64_t dashes, float offset);		// 虚线,用uint8_t v8[8]表示
+	void(*set_dash8)(void* ctx, uint64_t dashes, float offset);								// 虚线,用uint8_t v8[8]表示
 	// 图案：渐变/图片
 	void* (*new_surface)(void* ctx, int width, int height, uint32_t* data, int stride, int type);	// stride宽度，type: 0 rgba, 1 bgra
-	void* (*new_surface_vk)(void* ctx, int width, int height, void* vkimage);					// 输入vkimage做源
+	void* (*new_surface_vk)(void* ctx, int width, int height, void* vkimage);						// 输入vkimage做源
 	void* (*new_pattern_linear)(void* ctx, float x0, float y0, float x1, float y1);
 	void* (*new_pattern_radial)(void* ctx, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
 	void* (*new_pattern_sweep)(void* ctx, float cx, float cy, float start_angle, float end_angle);
@@ -682,7 +681,20 @@ struct rvg_cb {
 	void(*pattern_destroy)(void* pat);
 };
 
+struct text_style;
+struct text_st;
+struct image_r;
+struct geometry_d;
 
+struct canvas_cb {
+	void* ctx = 0;
+	bool (*set_clip)(void* ctx, const glm::ivec4* rect);
+	void (*add_vg)(void* ctx, void* vgctx, size_t idx);
+	void (*add_text)(void* ctx, text_st* p, text_style* ts);
+	void (*add_image)(void* ctx, image_r* r);
+	// 添加原始三角形，纹理使用texture_cb创建
+	void (*add_geometry)(void* ctx, geometry_d* geo);
+};
 
 #endif // !VG_H
 

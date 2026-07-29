@@ -59,6 +59,7 @@
 #include <mapView.h>
 #include <stb_image.h>
 #include "tria.h"
+#include "vg.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -636,7 +637,7 @@ editor2d_cx::~editor2d_cx()
 void editor2d_cx::init(void* p, const texture_cb& cb)
 {
 	renderer = p;
-	tex_cb = cb;
+	//tex_cb = cb;
 }
 
 void editor2d_cx::set_config(const char* fn)
