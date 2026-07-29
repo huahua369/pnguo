@@ -286,6 +286,8 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	dcb.clip0(dctx);	// 取消所有裁剪
 	//dcb.rectangle(path, 0, 0, 300, 160, 10);
 	//dcb.clip(dctx, path);// 圆角矩形裁剪
+	float rc0[4] = { 0,0,-1,-1 };
+	//dcb.clip_rc(dctx, rc0);
 	dcb.rectangle(path, 200, 12, 300, 200, 10);
 	dcb.set_line_width(dctx, 6);	dcb.set_source_rgba(dctx, 0, 0.51, 1, 1);
 
@@ -297,6 +299,10 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	dcb.fill_preserve(dctx, path);// 填充
 	dcb.set_color(dctx, 0xff1181f1);
 	dcb.stroke(dctx, path);//描边
+
+
+	//float rc[4] = { 0, 0, 60, 100 };
+	//dcb.clip_rc(dctx, rc);
 	dcb.set_line_width(dctx, 6);
 	dcb.rectangle(path, 12, 12, 232, 70, 0);
 	dcb.new_sub_path(path);	dcb.arc(path, 64, 64, 40, 0, 2 * M_PI);
@@ -305,8 +311,8 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	dcb.set_source_rgba(dctx, 0, 0.7, 0, 1);	dcb.fill_preserve(dctx, path);//填充
 	dcb.set_source_rgba(dctx, 0, 0, 0, 1);	dcb.stroke(dctx, path); //描边
 
-	dcb.rectangle(path, 20, 150, 200, 100, 10);
-	dcb.clip(dctx, path);// 圆角矩形裁剪
+	//dcb.rectangle(path, 20, 150, 200, 100, 10);
+	//dcb.clip(dctx, path);// 圆角矩形裁剪
 	dcb.set_line_width(dctx, 6);	dcb.translate(dctx, 0, 128);
 	dcb.rectangle(path, 12, 12, 232, 70, 0);
 	dcb.new_sub_path(path); dcb.arc(path, 64, 64, 40, 0, 2 * M_PI);
@@ -319,7 +325,7 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	dcb.set_source_rgba(dctx, 0, 0, 0, 1);	dcb.stroke(dctx, path); //描边
 	dcb.translate(dctx, 0, -128);
 
-	dcb.clip0(dctx);
+	//dcb.clip0(dctx);
 	dcb.translate(dctx, 300, 0);
 	auto sg = dcb.new_pattern_sweep(dctx, 128, 128, 0, 2);
 	vkvg_pattern_add_color_stop(sg, 0.0, white, 1);
@@ -331,7 +337,6 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	//dcb.rectangle(path, 0, 0, 256, 256, 0);
 	dcb.arc(path, 128.0, 128.0, 80, 0, 2 * glm::pi<float>());
 	dcb.fill(dctx, path);
-
 	//dcb.clip0(dctx);
 	//dcb.translate(dctx, -300, 0);
 	//dcb.set_color(dctx, 0x800020ff);
@@ -888,7 +893,7 @@ int main() {
 	if (kba)
 		_CrtSetBreakAlloc(kba);
 	system(R"(rd /s /q C:\Users\hua\AppData\Local\Temp\SymbolCache\vgtest.pdb)");
-	//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
+	auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 
 	testgui();
 	return 0;

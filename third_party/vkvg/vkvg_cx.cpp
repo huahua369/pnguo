@@ -9727,7 +9727,7 @@ void bind_draw_pipeline(VkvgContext ctx, state_save_t* t) {
 	CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
 }
 
-void cmd_draw_full_screen_quad(VkvgContext ctx, vgdev_ctx::cmd_t* c, vec4* scissor)
+void cmd_draw_full_screen_quad(VkvgContext ctx, vgdev_ctx::cmd_t* c, vec4* scissor, VkRect2D* clip)
 {
 #if defined(DEBUG) && defined(VKVG_DBG_UTILS)
 	vkh_cmd_label_start(ctx->cmd, "_draw_full_screen_quad", DBG_LAB_COLOR_FSQ);
@@ -9749,7 +9749,7 @@ void cmd_draw_full_screen_quad(VkvgContext ctx, vgdev_ctx::cmd_t* c, vec4* sciss
 	fsq_patternType &= ~FULLSCREEN_BIT;
 	CmdPushConstants(ctx->cmd, ctx->dev->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 24, 4, &fsq_patternType);
 	if (scissor)
-		CmdSetScissor(ctx->cmd, 0, 1, &ctx->bounds);
+		CmdSetScissor(ctx->cmd, 0, 1, clip && clip->extent.width > 0 && clip->extent.height > 0 ? clip : &ctx->bounds);
 
 #if defined(DEBUG) && defined(VKVG_DBG_UTILS)
 	vkh_cmd_label_end(ctx->cmd);
@@ -9917,19 +9917,19 @@ void dc_update_push_constants(VkvgContext ctx, state_save_t* t) {
 	CmdPushConstants(ctx->cmd, ctx->dev->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &t->pushConsts);
 }
 
-void dc_scissor(VkvgContext ctx, vec4* scissor) {
+VkRect2D dc_scissor(VkvgContext ctx, vec4* scissor) {
+	VkRect2D r = { 0,0,-1,-1 };
 	if (ctx)
 	{
-		VkRect2D r = ctx->bounds;
+		r = ctx->bounds;
 		if (scissor)
 		{
-			int w = scissor->x < 0 ? scissor->width + scissor->x : scissor->width;
-			int h = scissor->y < 0 ? scissor->height + scissor->y : scissor->height;
-			r.offset = { (int32_t)MAX(scissor->x, 0), (int32_t)MAX(scissor->y, 0) };
-			r.extent = { (uint32_t)MAX(w, 1), (uint32_t)MAX(h, 1) };
+			r.offset = { (int32_t)scissor->x , (int32_t)scissor->y };
+			r.extent = { (uint32_t)MAX(scissor->width, 1), (uint32_t)MAX(scissor->height, 1) };
 		}
 		CmdSetScissor(ctx->cmd, 0, 1, &r);
 	}
+	return r;
 }
 void dc_clear(VkvgContext ctx) {
 	if (vkvg_status(ctx))
@@ -10023,6 +10023,7 @@ void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 	auto cwait_last = ctx->cmdFence[cmdidx];
 	ctx->cmdStarted = false;
 	dc_clear(ctx);
+	VkRect2D cuclip = {};
 	for (auto& it : cmdlist)
 	{
 		auto t = it.state;
@@ -10044,7 +10045,7 @@ void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 				}
 				bind_draw_pipeline(ctx, it.state);
 				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
-				cmd_draw_full_screen_quad(ctx, &it, &it.bounds);
+				cmd_draw_full_screen_quad(ctx, &it, &it.bounds, &cuclip);
 				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
 			}
 			else {
@@ -10062,14 +10063,15 @@ void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 		break;
 		case 2:
 		{// 裁剪
-#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
-			vkh_cmd_label_start(ctx->cmd, "clip", DBG_LAB_COLOR_CLIP);
-#endif
 			int bw = it.bounds.width; int bh = it.bounds.height;
 			if (bw != 0 && bh != 0) {
-				dc_scissor(ctx, bw < 0 || bh < 0 ? nullptr : &it.bounds);
+				cuclip = dc_scissor(ctx, bw < 0 || bh < 0 ? nullptr : &it.bounds);
+				break;
 			}
-			else if (it.vc > 0 || it.index.y > 0) {
+			if (it.vc > 0 || it.index.y > 0) {
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+				vkh_cmd_label_start(ctx->cmd, "clip", DBG_LAB_COLOR_CLIP);
+#endif
 				if (t && t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
 					CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelinePolyFill);
 					for (size_t i = 0; i < it.vc; i++)
@@ -10088,17 +10090,18 @@ void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 				CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
 				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
 				CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_ALL_BIT);
-				cmd_draw_full_screen_quad(ctx, &it, NULL);
+				cmd_draw_full_screen_quad(ctx, &it, NULL, 0);
 				ctx->curClipState = vkvg_clip_state_clip;
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+				vkh_cmd_label_end(ctx->cmd);
+#endif
 			}
 			else {
 				auto cs = clearStencil;
 				cs.clearValue.depthStencil.stencil = 0;
 				vkCmdClearAttachments(ctx->cmd, 1, &cs, 1, &ctx->clearRect);
+				dc_scissor(ctx, nullptr);
 			}
-#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
-			vkh_cmd_label_end(ctx->cmd);
-#endif
 		}
 		break;
 		}

@@ -670,7 +670,7 @@ struct rvg_cb {
 	void(*set_dash8)(void* ctx, uint64_t dashes, float offset);		// 虚线,用uint8_t v8[8]表示
 	// 图案：渐变/图片
 	void* (*new_surface)(void* ctx, int width, int height, uint32_t* data, int stride, int type);	// stride宽度，type: 0 rgba, 1 bgra
-	void* (*new_surface)(void* ctx, int width, int height, void* vkimage);					// 输入vkimage做源
+	void* (*new_surface_vk)(void* ctx, int width, int height, void* vkimage);					// 输入vkimage做源
 	void* (*new_pattern_linear)(void* ctx, float x0, float y0, float x1, float y1);
 	void* (*new_pattern_radial)(void* ctx, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
 	void* (*new_pattern_sweep)(void* ctx, float cx, float cy, float start_angle, float end_angle);
