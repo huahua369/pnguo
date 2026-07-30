@@ -265,11 +265,135 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 	}
 #endif
 }
+
+struct stops_t {
+	float o;
+	float x, y, z, w;
+};
+
+/*
+用 bezier curve（贝塞尔曲线） 来设置 color stop（颜色渐变规则），
+这里使用下面的曲线形式，其中
+X轴为 offset（偏移量，取值范围为 0~1，0 代表阴影绘制起点），
+Y轴为 alpha（颜 色透明度，取值范围为0~1，0 代表完全透明），
+*/
+
+void draw_rect_gradient(rvg_cb* cr, int width, int height, const rect_shadow_t* pr, std::vector<stops_t>* tem)
+{
+	auto& rs = *pr;
+	static std::vector<stops_t> color_stops;
+	static std::vector<glm::vec2> _bv;
+	float radius = rs.radius;
+	if (radius < 1 || width < 2 || height < 2)
+		return;
+	if (!tem)
+		tem = &color_stops;
+	get_bezier_ptr(&rs.cubic, 1, rs.segment > 3 ? rs.segment : 3, &_bv);
+	auto& bv = _bv;
+	for (size_t i = 0; i < bv.size(); i++)
+	{
+		float ratio = bv[i].x;
+		float a = bv[i].y;
+		glm::vec4 color = glm::mix(rs.cfrom, rs.cto, ratio);
+		tem->push_back({ ratio,color.x, color.y, color.z, color.w * a });
+	}
+	if (width < 2 * radius)
+	{
+		width = 2 * radius;
+	}
+	if (height < 2 * radius)
+	{
+		height = 2 * radius;
+	}
+
+	//# radial gradient center points for four corners, top - left, top - right, etc
+	glm::vec2 corner_tl = glm::vec2(radius, radius);
+	glm::vec2 corner_tr = glm::vec2(width - radius, radius);
+	glm::vec2 corner_bl = glm::vec2(radius, height - radius);
+	glm::vec2 corner_br = glm::vec2(width - radius, height - radius);
+	std::vector<glm::vec2> corner_points = { corner_tl, corner_tr, corner_br, corner_bl };
+
+	//# linear gradient rectangle info for four sides
+	glm::vec4 side_top = glm::vec4(radius, 0, width - 2 * radius, radius);
+	glm::vec4 side_bottom = glm::vec4(radius, height - radius, width - 2 * radius, radius);
+	glm::vec4 side_left = glm::vec4(0, radius, radius, height - 2 * radius);
+	glm::vec4 side_right = glm::vec4(width - radius, radius, radius, height - 2 * radius);
+#ifndef M_PI
+#define M_PI 3.1415926
+#endif
+	//# draw four corners through radial gradient
+	int i = 0;
+	auto ph = cr->new_path(cr->ctx);
+	for (auto& point : corner_points)
+	{
+		auto rg = cr->new_pattern_radial(cr->ctx, point[0], point[1], 0, point[0], point[1], radius, false);
+		for (auto& stop : *tem)
+		{
+			cr->pattern_set_color_stop(rg, stop.o, stop.x, stop.y, stop.z, stop.w);
+		}
+		cr->move_to(ph, point[0], point[1]);
+		double	angle1 = M_PI + 0.5 * M_PI * i, angle2 = angle1 + 0.5 * M_PI;
+		cr->arc(ph, point[0], point[1], radius, angle1, angle2);
+		cr->set_source(cr, rg);
+		cr->fill(cr);
+		cr->pattern_destroy(rg);
+		i++;
+	}
+
+	//# draw four sides through linear gradient
+	//# top side
+
+	auto lg_top = cr->new_pattern_linear(cr->ctx, side_top[0], side_top[1] + radius, side_top[0], side_top[1]);
+	for (auto& stop : *tem)
+	{
+		cr->pattern_set_color_stop(lg_top, stop.o, stop.x, stop.y, stop.z, stop.w);
+	}
+
+	cr->rectangle(ph, side_top.x, side_top.y, side_top.z, side_top.w);
+	cr->set_source(cr, lg_top);
+	cr->fill(cr);
+
+	//# bottom side
+	auto lg_bottom = cr->new_pattern_linear(cr->ctx, side_bottom[0], side_bottom[1], side_bottom[0], side_bottom[1] + radius);
+	for (auto& stop : *tem)
+	{
+		cr->pattern_set_color_stop(lg_bottom, stop.o, stop.x, stop.y, stop.z, stop.w);
+	}
+	cr->rectangle(cr, side_bottom.x, side_bottom.y, side_bottom.z, side_bottom.w);
+	cr->set_source(cr, lg_bottom);
+	cr->fill(cr);
+
+	//# left side
+	auto lg_left = cr->new_pattern_linear(cr->ctx, side_left[0] + radius, side_left[1], side_left[0], side_left[1]);
+	for (auto& stop : *tem)
+	{
+		cr->pattern_set_color_stop(lg_left, stop.o, stop.x, stop.y, stop.z, stop.w);
+	}
+	cr->rectangle(cr, side_left.x, side_left.y, side_left.z, side_left.w);
+	cr->set_source(cr, lg_left);
+	cr->fill(cr);
+
+	//# right side
+	auto lg_right = cr->new_pattern_linear(cr->ctx, side_right[0], side_right[1], side_right[0] + radius, side_right[1]);
+	for (auto& stop : *tem)
+	{
+		cr->pattern_set_color_stop(lg_right, stop.o, stop.x, stop.y, stop.z, stop.w);
+	}
+	cr->rectangle(cr, side_right.x, side_right.y, side_right.z, side_right.w);
+	cr->set_source(cr, lg_right);
+	cr->fill(cr);
+
+	cr->pattern_destroy(lg_top);
+	cr->pattern_destroy(lg_bottom);
+	cr->pattern_destroy(lg_left);
+	cr->pattern_destroy(lg_right);
+}
+
 void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize, bool wait) {
 	const char* filename = "temp/vkvg_gradient.png";
 	static auto dctx = new_vgctx();
 	//free_vgctx(dctx);
-	auto M_PI = glm::pi<float>();
+	auto m_pi = glm::pi<float>();
 	drawctx_t dcb = get_drawctx(dctx);
 	auto cr = vkvg_create(surf);
 
@@ -305,8 +429,8 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	//dcb.clip_rc(dctx, rc);
 	dcb.set_line_width(dctx, 6);
 	dcb.rectangle(path, 12, 12, 232, 70, 0);
-	dcb.new_sub_path(path);	dcb.arc(path, 64, 64, 40, 0, 2 * M_PI);
-	dcb.new_sub_path(path);	dcb.arc_negative(path, 192, 64, 40, 0, -2 * M_PI);
+	dcb.new_sub_path(path);	dcb.arc(path, 64, 64, 40, 0, 2 * m_pi);
+	dcb.new_sub_path(path);	dcb.arc_negative(path, 192, 64, 40, 0, -2 * m_pi);
 	dcb.set_fill_rule(dctx, VKVG_FILL_RULE_EVEN_ODD);
 	dcb.set_source_rgba(dctx, 0, 0.7, 0, 1);	dcb.fill_preserve(dctx, path);//填充
 	dcb.set_source_rgba(dctx, 0, 0, 0, 1);	dcb.stroke(dctx, path); //描边
@@ -315,8 +439,8 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	//dcb.clip(dctx, path);// 圆角矩形裁剪
 	dcb.set_line_width(dctx, 6);	dcb.translate(dctx, 0, 128);
 	dcb.rectangle(path, 12, 12, 232, 70, 0);
-	dcb.new_sub_path(path); dcb.arc(path, 64, 64, 40, 0, 2 * M_PI);
-	dcb.new_sub_path(path); dcb.arc_negative(path, 192, 64, 40, 0, -2 * M_PI);
+	dcb.new_sub_path(path); dcb.arc(path, 64, 64, 40, 0, 2 * m_pi);
+	dcb.new_sub_path(path); dcb.arc_negative(path, 192, 64, 40, 0, -2 * m_pi);
 	dcb.set_glutess(dctx, true);
 	dcb.set_fill_rule(dctx, VKVG_FILL_RULE_NON_ZERO);
 	dcb.set_source_rgba(dctx, 0, 0, 0.9, 1);	dcb.fill_preserve(dctx, path);// 填充
@@ -358,6 +482,22 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	//dcb.arc(path, 128.0, 128.0, 76.8, 0, 2 * glm::pi<float>());
 	////vkvg_rectangle(cr, 0, 0, 256, 256);
 	//dcb.fill(dctx, path);
+
+	struct rect_shadow_taa
+	{
+		float radius = 4;	// 半径
+		int segment = 6;	// 细分段
+		glm::vec4 cfrom = { 0,0,0,0.8 }, cto = { 0.5,0.5,0.5,0.5 };// 颜色从cf到ct
+		/*	cubic
+			X轴为 offset（偏移量，取值范围为 0~1，0 代表阴影绘制起点），
+			Y轴为 alpha（颜 色透明度，取值范围为0~1，0 代表完全透明），
+		*/
+		cubic_v cubic = { {0.0,0.6},{0.5,0.39},{0.4,0.1},{1.0,0.0 } };
+	};
+	rect_shadow_t rs = {};
+	rvg_cb* rb = 0;
+	draw_rect_gradient(rb, 100, 100, &rs, 0);
+
 
 	auto sem = dcb.draw(dctx, (VkvgContext)cr, 0);//批量执行，返回vksem
 	dcb.end_frame(dctx);

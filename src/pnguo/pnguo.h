@@ -473,6 +473,7 @@ namespace gpv {
 }
 
 std::vector<glm::vec2> get_bezier(const cubic_v* path, size_t n, double m);
+void get_bezier_ptr(const cubic_v* path, size_t n, double m, std::vector<glm::vec2>* r);
 int make_grid(const glm::vec2& vsize, const glm::vec3& step_width, glm::vec2 nps, path_v* data);
 
 namespace gp {

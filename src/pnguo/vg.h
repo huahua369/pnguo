@@ -320,45 +320,6 @@ struct image_d {
 	size_t res_idx;		// 资源序号
 };
 
-struct clip_rect_d {
-	glm::vec2 pos;
-	glm::vec2 size;
-};
-enum class VG_DRAW_CMD :uint8_t {
-	VG_CMD_CLEAR = 0,
-	VG_CMD_SAVE,
-	VG_CMD_RESTORE,
-	VG_CMD_CLIP_RECT,
-	VG_CMD_RECT,
-	VG_CMD_RECT4R,
-	VG_CMD_CIRCLE,
-	VG_CMD_ELLIPSE,
-	VG_CMD_TRIANGLE,
-	VG_CMD_FILL_GRID,
-	VG_CMD_FILL_LINEAR,
-	VG_CMD_STROKE_LINE,
-	VG_CMD_STROKE_POLYLINE,
-	//VG_CMD_IMAGE,
-	//VG_CMD_TEXT,
-};
-/*
-渲染命令函数，
-ctx：渲染上下文指针
-cmds：命令数组
-count：命令数量
-data：命令数据指针
-size：数据大小
-order：渲染顺序，0=默认，数值越小，越靠前
-*/
-struct vg_style_data {
-	fill_style_d* fs;
-	size_t fs_count;
-	text_style_d* ts;
-	size_t ts_count;
-};
-typedef void (*vg_draw_cmd_fun)(void* ctx, uint8_t* cmds, size_t count, void* data, size_t size, vg_style_data* style);
-typedef void (*vg_draw_path_fun)(void* ctx, path_d* path, fill_style_d* style);
-
  
 struct text_style_data
 {
@@ -666,7 +627,7 @@ struct rvg_cb {
 	void(*set_operator)(void* ctx, int op);
 	void(*set_fill_rule)(void* ctx, int fr);
 	void(*set_dash)(void* ctx, const float* dashes, uint32_t num_dashes, float offset);		// 虚线
-	void(*set_dash8)(void* ctx, uint64_t dashes, float offset);								// 虚线,用uint8_t v8[8]表示
+	void(*set_dash8)(void* ctx, uint64_t dashes, uint32_t num_dashes, float offset);								// 虚线,用uint8_t v8[8]表示
 	// 图案：渐变/图片
 	void* (*new_surface)(void* ctx, int width, int height, uint32_t* data, int stride, int type);	// stride宽度，type: 0 rgba, 1 bgra
 	void* (*new_surface_vk)(void* ctx, int width, int height, void* vkimage);						// 输入vkimage做源

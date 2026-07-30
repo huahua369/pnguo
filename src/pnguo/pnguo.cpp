@@ -1280,7 +1280,7 @@ bool in_box_cr(const glm::vec2& p, const glm::vec4* c)
 		if ((int)c->w > 0)
 		{
 			auto r = *c;
-			ret = in_rect_box(r,p);// !((p.x < r.x) || (p.y < r.y) || (p.x > r.x + r.z - 1) || (p.y > r.y + r.w - 1));
+			ret = in_rect_box(r, p);// !((p.x < r.x) || (p.y < r.y) || (p.x > r.x + r.z - 1) || (p.y > r.y + r.w - 1));
 		}
 		else {
 			//计算点p和 当前圆圆心c 的距离
@@ -2333,6 +2333,14 @@ std::vector<glm::vec2> get_bezier(const cubic_v* path, size_t n, double m)
 		bs::sol4((glm::vec2*)path, n * 4, m, true, r);
 	}
 	return r;
+}
+void get_bezier_ptr(const cubic_v* path, size_t n, double m, std::vector<glm::vec2>* r)
+{
+	if (path && n > 0 && r)
+	{
+		bs::sol4((glm::vec2*)path, n * 4, m, true, *r);
+	}
+	return;
 }
 std::vector<glm::dvec2> get_bezier64(const cubic_v* path, size_t n, double m)
 {
