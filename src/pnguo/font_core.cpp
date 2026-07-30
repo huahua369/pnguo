@@ -6131,13 +6131,7 @@ void free_fonts_ctx(font_rctx* p)
 
 
 
-
-internal_text_cx::internal_text_cx()
-{}
-
-internal_text_cx::~internal_text_cx()
-{}
-
+ 
 
 
 #endif

@@ -25,7 +25,7 @@ struct itd_t
 {
 	std::string str;
 	mitem_t* child = 0;
-}; 
+};
 // 显示工具提示面板 
 void show_tooltip(form_x* form, const std::string& str, const glm::ivec2& pos, style_tooltip* bc);
 void hide_tooltip(form_x* form);
@@ -75,7 +75,7 @@ private:
 };
 
 
- 
+
 struct action_show_t
 {
 	void* ptr = 0;
@@ -160,14 +160,6 @@ action_t* move2inc(const glm::vec2& pad, float mt, float wait);
 action_t* at_size(const glm::vec2& dst, float mt);
 action_show_t* wait_show(bool visible, float wait);
 
-class listview_x
-{
-public:
-	listview_x();
-	~listview_x();
-	void set_style(text_style_t* t);
-private:
-};
 
 namespace hz {
 	// LinearRGB转换为sRGB：0-1的数值

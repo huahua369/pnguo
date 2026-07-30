@@ -363,115 +363,6 @@ public:
 	uint32_t block_idx = 0;
 	uint32_t tb_idx = 0;
 };
-/*
-	LINE_CAP_BUTT,0
-	LINE_CAP_ROUND,1
-	LINE_CAP_SQUARE2
-	LINE_JOIN_MITER,0
-	LINE_JOIN_ROUND,1
-	LINE_JOIN_BEVEL2
-	*/
-struct vg_style_t {
-	uint32_t fill = 0;// 填充颜色
-	uint32_t color = 0;		// 线颜色
-	float thickness = 1;	// 线宽
-	int round = 0;			// 圆角
-	int cap = -1, join = -1;
-	int dash_offset = 0;
-	int dash_num = 0;		// 虚线计数 dash最大8、dash_p最大64
-	union {
-		uint64_t v = 0;
-		uint8_t v8[8];
-	}dash = {};		// ink  skip  ink  skip
-	float* dash_p = 0;		// 虚线逗号/空格分隔的数字
-};
-/*	vg_style_t st[1] = {};
-	st->dash = 0xF83E0;//0b11111000001111100000
-	st->dash_num = 20;
-	st->thickness = 1;
-	st->join = 1;
-	st->cap = 1;
-	st->fill = 0x80FF7373;
-	st->color = 0xffffffff;
-	*/
-	//struct text_layout_t
-	//{
-	//	PangoLayout* layout = 0;
-	//	font_rctx* ctx = 0;
-	//	glm::ivec2 pos = {};
-	//	glm::ivec2 rc = {};
-	//	int lineheight = 0;
-	//	int baseline = 0;
-	//	int text_color = -1;
-	//	bool once = false;
-	//};
-
-struct text_style_t
-{
-	int font = 0;
-	int font_size = 18;
-	glm::vec2 text_align = { 0.0,0.5 };
-	glm::vec2 shadow_pos = { 1.0,1.0 };
-	uint32_t text_color = 0xffffffff;
-	uint32_t text_color_shadow = 0;
-	bool clip = true;
-};
-
-struct text_style_tx
-{
-	text_style_t st = {};	// 文本样式
-	vg_style_t rcst = {};	// 背景矩形样式
-};
-//typedef enum TTF_Direction
-//{
-//	TTF_DIRECTION_INVALID = 0,
-//	TTF_DIRECTION_LTR = 4,        /**< Left to Right */
-//	TTF_DIRECTION_RTL,            /**< Right to Left */
-//	TTF_DIRECTION_TTB,            /**< Top to Bottom */
-//	TTF_DIRECTION_BTT             /**< Bottom to Top */
-//} TTF_Direction;
-
-struct text_ayout_t
-{
-	int direction;
-	uint32_t script;
-	int font_height;
-	int* lines;
-	int wrap_length;
-	bool wrap_whitespace_visible;
-};
-struct text_data
-{
-	font_t* font = 0;
-	text_style_t st = {};
-	text_ayout_t* layout;
-	int x, y, w, h;
-	uint32_t props = 0;
-	bool needs_engine_update;
-	bool needs_layout_update;
-};
-// 文件对象
-struct text_t
-{
-	char* text = 0;
-	int num_lines = 0;
-	text_data* internal = 0;
-};
-
-class internal_text_cx
-{
-public:
-	text_t text = {};
-	text_data internal = {};
-	text_ayout_t layout = {};
-public:
-	internal_text_cx();
-	~internal_text_cx();
-
-private:
-
-};
-
 struct text_path_t
 {
 	std::vector<tinypath_t> tv;	// 每个字的路径
@@ -483,12 +374,6 @@ struct text_image_t
 	std::vector<font_item_t> tv;
 
 };
-//struct text_atlas_t
-//{
-//	atlas_t atlas = {};
-//	image_ptr_t ipt = {};
-//};
-
 // Histogram
 class yHist
 {

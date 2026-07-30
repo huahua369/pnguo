@@ -61,31 +61,27 @@ void hide_tooltip(form_x* form)
 	if (form && form->tooltip)form->tooltip->hide();
 }
 
- 
+
 
 // todo 列表视图
 #if 1
 
 list_box_cx::list_box_cx()
-{
-}
+{}
 
 list_box_cx::~list_box_cx()
-{
-}
+{}
 
 dialog_cx::dialog_cx()
-{
-}
+{}
 
 dialog_cx::~dialog_cx()
-{
-}
+{}
 
 #endif // 1
 
 #if 1
- 
+
 // 渲染树节点
 //void draw_treenode(cairo_t* cr, layout_text_x* ltx)
 //{
@@ -1115,17 +1111,6 @@ void new_tree2(const std::vector<dv_t>& d, tree2_info_t* info, std::function<voi
 #endif
 
 
-
-listview_x::listview_x()
-{
-}
-
-listview_x::~listview_x()
-{
-}
-void listview_x::set_style(text_style_t* t)
-{
-}
 
 #if 1
 #include <regex>

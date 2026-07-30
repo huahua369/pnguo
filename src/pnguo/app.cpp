@@ -53,6 +53,20 @@ namespace nlohmann {
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(glm::ivec4, x, y, z, w)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(glm::vec4, x, y, z, w)
 }
+// 文本样式
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(text_style_data,
+	family, styles,
+	fontsize,
+	lineheight,
+	align,
+	shadow_pos,
+	stroke,
+	color,
+	color_stroke,
+	color_shadow,
+	mcolor_effect
+)
+// flex属性
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(flex_data,
 	width, height,
 	left, right, top, bottom,
@@ -73,19 +87,6 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(flex_data1,
 	should_order_children
 )
 
-// 文本样式
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(text_style_str,
-	family, styles,
-	fontsize,
-	lineheight,
-	align,
-	shadow_pos,
-	stroke,
-	color,
-	color_stroke,
-	color_shadow,
-	mcolor_effect
-)
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(btn_cols_t,
 	font_color,
@@ -111,7 +112,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(color_style,
 
 std::string save_text_style_str(font_rctx* ctx, const text_style* t, int indent)
 {
-	text_style_str data;
+	text_style_data data;
 	if (!ctx || !t) return "";
 	auto fs = get_font_family_str(ctx, t->family);
 	data.family = fs.family;
@@ -133,7 +134,7 @@ bool load_text_style_str(font_rctx* ctx, const std::string& json_str, text_style
 {
 	if (!ctx || !t || json_str.empty())return false;
 	njson0 j = njson0::parse(json_str);
-	auto ss = j.get<text_style_str>();
+	auto ss = j.get<text_style_data>();
 	text_style ts;
 	if (ctx)
 		ts.family = new_font_family(ctx, ss.family.c_str(), ss.styles.c_str());

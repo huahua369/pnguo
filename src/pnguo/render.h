@@ -259,12 +259,6 @@ class packer_base;
 
 // SDL渲染器专用
 typedef struct texture_cb texture_cb;
-struct text_vx
-{
-	glm::vec2 pos;
-	glm::vec2 uv;
-	glm::vec4 color;
-};
 struct submit_color_d
 {
 	uint32_t fill, color; int linewidth;
@@ -358,6 +352,12 @@ struct d2_rt {
 struct surface_ctx {
 	void* surface;
 	void* ctx;
+};
+struct text_vx
+{
+	glm::vec2 pos;
+	glm::vec2 uv;
+	glm::vec4 color;
 };
 struct draw_cmd
 {

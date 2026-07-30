@@ -359,8 +359,8 @@ struct vg_style_data {
 typedef void (*vg_draw_cmd_fun)(void* ctx, uint8_t* cmds, size_t count, void* data, size_t size, vg_style_data* style);
 typedef void (*vg_draw_path_fun)(void* ctx, path_d* path, fill_style_d* style);
 
-
-struct text_style_str
+ 
+struct text_style_data
 {
 	std::string family;				// 字体名称，逗号分隔
 	std::string styles;				// 字体风格，逗号分隔
@@ -624,10 +624,10 @@ struct rvg_cb {
 	void(*get_current_point)(void* path, float* x, float* y);
 	// 添加数据到当前路径，参考path_type_e
 	void(*add_path)(void* path, float* data, size_t count);
-	void(*line_to)(void* path, float x, float y);
-	void(*rel_line_to)(void* path, float dx, float dy);
 	void(*move_to)(void* path, float x, float y);
 	void(*rel_move_to)(void* path, float x, float y);
+	void(*line_to)(void* path, float x, float y);
+	void(*rel_line_to)(void* path, float dx, float dy);
 	void(*arc)(void* path, float xc, float yc, float radius, float a1, float a2);
 	void(*arc_negative)(void* path, float xc, float yc, float radius, float a1, float a2);
 	void(*curve_to)(void* path, float x1, float y1, float x2, float y2, float x3, float y3);
@@ -688,11 +688,16 @@ struct geometry_d;
 
 struct canvas_cb {
 	void* ctx = 0;
-	bool (*set_clip)(void* ctx, const glm::ivec4* rect);
+	// 清空数据
+	void (*clear)(void* ctx);
+	bool (*clip)(void* ctx, const glm::ivec4* rect);
+	// 添加预渲染矢量图索引
 	void (*add_vg)(void* ctx, void* vgctx, size_t idx);
+	// 添加文本，风格
 	void (*add_text)(void* ctx, text_st* p, text_style* ts);
+	// 普通图片，支持九宫格、混合颜色
 	void (*add_image)(void* ctx, image_r* r);
-	// 添加原始三角形，纹理使用texture_cb创建
+	// 添加原始三角形
 	void (*add_geometry)(void* ctx, geometry_d* geo);
 };
 

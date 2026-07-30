@@ -827,9 +827,7 @@ int inflate2flatten(path_v* p, path_v* dst, inflate_t* t);
 void save_png_v(path_v* pv, int count, const std::string& fn, bool fy, float sc);
 
 class gshadow_cx;
-class plane_cx;
-struct text_style_t;
-struct text_style_tx;
+class plane_cx;  
 struct vg_style_t;
 
 struct grid_div
