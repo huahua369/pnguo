@@ -11178,17 +11178,18 @@ VkvgPattern dc_pattern_create_sweep(vgdev_ctx* ctx, float cx, float cy, float st
 	return pat;
 }
 
-vkvg_status_t dc_pattern_set_color_stop(VkvgPattern pat, int idx, float r, float g, float b, float a) {
+vkvg_status_t dc_pattern_set_color_stop(VkvgPattern pat, int idx, float offset, float r, float g, float b, float a) {
 	if (vkvg_pattern_status(pat))
 		return vkvg_pattern_status(pat);
 	if (pat->type == VKVG_PATTERN_TYPE_SURFACE || pat->type == VKVG_PATTERN_TYPE_SOLID)
 		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
 	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
 	if (idx < 0 || idx >= MAX_STOPS)return VKVG_STATUS_PATTERN_INVALID_GRADIENT;
-	if (idx > grad->count)
+	if (idx >= grad->count)
 		grad->count = idx + 1;
 	vkvg_color_t c = { r, g, b, a };
 	grad->colors[idx] = c;
+	grad->stops[idx] = offset;
 	return VKVG_STATUS_SUCCESS;
 }
 
@@ -11750,10 +11751,15 @@ void* rvg_new_pattern_sweep(void* ctx, float cx, float cy, float start_angle, fl
 	auto p = (vgdev_ctx*)ctx;
 	return dc_pattern_create_sweep(p, cx, cy, start_angle, end_angle);
 }
-int  rvg_pattern_set_color_stop(void* pat, int idx, float r, float g, float b, float a)
+int  rvg_pattern_set_color_stop(void* pat, int idx, float o, float r, float g, float b, float a)
 {
 	auto p = (VkvgPattern)pat;
-	return dc_pattern_set_color_stop(p, idx, r, g, b, a);
+	return dc_pattern_set_color_stop(p, idx, o, r, g, b, a);
+}
+int  rvg_pattern_add_color_stop(void* pat, float o, float r, float g, float b, float a)
+{
+	auto p = (VkvgPattern)pat;
+	return vkvg_pattern_add_color_stop(p, o, r, g, b, a);
 }
 void rvg_pattern_set_matrix(void* pat, const void* matrix)
 {
@@ -11793,124 +11799,67 @@ void init_rvg(vgdev_ctx* ptr, rvg_cb* r) {
 	r->get_view == rvg_get_view;
 	// 路径操作	// 路径操作
 	r->new_path = rvg_new_path;
-
 	r->clear_path = rvg_clear_path;
-
 	r->close_path = rvg_close_path;
-
 	r->new_sub_path = rvg_new_sub_path;
-
 	r->path_extents = rvg_path_extents;
-
 	r->get_current_point = rvg_get_current_point;
-
 	// 添加数据到当前路径，参考path_type_e	// 添加数据到当前路径，参考path_type_e
 	r->add_path = rvg_add_path;
-
 	r->move_to = rvg_move_to;
-
 	r->rel_move_to = rvg_rel_move_to;
-
 	r->line_to = rvg_line_to;
-
 	r->rel_line_to = rvg_rel_line_to;
-
 	r->arc = rvg_arc;
-
 	r->arc_negative = rvg_arc_negative;
-
 	r->curve_to = rvg_curve_to;
-
 	r->rel_curve_to = rvg_rel_curve_to;
-
 	r->quadratic_to = rvg_quadratic_to;
-
 	r->rel_quadratic_to = rvg_rel_quadratic_to;
-
 	r->rectangle = rvg_rectangle;
-
 	r->rounded_rectangle = rvg_rounded_rectangle;
-
 	r->rounded_rectangle2 = rvg_rounded_rectangle2;
-
 	r->ellipse = rvg_ellipse;
-
 	r->elliptic_arc_to = rvg_elliptic_arc_to;
-
 	r->rel_elliptic_arc_to = rvg_rel_elliptic_arc_to;
-
-
 	// 渲染操作	// 渲染操作
 	r->stroke = rvg_stroke;
-
 	r->stroke_preserve = rvg_stroke_preserve;
-
 	r->fill = rvg_fill;
-
 	r->fill_preserve = rvg_fill_preserve;
-
 	r->paint = rvg_paint;
-
 	r->clear = rvg_clear;
-
 	r->reset_clip = rvg_reset_clip;
-
 	r->clip = rvg_clip;
-
 	r->clip_preserve = rvg_clip_preserve;
-
 	r->scissor = rvg_scissor;
-
 	// 配置	// 配置
 	r->set_opacity = rvg_set_opacity;
-
 	r->set_source_color = rvg_set_source_color;
-
 	r->set_source_rgba = rvg_set_source_rgba;
-
 	r->set_source_rgb = rvg_set_source_rgb;
-
 	r->set_line_width = rvg_set_line_width;
-
 	r->set_miter_limit = rvg_set_miter_limit;
-
 	r->set_line_cap = rvg_set_line_cap;
-
 	r->set_line_join = rvg_set_line_join;
-
 	r->set_source_surface = rvg_set_source_surface;
-
 	r->set_source = rvg_set_source;
-
 	r->set_operator = rvg_set_operator;
-
 	r->set_fill_rule = rvg_set_fill_rule;
-
 	r->set_dash = rvg_set_dash;
-
 	r->set_dash8 = rvg_set_dash8;
-
 	// 图案：渐变/图片	// 图案：渐变/图片
 	r->new_surface = rvg_new_surface;
-
 	r->new_surface_vk = rvg_new_surface_vk;
-
 	r->new_pattern_linear = rvg_new_pattern_linear;
-
 	r->new_pattern_radial = rvg_new_pattern_radial;
-
 	r->new_pattern_sweep = rvg_new_pattern_sweep;
-
+	r->pattern_add_color_stop = rvg_pattern_add_color_stop;
 	r->pattern_set_color_stop = rvg_pattern_set_color_stop;
-
 	r->pattern_set_matrix = rvg_pattern_set_matrix;
-
 	r->pattern_set_extend = rvg_pattern_set_extend;
-
 	r->pattern_set_filter = rvg_pattern_set_filter;
-
 	r->surface_destroy = rvg_surface_destroy;
-
 	r->pattern_destroy = rvg_pattern_destroy;
 
 

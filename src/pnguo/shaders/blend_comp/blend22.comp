@@ -1,0 +1,76 @@
+#version 450
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(binding = 0, rgba8) uniform readonly image2D aSampler;
+layout(binding = 1, rgba8) uniform readonly image2D bSampler;
+layout(binding = 2, rgba8) uniform image2D outputImage;
+
+void main()
+{
+	vec4 a;
+	vec4 b;
+	vec4 c;
+	vec4 f;
+	vec4 t1;
+	float f1;
+	ivec2 uv;
+	uv = ivec2(gl_GlobalInvocationID.xy);
+	a = imageLoad(aSampler, uv);
+	b = imageLoad(bSampler, uv);
+	//  *begin
+	// 1.正常
+	c = a * (1 - b.a) + b * (b.a);
+	// 2.变暗darken
+	c = min(a, b);
+	// 3.变亮
+	c = max(a, b);
+	// 4.正片叠底
+	c = a * b;
+	// 5.滤色（屏幕）
+	c = 1 - ((1 - c) * (1 - b));
+	// 6.颜色加深
+	c = a - ((1 - a) * (1 - b)) / b;
+	// 7.颜色减淡
+	c = a + (a * b) / (1 - b);
+	// 8.线性加深  
+	c = a + b - 1;
+	// 9.线性减淡  
+	c = a + b;
+	// 10.叠加
+	t1 = vec4(0.5, 0.5, 0.5, 0.5);
+	f = step(a, t1);
+	c = f * a * b * 2 + (1 - f) * (1 - (1 - a) * (1 - b) * 2);
+	// 11.强光
+	f = step(b, t1);
+	c = f * a * b * 2 + (1 - f) * (1 - (1 - a) * (1 - b) * 2);
+	// 12.柔光
+	f = step(b, t1);
+	c = f * (a * b * 2 + a * a * (1 - b * 2)) + (1 - f) * (a * (1 - b) * 2 + sqrt(a) * (2 * b - 1));
+	// 13.亮光
+	f = step(b, t1);
+	c = f * (a - (1 - a) * (1 - 2 * b) / (2 * b)) + (1 - f) * (a + a * (2 * b - 1) / (2 * (1 - b)));
+	// 14.点光
+	f = step(b, t1);
+	c = f * (min(a, 2 * b)) + (1 - f) * (max(a, (b * 2 - 1)));
+	// 15.线性光
+	c = a + 2 * b - 1;
+	// 16.实色混合
+	t1 = vec4(1, 1, 1, 1);
+	f = step(a + b, t1);
+	c = f * (vec4(0, 0, 0, 0) + (1 - f) * t1);
+	// 17.排除
+	c = a + b - a * b * 2;
+	// 18.差值  
+	c = abs(a - b);
+	// 19.深色
+	f1 = step(b.r + b.g + b.b, a.r + a.g + a.b);
+	c = f1 * b + (1 - f1) * a;
+	// 20.浅色
+	f1 = step(b.r + b.g + b.b, a.r + a.g + a.b);
+	c = f1 * a + (1 - f1) * b;
+	// 21.减去 
+	c = a - b;
+	// 22.划分 
+	c = a / b;
+	//  *end
+	imageStore(outputImage, ivec2(gl_GlobalInvocationID.xy), c);
+}

@@ -539,16 +539,6 @@ struct grid_info_t
 void draw_grid(void* ctx, grid_info_t* t, vkvg_func_t* func);
 
 
-/*
-渲染命令函数，
-ctx：渲染上下文指针VkvgContext
-cmds：命令数组
-count：命令数量
-data：命令数据指针
-size：数据大小
-order：渲染顺序，0=默认，数值越小，越靠前
-*/
-void vgc_draw_cmds(void* ctx, uint8_t* cmds, size_t count, void* data, size_t size, vg_style_data* style);
 // 绘制路径函数
 void vgc_draw_path(void* ctx, path_d* path, fill_style_d* style);
 /*

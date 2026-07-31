@@ -188,7 +188,7 @@ struct drawctx_t {
 	VkvgPattern(*new_pattern_linear)(vgdev_ctx* ctx, float x0, float y0, float x1, float y1);
 	VkvgPattern(*new_pattern_radial)(vgdev_ctx* ctx, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
 	VkvgPattern(*new_pattern_sweep)(vgdev_ctx* ctx, float cx, float cy, float start_angle, float end_angle);
-	vkvg_status_t(*pattern_set_color_stop)(VkvgPattern pat, int idx, float r, float g, float b, float a);
+	vkvg_status_t(*pattern_set_color_stop)(VkvgPattern pat, int idx, float o, float r, float g, float b, float a);
 
 	paths_t* (*get_paths)(vgdev_ctx* ctx);
 	paths_t* (*new_paths)(vgdev_ctx* ctx);
@@ -209,4 +209,6 @@ struct drawctx_t {
 vgdev_ctx* new_vgctx();
 void free_vgctx(vgdev_ctx* p);
 drawctx_t get_drawctx(vgdev_ctx* p);
+struct rvg_cb;
+void init_rvg(vgdev_ctx* ptr, rvg_cb* r);
 

@@ -320,7 +320,7 @@ struct image_d {
 	size_t res_idx;		// 资源序号
 };
 
- 
+
 struct text_style_data
 {
 	std::string family;				// 字体名称，逗号分隔
@@ -634,7 +634,8 @@ struct rvg_cb {
 	void* (*new_pattern_linear)(void* ctx, float x0, float y0, float x1, float y1);
 	void* (*new_pattern_radial)(void* ctx, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
 	void* (*new_pattern_sweep)(void* ctx, float cx, float cy, float start_angle, float end_angle);
-	int (*pattern_set_color_stop)(void* pat, int idx, float r, float g, float b, float a);
+	int (*pattern_add_color_stop)(void* pat, float o, float r, float g, float b, float a);
+	int (*pattern_set_color_stop)(void* pat,int idx, float o, float r, float g, float b, float a);
 	void(*pattern_set_matrix)(void* pat, const void* matrix);	// mat3x2
 	void(*pattern_set_extend)(void* pat, int extend);
 	void(*pattern_set_filter)(void* pat, int filter);

@@ -1,0 +1,32 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(binding = 0, rgba16f) uniform readonly image2D inputImage;
+layout(binding = 1, rgba16f) uniform writeonly image2D outputImage;
+layout(push_constant) uniform BlurParams {
+	ivec2 direction;      // 水平{1,0}, 垂直{0,1} 
+	vec2 texSize;
+	float blurRadius;    // 高斯核半径（像素）
+} params;
+
+void main() {
+	ivec2 texCoord = ivec2(gl_GlobalInvocationID.xy);
+	vec4 result = vec4(0.0);
+	float weightSum = 0.0;
+
+	int radius = int(ceil(params.blurRadius));
+	float sigma = max(params.blurRadius * 0.5, 0.5);
+
+	for (int i = -radius; i <= radius; ++i) {
+		// 计算高斯权重 
+		float weight = exp(-float(i * i) / (2.0 * sigma * sigma));
+		ivec2 sampleCoord = texCoord;
+		sampleCoord += params.direction * ivec2(i,i);
+		// 边界钳位 
+		sampleCoord = clamp(sampleCoord, ivec2(0), ivec2(params.texSize) - 1);
+		result += imageLoad(inputImage, sampleCoord) * weight;
+		weightSum += weight;
+	}
+	imageStore(outputImage, texCoord, result / weightSum);
+}

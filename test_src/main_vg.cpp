@@ -288,8 +288,10 @@ void draw_rect_gradient(rvg_cb* cr, int width, int height, const rect_shadow_t* 
 		return;
 	if (!tem)
 		tem = &color_stops;
+	_bv.clear();
 	get_bezier_ptr(&rs.cubic, 1, rs.segment > 3 ? rs.segment : 3, &_bv);
 	auto& bv = _bv;
+	tem->clear();
 	for (size_t i = 0; i < bv.size(); i++)
 	{
 		float ratio = bv[i].x;
@@ -329,13 +331,13 @@ void draw_rect_gradient(rvg_cb* cr, int width, int height, const rect_shadow_t* 
 		auto rg = cr->new_pattern_radial(cr->ctx, point[0], point[1], 0, point[0], point[1], radius, false);
 		for (auto& stop : *tem)
 		{
-			cr->pattern_set_color_stop(rg, stop.o, stop.x, stop.y, stop.z, stop.w);
+			cr->pattern_add_color_stop(rg, stop.o, stop.x, stop.y, stop.z, stop.w);
 		}
 		cr->move_to(ph, point[0], point[1]);
 		double	angle1 = M_PI + 0.5 * M_PI * i, angle2 = angle1 + 0.5 * M_PI;
 		cr->arc(ph, point[0], point[1], radius, angle1, angle2);
-		cr->set_source(cr, rg);
-		cr->fill(cr);
+		cr->set_source(cr->ctx, rg);
+		cr->fill(cr->ctx);
 		cr->pattern_destroy(rg);
 		i++;
 	}
@@ -346,42 +348,42 @@ void draw_rect_gradient(rvg_cb* cr, int width, int height, const rect_shadow_t* 
 	auto lg_top = cr->new_pattern_linear(cr->ctx, side_top[0], side_top[1] + radius, side_top[0], side_top[1]);
 	for (auto& stop : *tem)
 	{
-		cr->pattern_set_color_stop(lg_top, stop.o, stop.x, stop.y, stop.z, stop.w);
+		cr->pattern_add_color_stop(lg_top, stop.o, stop.x, stop.y, stop.z, stop.w);
 	}
 
 	cr->rectangle(ph, side_top.x, side_top.y, side_top.z, side_top.w);
-	cr->set_source(cr, lg_top);
-	cr->fill(cr);
+	cr->set_source(cr->ctx, lg_top);
+	cr->fill(cr->ctx);
 
 	//# bottom side
 	auto lg_bottom = cr->new_pattern_linear(cr->ctx, side_bottom[0], side_bottom[1], side_bottom[0], side_bottom[1] + radius);
 	for (auto& stop : *tem)
 	{
-		cr->pattern_set_color_stop(lg_bottom, stop.o, stop.x, stop.y, stop.z, stop.w);
+		cr->pattern_add_color_stop(lg_bottom, stop.o, stop.x, stop.y, stop.z, stop.w);
 	}
-	cr->rectangle(cr, side_bottom.x, side_bottom.y, side_bottom.z, side_bottom.w);
-	cr->set_source(cr, lg_bottom);
-	cr->fill(cr);
+	cr->rectangle(ph, side_bottom.x, side_bottom.y, side_bottom.z, side_bottom.w);
+	cr->set_source(cr->ctx, lg_bottom);
+	cr->fill(cr->ctx);
 
 	//# left side
 	auto lg_left = cr->new_pattern_linear(cr->ctx, side_left[0] + radius, side_left[1], side_left[0], side_left[1]);
 	for (auto& stop : *tem)
 	{
-		cr->pattern_set_color_stop(lg_left, stop.o, stop.x, stop.y, stop.z, stop.w);
+		cr->pattern_add_color_stop(lg_left, stop.o, stop.x, stop.y, stop.z, stop.w);
 	}
-	cr->rectangle(cr, side_left.x, side_left.y, side_left.z, side_left.w);
-	cr->set_source(cr, lg_left);
-	cr->fill(cr);
+	cr->rectangle(ph, side_left.x, side_left.y, side_left.z, side_left.w);
+	cr->set_source(cr->ctx, lg_left);
+	cr->fill(cr->ctx);
 
 	//# right side
 	auto lg_right = cr->new_pattern_linear(cr->ctx, side_right[0], side_right[1], side_right[0] + radius, side_right[1]);
 	for (auto& stop : *tem)
 	{
-		cr->pattern_set_color_stop(lg_right, stop.o, stop.x, stop.y, stop.z, stop.w);
+		cr->pattern_add_color_stop(lg_right, stop.o, stop.x, stop.y, stop.z, stop.w);
 	}
-	cr->rectangle(cr, side_right.x, side_right.y, side_right.z, side_right.w);
-	cr->set_source(cr, lg_right);
-	cr->fill(cr);
+	cr->rectangle(ph, side_right.x, side_right.y, side_right.z, side_right.w);
+	cr->set_source(cr->ctx, lg_right);
+	cr->fill(cr->ctx);
 
 	cr->pattern_destroy(lg_top);
 	cr->pattern_destroy(lg_bottom);
@@ -450,7 +452,8 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	dcb.translate(dctx, 0, -128);
 
 	//dcb.clip0(dctx);
-	dcb.translate(dctx, 300, 0);
+	dcb.translate(dctx, 520, 0);
+#if 0
 	auto sg = dcb.new_pattern_sweep(dctx, 128, 128, 0, 2);
 	vkvg_pattern_add_color_stop(sg, 0.0, white, 1);
 	vkvg_pattern_add_color_stop(sg, 0.25, red, 1);
@@ -461,6 +464,7 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	//dcb.rectangle(path, 0, 0, 256, 256, 0);
 	dcb.arc(path, 128.0, 128.0, 80, 0, 2 * glm::pi<float>());
 	dcb.fill(dctx, path);
+#endif
 	//dcb.clip0(dctx);
 	//dcb.translate(dctx, -300, 0);
 	//dcb.set_color(dctx, 0x800020ff);
@@ -495,7 +499,9 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 		cubic_v cubic = { {0.0,0.6},{0.5,0.39},{0.4,0.1},{1.0,0.0 } };
 	};
 	rect_shadow_t rs = {};
-	rvg_cb* rb = 0;
+	static rvg_cb rb[1] = {};
+	init_rvg(dctx, rb);
+	rs.radius = 20;
 	draw_rect_gradient(rb, 100, 100, &rs, 0);
 
 
