@@ -11401,32 +11401,32 @@ drawctx_t get_drawctx(vgdev_ctx* p)
 }
 
 // 视图
-size_t rvg_new_view(void* ctx, int x, int y, int width, int height) {
+size_t rvg_new_view(rvgctx_t* ctx, int x, int y, int width, int height) {
 	return 0;
 }
-size_t rvg_get_view(void* ctx, int* width, int* height)	// 获取当前视图宽高可空，返回idx
+size_t rvg_get_view(rvgctx_t* ctx, int* width, int* height)	// 获取当前视图宽高可空，返回idx
 {
 	return 0;
 }
 #define PRI_CTX auto cr=(vgdev_ctx*)ctx
 // 路径操作
-void* rvg_new_path(void* ctx)
+rvg_path_t* rvg_new_path(rvgctx_t* ctx)
 {
 	if (!ctx)return 0;
 	PRI_CTX;
 	dc_clear_path(cr->get_path());
-	return cr->get_path();
+	return (rvg_path_t*)cr->get_path();
 }
-void rvg_clear_path(void* path)
+void rvg_clear_path(rvg_path_t* path)
 {
 	if (path)
 		dc_clear_path((paths_t*)path);
 }
-void rvg_close_path(void* path)
+void rvg_close_path(rvg_path_t* path)
 {
 	if (path)dc_close_path((paths_t*)path);
 }
-void rvg_new_sub_path(void* path)
+void rvg_new_sub_path(rvg_path_t* path)
 {
 	if (path)dc_finish_path((paths_t*)path);
 }
@@ -11472,7 +11472,7 @@ void _rvg_path_extents(paths_t* ctx, bool transformed, float* x1, float* y1, flo
 	*y2 = yMax;
 }
 
-void rvg_path_extents(void* path, float* x1, float* y1, float* x2, float* y2)
+void rvg_path_extents(rvg_path_t* path, float* x1, float* y1, float* x2, float* y2)
 {
 	auto ph = (paths_t*)path;
 	if (!ph)return;
@@ -11485,67 +11485,67 @@ void rvg_path_extents(void* path, float* x1, float* y1, float* x2, float* y2)
 
 	_rvg_path_extents(ph, false, x1, y1, x2, y2);
 }
-void rvg_get_current_point(void* path, float* x, float* y)
+void rvg_get_current_point(rvg_path_t* path, float* x, float* y)
 {
 	auto cp = dc_get_current_point((paths_t*)path);
 	if (x)*x = cp.x;
 	if (y)*y = cp.y;
 }
 // 添加数据到当前路径，参考path_type_e
-void rvg_add_path(void* path, float* data, size_t count)
+void rvg_add_path(rvg_path_t* path, float* data, size_t count)
 {
 
 }
 
-void rvg_move_to(void* path, float x, float y)
+void rvg_move_to(rvg_path_t* path, float x, float y)
 {
 	dc_move_to((paths_t*)path, x, y);
 }
-void rvg_rel_move_to(void* path, float x, float y)
+void rvg_rel_move_to(rvg_path_t* path, float x, float y)
 {
 	dc_rel_move_to((paths_t*)path, x, y);
 }
-void rvg_line_to(void* path, float x, float y)
+void rvg_line_to(rvg_path_t* path, float x, float y)
 {
 	dc_line_to((paths_t*)path, x, y);
 }
-void rvg_rel_line_to(void* path, float dx, float dy)
+void rvg_rel_line_to(rvg_path_t* path, float dx, float dy)
 {
 	dc_rel_line_to((paths_t*)path, dx, dy);
 }
-void rvg_arc(void* path, float xc, float yc, float radius, float a1, float a2)
+void rvg_arc(rvg_path_t* path, float xc, float yc, float radius, float a1, float a2)
 {
 	dc_arc((paths_t*)path, xc, yc, radius, a1, a2);
 }
-void rvg_arc_negative(void* path, float xc, float yc, float radius, float a1, float a2)
+void rvg_arc_negative(rvg_path_t* path, float xc, float yc, float radius, float a1, float a2)
 {
 	dc_arc_negative((paths_t*)path, xc, yc, radius, a1, a2);
 }
-void rvg_curve_to(void* path, float x1, float y1, float x2, float y2, float x3, float y3)
+void rvg_curve_to(rvg_path_t* path, float x1, float y1, float x2, float y2, float x3, float y3)
 {
 	dc_curve_to((paths_t*)path, x1, y1, x2, y2, x3, y3);
 }
-void rvg_rel_curve_to(void* path, float x1, float y1, float x2, float y2, float x3, float y3)
+void rvg_rel_curve_to(rvg_path_t* path, float x1, float y1, float x2, float y2, float x3, float y3)
 {
 	dc_rel_curve_to((paths_t*)path, x1, y1, x2, y2, x3, y3);
 }
-void rvg_quadratic_to(void* path, float x1, float y1, float x2, float y2)
+void rvg_quadratic_to(rvg_path_t* path, float x1, float y1, float x2, float y2)
 {
 	dc_quadratic_to((paths_t*)path, x1, y1, x2, y2);
 }
-void rvg_rel_quadratic_to(void* path, float x1, float y1, float x2, float y2)
+void rvg_rel_quadratic_to(rvg_path_t* path, float x1, float y1, float x2, float y2)
 {
 	dc_rel_quadratic_to((paths_t*)path, x1, y1, x2, y2);
 }
-void rvg_rectangle(void* path, float x, float y, float w, float h)
+void rvg_rectangle(rvg_path_t* path, float x, float y, float w, float h)
 {
 	dc_rectangle((paths_t*)path, x, y, w, h, 0);
 }
-void rvg_rounded_rectangle(void* path, float x, float y, float w, float h, float radius)
+void rvg_rounded_rectangle(rvg_path_t* path, float x, float y, float w, float h, float radius)
 {
 	dc_rounded_rectangle((paths_t*)path, x, y, w, h, radius);
 }
-void rvg_rounded_rectangle2(void* path, float x, float y, float w, float h, float rx, float ry)
+void rvg_rounded_rectangle2(rvg_path_t* path, float x, float y, float w, float h, float rx, float ry)
 {
 	auto ctx = (paths_t*)path;
 	if (!ctx)
@@ -11565,86 +11565,86 @@ void rvg_rounded_rectangle2(void* path, float x, float y, float w, float h, floa
 
 	dc_close_path(ctx);
 }
-void rvg_ellipse(void* path, float radiusX, float radiusY, float x, float y, float rotationAngle)
+void rvg_ellipse(rvg_path_t* path, float radiusX, float radiusY, float x, float y, float rotationAngle)
 {
 	dc_ellipse((paths_t*)path, radiusX, radiusY, x, y, rotationAngle);
 }
-void rvg_elliptic_arc_to(void* path, float x, float y, bool large_arc_flag, bool sweep_flag, float rx, float ry, float phi)
+void rvg_elliptic_arc_to(rvg_path_t* path, float x, float y, bool large_arc_flag, bool sweep_flag, float rx, float ry, float phi)
 {
-	rvg_elliptic_arc_to((paths_t*)path, x, y, large_arc_flag, sweep_flag, rx, ry, phi);
+	dc_elliptic_arc_to((paths_t*)path, x, y, large_arc_flag, sweep_flag, rx, ry, phi);
 }
-void rvg_rel_elliptic_arc_to(void* path, float x, float y, bool large_arc_flag, bool sweep_flag, float rx, float ry, float phi)
+void rvg_rel_elliptic_arc_to(rvg_path_t* path, float x, float y, bool large_arc_flag, bool sweep_flag, float rx, float ry, float phi)
 {
-	rvg_rel_elliptic_arc_to((paths_t*)path, x, y, large_arc_flag, sweep_flag, rx, ry, phi);
+	dc_rel_elliptic_arc_to((paths_t*)path, x, y, large_arc_flag, sweep_flag, rx, ry, phi);
 }
 
 // 渲染操作
-void rvg_stroke(void* ctx)
+void rvg_stroke(rvgctx_t* ctx)
 {
 	auto p = (vgdev_ctx*)ctx;
 	p->stroke(p->get_path());
 }
-void rvg_stroke_preserve(void* ctx)
+void rvg_stroke_preserve(rvgctx_t* ctx)
 {
 	auto p = (vgdev_ctx*)ctx;
 	p->stroke_preserve(p->get_path());
 }
-void rvg_fill(void* ctx)
+void rvg_fill(rvgctx_t* ctx)
 {
 	auto p = (vgdev_ctx*)ctx;
 	p->fill(p->get_path());
 }
-void rvg_fill_preserve(void* ctx)
+void rvg_fill_preserve(rvgctx_t* ctx)
 {
 	auto p = (vgdev_ctx*)ctx;
 	p->fill_preserve(p->get_path());
 }
-void rvg_paint(void* ctx)			// 全屏渲染
+void rvg_paint(rvgctx_t* ctx)			// 全屏渲染
 {
 	auto p = (vgdev_ctx*)ctx;
 	p->paint();
 }
 
-void rvg_clear(void* ctx)			// 清空画布
+void rvg_clear(rvgctx_t* ctx)			// 清空画布
 {
 	auto p = (vgdev_ctx*)ctx;
 	p->clear();
 }
-void rvg_reset_clip(void* ctx)		// 重置裁剪
+void rvg_reset_clip(rvgctx_t* ctx)		// 重置裁剪
 {
 	auto p = (vgdev_ctx*)ctx;
 	dc_clip0(p);
 }
-void rvg_clip(void* ctx)				// 路径裁剪，清空当前路径
+void rvg_clip(rvgctx_t* ctx)				// 路径裁剪，清空当前路径
 {
 	auto p = (vgdev_ctx*)ctx;
 	p->clip(p->get_path());
 }
-void rvg_clip_preserve(void* ctx)	// 路径裁剪
+void rvg_clip_preserve(rvgctx_t* ctx)	// 路径裁剪
 {
 	auto p = (vgdev_ctx*)ctx;
 	p->clip_preserve(p->get_path());
 }
-void rvg_scissor(void* ctx, int x, int y, int width, int height)	// 矩形裁剪
+void rvg_scissor(rvgctx_t* ctx, int x, int y, int width, int height)	// 矩形裁剪
 {
 	auto p = (vgdev_ctx*)ctx;
 	glm::ivec4 rc = { x,y,width,height };
 	p->clip(&rc);
 }
 // 配置
-void rvg_set_opacity(void* ctx, float opacity)
+void rvg_set_opacity(rvgctx_t* ctx, float opacity)
 {
 	auto p = (vgdev_ctx*)ctx;
 	if (p && p->t)
 		p->t->curOperator = (vkvg_operator_t)opacity;
 }
-void rvg_set_source_color(void* ctx, uint32_t c)
+void rvg_set_source_color(rvgctx_t* ctx, uint32_t c)
 {
 	auto p = (vgdev_ctx*)ctx;
 	auto t = p ? p->t : nullptr;
 	if (t) { t->curColor = c; t->pattern = 0; }
 }
-void rvg_set_source_rgba(void* ctx, float r, float g, float b, float a)
+void rvg_set_source_rgba(rvgctx_t* ctx, float r, float g, float b, float a)
 {
 	auto p = (vgdev_ctx*)ctx;
 	auto t = p ? p->t : nullptr;
@@ -11652,34 +11652,34 @@ void rvg_set_source_rgba(void* ctx, float r, float g, float b, float a)
 		return;
 	t->curColor = CreateRgbaf(r, g, b, a); t->pattern = 0;
 }
-void rvg_set_source_rgb(void* ctx, float r, float g, float b)
+void rvg_set_source_rgb(rvgctx_t* ctx, float r, float g, float b)
 {
 	rvg_set_source_rgba(ctx, r, g, b, 1.0f);
 }
-void rvg_set_line_width(void* ctx, float width)
+void rvg_set_line_width(rvgctx_t* ctx, float width)
 {
 	auto p = (vgdev_ctx*)ctx;
 	if (p && p->t)
 		p->t->lineWidth = width;
 }
 
-void rvg_set_miter_limit(void* ctx, float limit)
+void rvg_set_miter_limit(rvgctx_t* ctx, float limit)
 {
 	auto p = (vgdev_ctx*)ctx;
 	if (p && p->t)
 		p->t->miterLimit = limit;
 }
-void rvg_set_line_cap(void* ctx, int cap)
+void rvg_set_line_cap(rvgctx_t* ctx, int cap)
 {
 	auto p = (vgdev_ctx*)ctx;
 	dc_set_line_cap(p, (vkvg_line_cap_t)cap);
 }
-void rvg_set_line_join(void* ctx, int join)
+void rvg_set_line_join(rvgctx_t* ctx, int join)
 {
 	auto p = (vgdev_ctx*)ctx;
 	dc_set_line_join(p, (vkvg_line_join_t)join);
 }
-void rvg_set_source_surface(void* ctx, void* surf, float x, float y)
+void rvg_set_source_surface(rvgctx_t* ctx, rvg_surface_t* surf, float x, float y)
 {
 	auto p = (vgdev_ctx*)ctx;
 	p->t->pushConsts.source.x = x;
@@ -11687,27 +11687,27 @@ void rvg_set_source_surface(void* ctx, void* surf, float x, float y)
 	auto pat = dc_pattern_create_for_surface(p, (VkvgSurface)surf);
 	p->t->pattern = pat;
 }
-void rvg_set_source(void* ctx, void* pat)
+void rvg_set_source(rvgctx_t* ctx, rvg_pattern_t* pat)
 {
 	auto p = (vgdev_ctx*)ctx;
 	dc_set_source(p, (VkvgPattern)pat);
 }
-void rvg_set_operator(void* ctx, int op)
+void rvg_set_operator(rvgctx_t* ctx, int op)
 {
 	auto p = (vgdev_ctx*)ctx;
 	dc_set_operator(p, (vkvg_operator_t)op);
 }
-void rvg_set_fill_rule(void* ctx, int fr)
+void rvg_set_fill_rule(rvgctx_t* ctx, int fr)
 {
 	auto p = (vgdev_ctx*)ctx;
 	dc_set_fill_rule(p, (vkvg_fill_rule_t)fr);
 }
-void rvg_set_dash(void* ctx, const float* dashes, uint32_t num_dashes, float offset)
+void rvg_set_dash(rvgctx_t* ctx, const float* dashes, uint32_t num_dashes, float offset)
 {
 	auto p = (vgdev_ctx*)ctx;
 	p->set_dash(dashes, num_dashes, offset);
 }
-void rvg_set_dash8(void* ctx, uint64_t dashes0, uint32_t num_dashes, float offset)
+void rvg_set_dash8(rvgctx_t* ctx, uint64_t dashes0, uint32_t num_dashes, float offset)
 {
 	auto p = (vgdev_ctx*)ctx;
 	float dashes[64] = {};
@@ -11726,42 +11726,42 @@ void rvg_set_dash8(void* ctx, uint64_t dashes0, uint32_t num_dashes, float offse
 	}
 }
 // 图案：渐变/图片
-void* rvg_new_surface(void* ctx, int width, int height, uint32_t* data, int stride, int type)
+rvg_surface_t* rvg_new_surface(rvgctx_t* ctx, int width, int height, uint32_t* data, int stride, int type)
 {
 	auto p = (vgdev_ctx*)ctx;
 	return 0;
 }
-void* rvg_new_surface_vk(void* ctx, int width, int height, void* vkimage)
+rvg_surface_t* rvg_new_surface_vk(rvgctx_t* ctx, int width, int height, void* vkimage)
 {
 	auto p = (vgdev_ctx*)ctx;
 	return 0;
 }
-void* rvg_new_pattern_linear(void* ctx, float x0, float y0, float x1, float y1)
+rvg_pattern_t* rvg_new_pattern_linear(rvgctx_t* ctx, float x0, float y0, float x1, float y1)
 {
 	auto p = (vgdev_ctx*)ctx;
-	return dc_pattern_create_linear(p, x0, y0, x1, y1);
+	return (rvg_pattern_t*)dc_pattern_create_linear(p, x0, y0, x1, y1);
 }
-void* rvg_new_pattern_radial(void* ctx, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse)
+rvg_pattern_t* rvg_new_pattern_radial(rvgctx_t* ctx, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse)
 {
 	auto p = (vgdev_ctx*)ctx;
-	return dc_pattern_create_radial(p, cx0, cy0, radius0, cx1, cy1, radius1, is_ellipse);
+	return (rvg_pattern_t*)dc_pattern_create_radial(p, cx0, cy0, radius0, cx1, cy1, radius1, is_ellipse);
 }
-void* rvg_new_pattern_sweep(void* ctx, float cx, float cy, float start_angle, float end_angle)
+rvg_pattern_t* rvg_new_pattern_sweep(rvgctx_t* ctx, float cx, float cy, float start_angle, float end_angle)
 {
 	auto p = (vgdev_ctx*)ctx;
-	return dc_pattern_create_sweep(p, cx, cy, start_angle, end_angle);
+	return (rvg_pattern_t*)dc_pattern_create_sweep(p, cx, cy, start_angle, end_angle);
 }
-int  rvg_pattern_set_color_stop(void* pat, int idx, float o, float r, float g, float b, float a)
+int  rvg_pattern_set_color_stop(rvg_pattern_t* pat, int idx, float o, float r, float g, float b, float a)
 {
 	auto p = (VkvgPattern)pat;
 	return dc_pattern_set_color_stop(p, idx, o, r, g, b, a);
 }
-int  rvg_pattern_add_color_stop(void* pat, float o, float r, float g, float b, float a)
+int  rvg_pattern_add_color_stop(rvg_pattern_t* pat, float o, float r, float g, float b, float a)
 {
 	auto p = (VkvgPattern)pat;
 	return vkvg_pattern_add_color_stop(p, o, r, g, b, a);
 }
-void rvg_pattern_set_matrix(void* pat, const void* matrix)
+void rvg_pattern_set_matrix(rvg_pattern_t* pat, const void* matrix)
 {
 	auto p = (VkvgPattern)pat; auto m = (const vkvg_matrix_t*)matrix;
 	if (p && m) {
@@ -11769,22 +11769,22 @@ void rvg_pattern_set_matrix(void* pat, const void* matrix)
 		p->hasMatrix = true;
 	}
 }
-void rvg_pattern_set_extend(void* pat, int extend)
+void rvg_pattern_set_extend(rvg_pattern_t* pat, int extend)
 {
 	auto p = (VkvgPattern)pat;
 	p->extend = (vkvg_extend_t)extend;
 }
-void rvg_pattern_set_filter(void* pat, int filter)
+void rvg_pattern_set_filter(rvg_pattern_t* pat, int filter)
 {
 	auto p = (VkvgPattern)pat;
 	p->filter = (vkvg_filter_t)filter;
 }
-void rvg_surface_destroy(void* surf)
+void rvg_surface_destroy(rvg_surface_t* surf)
 {
 	if (surf)
 		vkvg_surface_destroy((VkvgSurface)surf);
 }
-void rvg_pattern_destroy(void* pat)
+void rvg_pattern_destroy(rvg_pattern_t* pat)
 {
 	auto p = (VkvgPattern)pat;
 	assert(p);// mac创建会自动释放
@@ -11793,7 +11793,7 @@ void rvg_pattern_destroy(void* pat)
 void init_rvg(vgdev_ctx* ptr, rvg_cb* r) {
 	if (!ptr || !r)return;
 	*r = {};
-	r->ctx = ptr;
+	r->ctx = (rvgctx_t*)ptr;
 	// 视图
 
 	r->new_view = rvg_new_view;
