@@ -139,6 +139,7 @@ public:
 	uint32_t gCount = 0;		// ubo数量
 	state_save_t* t = 0;
 	paths_t* _dpath = 0;		// 默认路径缓存
+	paths_t* cur_dpath = 0;		// 当前路径
 	std::stack<state_save_t*> _cst;	// 保存栈 
 	int  cmdidx = 0;
 	bool is_glutess = false;
@@ -9724,7 +9725,7 @@ void vgdev_ctx::stroke(paths_t* p)
 
 void vgdev_ctx::paint()
 {
-	auto ph = get_path();
+	auto ph = cur_dpath ? cur_dpath : get_path();
 	dc_finish_path(ph);
 	if (ph->pathPtr) {
 		fill(ph);
@@ -10352,13 +10353,13 @@ void dc_clip_rc(vgdev_ctx* ctx, float* rc) {
 		return;
 	glm::ivec4 r = { rc[0],rc[1],rc[2],rc[3] };
 	ctx->clip(&r);
-	dc_clear_path(ctx->get_path());
+	dc_clear_path(ctx->cur_dpath ? ctx->cur_dpath : ctx->get_path());
 }
 void dc_clip0(vgdev_ctx* ctx) {
 	if (!ctx) // nothing to clip
 		return;
 	ctx->clip0();
-	dc_clear_path(ctx->get_path());
+	dc_clear_path(ctx->cur_dpath ? ctx->cur_dpath : ctx->get_path());
 }
 
 void dc_clip(vgdev_ctx* ctx, paths_t* p) {
@@ -11340,7 +11341,7 @@ void dc_grid_fill(vgdev_ctx* cr, glm::vec2 size, glm::ivec2 cols, int width)
 	int yn = size.y / width;
 	if (x > 0)xn++;
 	if (y > 0)yn++;
-	auto path = cr->get_path();
+	auto path = cr->cur_dpath ? cr->cur_dpath : cr->get_path();
 	dc_rectangle(path, 0, 0, size.x, size.y, 0);
 	dc_clip(cr, path);
 	for (size_t i = 0; i < yn; i++)
@@ -11481,7 +11482,20 @@ rvg_path_t* rvg_new_path(rvgctx_t* ctx)
 {
 	if (!ctx)return 0;
 	PRI_CTX;
-	dc_clear_path(cr->get_path());
+	return (rvg_path_t*)dc_new_paths(cr);
+}
+void rvg_path_destroy(rvg_path_t* path) {
+	dc_free_paths((paths_t*)path);
+}
+void rvg_set_path(rvgctx_t* ctx, rvg_path_t* path) {
+	if (!ctx || !path)return;
+	PRI_CTX;
+	cr->cur_dpath = (paths_t*)path;
+}
+rvg_path_t* rvg_get_path(rvgctx_t* ctx)
+{
+	if (!ctx)return 0;
+	PRI_CTX;
 	return (rvg_path_t*)cr->get_path();
 }
 void rvg_clear_path(rvg_path_t* path)
@@ -11635,22 +11649,26 @@ void rvg_rel_elliptic_arc_to(rvg_path_t* path, float x, float y, bool large_arc_
 void rvg_stroke(rvgctx_t* ctx)
 {
 	auto p = (vgdev_ctx*)ctx;
-	p->stroke(p->get_path());
+	auto ph = p->cur_dpath;
+	p->stroke(ph ? ph : p->get_path());
 }
 void rvg_stroke_preserve(rvgctx_t* ctx)
 {
 	auto p = (vgdev_ctx*)ctx;
-	p->stroke_preserve(p->get_path());
+	auto ph = p->cur_dpath;
+	p->stroke_preserve(ph ? ph : p->get_path());
 }
 void rvg_fill(rvgctx_t* ctx)
 {
 	auto p = (vgdev_ctx*)ctx;
-	p->fill(p->get_path());
+	auto ph = p->cur_dpath;
+	p->fill(ph ? ph : p->get_path());
 }
 void rvg_fill_preserve(rvgctx_t* ctx)
 {
 	auto p = (vgdev_ctx*)ctx;
-	p->fill_preserve(p->get_path());
+	auto ph = p->cur_dpath;
+	p->fill_preserve(ph ? ph : p->get_path());
 }
 void rvg_paint(rvgctx_t* ctx)			// 全屏渲染
 {
@@ -11671,12 +11689,14 @@ void rvg_reset_clip(rvgctx_t* ctx)		// 重置裁剪
 void rvg_clip(rvgctx_t* ctx)				// 路径裁剪，清空当前路径
 {
 	auto p = (vgdev_ctx*)ctx;
-	p->clip(p->get_path());
+	auto ph = p->cur_dpath;
+	p->clip(ph ? ph : p->get_path());
 }
 void rvg_clip_preserve(rvgctx_t* ctx)	// 路径裁剪
 {
 	auto p = (vgdev_ctx*)ctx;
-	p->clip_preserve(p->get_path());
+	auto ph = p->cur_dpath;
+	p->clip_preserve(ph ? ph : p->get_path());
 }
 void rvg_scissor(rvgctx_t* ctx, int x, int y, int width, int height)	// 矩形裁剪
 {
@@ -11899,6 +11919,9 @@ void init_rvg(vgdev_ctx* ptr, rvg_cb* r) {
 	//r->get_view = rvg_get_view;
 	// 路径操作	// 路径操作
 	r->new_path = rvg_new_path;
+	r->get_path = rvg_get_path;
+	r->path_destroy = rvg_path_destroy;
+	r->set_path = rvg_set_path;
 	r->clear_path = rvg_clear_path;
 	r->close_path = rvg_close_path;
 	r->new_sub_path = rvg_new_sub_path;
@@ -11999,7 +12022,7 @@ void rvg_x::submit(fill_style_d* st)
 	bool stroke = st && st->thickness > 0 && st->color > 0;
 	if (!ctx || !st || !ctx->t)return;
 	auto cr = ctx;
-	auto path = ctx->get_path();
+	auto path = ctx->cur_dpath ? ctx->cur_dpath : ctx->get_path();
 	if (st->fill)
 	{
 		dc_set_color(ctx, st->fill);

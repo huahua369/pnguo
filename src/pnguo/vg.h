@@ -577,9 +577,10 @@ typedef void* rvg_pattern_t;
 // 矢量接口
 struct rvg_cb {
 	rvgctx_t* ctx = 0;
-
 	// 路径操作
 	rvg_path_t* (*new_path)(rvgctx_t* ctx);
+	void(*path_destroy)(rvg_path_t* path);
+	rvg_path_t* (*get_path)(rvgctx_t* ctx);
 	void(*clear_path)(rvg_path_t* path);
 	void(*close_path)(rvg_path_t* path);
 	void(*new_sub_path)(rvg_path_t* path);
@@ -605,6 +606,7 @@ struct rvg_cb {
 	void(*rel_elliptic_arc_to)(rvg_path_t* path, float x, float y, bool large_arc_flag, bool sweep_flag, float rx, float ry, float phi);
 
 	// 渲染操作
+	void(*set_path)(rvgctx_t* ctx, rvg_path_t* path);
 	void(*stroke)(rvgctx_t* ctx);
 	void(*stroke_preserve)(rvgctx_t* ctx);
 	void(*fill)(rvgctx_t* ctx);

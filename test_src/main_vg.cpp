@@ -325,6 +325,7 @@ void draw_rect_gradient(rvg_cb* cr, int width, int height, const rect_shadow_t* 
 	//# draw four corners through radial gradient
 	int i = 0;
 	auto ph = cr->new_path(cr->ctx);
+	cr->set_path(cr->ctx, ph);
 	for (auto& point : corner_points)
 	{
 		auto rg = cr->new_pattern_radial(cr->ctx, point[0], point[1], 0, point[0], point[1], radius, false);
@@ -1018,7 +1019,8 @@ void testgui() {
 	{
 		appx->draw2d = [=](app_x* ptr, float delta)
 			{
-				return draw_vgtest(surf, img, surfsize, 0);
+				void* psem = 0;
+				return psem;// draw_vgtest(surf, img, surfsize, 0);
 			};
 	}
 
@@ -1038,7 +1040,7 @@ int main() {
 	if (kba)
 		_CrtSetBreakAlloc(kba);
 	system(R"(rd /s /q C:\Users\hua\AppData\Local\Temp\SymbolCache\vgtest.pdb)");
-	auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
+	//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 
 	testgui();
 	return 0;
