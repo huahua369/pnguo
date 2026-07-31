@@ -307,7 +307,6 @@ void draw_rect_gradient(rvg_cb* cr, int width, int height, const rect_shadow_t* 
 	{
 		height = 2 * radius;
 	}
-
 	//# radial gradient center points for four corners, top - left, top - right, etc
 	glm::vec2 corner_tl = glm::vec2(radius, radius);
 	glm::vec2 corner_tr = glm::vec2(width - radius, radius);
@@ -452,7 +451,7 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	dcb.translate(dctx, 0, -128);
 
 	//dcb.clip0(dctx);
-	dcb.translate(dctx, 520, 0);
+	dcb.translate(dctx, 528, 0);
 #if 0
 	auto sg = dcb.new_pattern_sweep(dctx, 128, 128, 0, 2);
 	vkvg_pattern_add_color_stop(sg, 0.0, white, 1);

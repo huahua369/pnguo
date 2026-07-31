@@ -139,7 +139,7 @@ public:
 	uint32_t gCount = 0;		// ubo数量
 	state_save_t* t = 0;
 	paths_t* _dpath = 0;		// 默认路径缓存
-	std::stack<state_save_t*> _cst;	// 保存栈
+	std::stack<state_save_t*> _cst;	// 保存栈 
 	int  cmdidx = 0;
 	bool is_glutess = false;
 	bool is_fence = true;
@@ -8557,9 +8557,23 @@ void vgdev_ctx::clear()
 {
 	cmd_t c = {};
 	c.type = 4;
-
 	cmdlist.push_back(c);
 }
+
+//size_t vgdev_ctx::new_view(int x, int y, int width, int height)
+//{
+//	glm::ivec4 c = { x,y,width,height };
+//	viewlist.push_back(c);
+//	return viewlist.size() - 1;
+//}
+//
+//void vgdev_ctx::get_view(size_t idx, int* rc4)
+//{
+//	if (rc4 && idx < viewlist.size()) {
+//		*((glm::ivec4*)rc4) = viewlist[idx];
+//	}
+//}
+
 
 void vgdev_ctx::save()
 {
@@ -11255,6 +11269,13 @@ void dc_transform(vgdev_ctx* ctx, const vkvg_matrix_t* matrix) {
 		dc_set_mat_inv_and_vkCmdPush(t);
 	}
 }
+void dc_identity_matrix(vgdev_ctx* ctx) {
+	if (!ctx || !ctx->t)
+		return;
+	vkvg_matrix_t im = VKVG_IDENTITY_MATRIX;
+	ctx->t->pushConsts.mat = im;
+	dc_set_mat_inv_and_vkCmdPush(ctx->t);
+}
 void dc_set_matrix(vgdev_ctx* ctx, const vkvg_matrix_t* matrix) {
 	if (!ctx || !ctx->t || !matrix)
 		return;
@@ -11400,37 +11421,6 @@ drawctx_t get_drawctx(vgdev_ctx* p)
 	return r;
 }
 
-// 视图
-size_t rvg_new_view(rvgctx_t* ctx, int x, int y, int width, int height) {
-	return 0;
-}
-size_t rvg_get_view(rvgctx_t* ctx, int* width, int* height)	// 获取当前视图宽高可空，返回idx
-{
-	return 0;
-}
-#define PRI_CTX auto cr=(vgdev_ctx*)ctx
-// 路径操作
-rvg_path_t* rvg_new_path(rvgctx_t* ctx)
-{
-	if (!ctx)return 0;
-	PRI_CTX;
-	dc_clear_path(cr->get_path());
-	return (rvg_path_t*)cr->get_path();
-}
-void rvg_clear_path(rvg_path_t* path)
-{
-	if (path)
-		dc_clear_path((paths_t*)path);
-}
-void rvg_close_path(rvg_path_t* path)
-{
-	if (path)dc_close_path((paths_t*)path);
-}
-void rvg_new_sub_path(rvg_path_t* path)
-{
-	if (path)dc_finish_path((paths_t*)path);
-}
-
 void _rvg_path_extents(paths_t* ctx, bool transformed, float* x1, float* y1, float* x2, float* y2) {
 	uint32_t ptrPath = 0;
 	uint32_t firstPtIdx = 0;
@@ -11472,6 +11462,42 @@ void _rvg_path_extents(paths_t* ctx, bool transformed, float* x1, float* y1, flo
 	*y2 = yMax;
 }
 
+#define PRI_CTX auto cr=(vgdev_ctx*)ctx
+// 视图
+//size_t rvg_new_view(rvgctx_t* ctx, int x, int y, int width, int height) {
+//	PRI_CTX;
+//	glm::ivec4 c = { x,y,width,height };
+//	cr->clip(&c);
+//	dc_translate(cr, x, y);
+//	return cr->new_view(x, y, width, height);
+//}
+//void rvg_get_view(rvgctx_t* ctx, size_t idx, int* rc4)	// 获取当前视图坐标宽高
+//{
+//	PRI_CTX;
+//	cr->get_view(idx, rc4);
+//}
+// 路径操作
+rvg_path_t* rvg_new_path(rvgctx_t* ctx)
+{
+	if (!ctx)return 0;
+	PRI_CTX;
+	dc_clear_path(cr->get_path());
+	return (rvg_path_t*)cr->get_path();
+}
+void rvg_clear_path(rvg_path_t* path)
+{
+	if (path)
+		dc_clear_path((paths_t*)path);
+}
+void rvg_close_path(rvg_path_t* path)
+{
+	if (path)dc_close_path((paths_t*)path);
+}
+void rvg_new_sub_path(rvg_path_t* path)
+{
+	if (path)dc_finish_path((paths_t*)path);
+}
+
 void rvg_path_extents(rvg_path_t* path, float* x1, float* y1, float* x2, float* y2)
 {
 	auto ph = (paths_t*)path;
@@ -11491,10 +11517,37 @@ void rvg_get_current_point(rvg_path_t* path, float* x, float* y)
 	if (x)*x = cp.x;
 	if (y)*y = cp.y;
 }
+
 // 添加数据到当前路径，参考path_type_e
 void rvg_add_path(rvg_path_t* path, float* data, size_t count)
 {
-
+	if (!path || !data || !count)return;
+	auto d = data;
+	for (; d - data < count;) {
+		auto t = (path_type_e)*d;
+		float x = d[1], y = d[2];
+		d += 3;
+		switch (t) {
+		case path_type_e::e_vmove:
+			dc_move_to((paths_t*)path, x, y);
+			break;
+		case path_type_e::e_vline:
+			dc_line_to((paths_t*)path, x, y);
+			break;
+		case path_type_e::e_vcurve:
+		{
+			dc_quadratic_to((paths_t*)path, x, y, d[0], d[1]);
+			d += 2;
+		}
+		break;
+		case path_type_e::e_vcubic:
+		{
+			dc_curve_to((paths_t*)path, x, y, d[0], d[1], d[2], d[3]);
+			d += 4;
+		}
+		break;
+		}
+	}
 }
 
 void rvg_move_to(rvg_path_t* path, float x, float y)
@@ -11725,6 +11778,52 @@ void rvg_set_dash8(rvgctx_t* ctx, uint64_t dashes0, uint32_t num_dashes, float o
 			p->set_dash(dashes, num_dashes, offset);
 	}
 }
+void rvg_save(rvgctx_t* ctx)
+{
+	PRI_CTX;
+	cr->save();
+}
+void rvg_restore(rvgctx_t* ctx)
+{
+	PRI_CTX;
+	cr->restore();
+}
+void rvg_translate(rvgctx_t* ctx, float dx, float dy)
+{
+	PRI_CTX;
+	dc_translate(cr, dx, dy);
+}
+void rvg_scale(rvgctx_t* ctx, float sx, float sy)
+{
+	PRI_CTX;
+	dc_scale(cr, sx, sy);
+}
+void rvg_rotate(rvgctx_t* ctx, float radians)
+{
+	PRI_CTX;
+	dc_rotate(cr, radians);
+}
+void rvg_transform(rvgctx_t* ctx, const void* matrix)
+{
+	PRI_CTX;
+	dc_transform(cr, (vkvg_matrix_t*)matrix);
+}
+void rvg_set_matrix(rvgctx_t* ctx, const void* matrix)
+{
+	PRI_CTX;
+	dc_set_matrix(cr, (vkvg_matrix_t*)matrix);
+}
+void rvg_get_matrix(rvgctx_t* ctx, void* matrix)
+{
+	PRI_CTX;
+	dc_get_matrix(cr, (vkvg_matrix_t*)matrix);
+}
+void rvg_identity_matrix(rvgctx_t* ctx)
+{
+	PRI_CTX;
+	dc_identity_matrix(cr);
+}
+
 // 图案：渐变/图片
 rvg_surface_t* rvg_new_surface(rvgctx_t* ctx, int width, int height, uint32_t* data, int stride, int type)
 {
@@ -11796,8 +11895,8 @@ void init_rvg(vgdev_ctx* ptr, rvg_cb* r) {
 	r->ctx = (rvgctx_t*)ptr;
 	// 视图
 
-	r->new_view = rvg_new_view;
-	r->get_view = rvg_get_view;
+	//r->new_view = rvg_new_view;
+	//r->get_view = rvg_get_view;
 	// 路径操作	// 路径操作
 	r->new_path = rvg_new_path;
 	r->clear_path = rvg_clear_path;
@@ -11806,7 +11905,7 @@ void init_rvg(vgdev_ctx* ptr, rvg_cb* r) {
 	r->path_extents = rvg_path_extents;
 	r->get_current_point = rvg_get_current_point;
 	// 添加数据到当前路径，参考path_type_e	// 添加数据到当前路径，参考path_type_e
-	//r->add_path = rvg_add_path;
+	r->add_path = rvg_add_path;
 	r->move_to = rvg_move_to;
 	r->rel_move_to = rvg_rel_move_to;
 	r->line_to = rvg_line_to;
@@ -11849,6 +11948,15 @@ void init_rvg(vgdev_ctx* ptr, rvg_cb* r) {
 	r->set_fill_rule = rvg_set_fill_rule;
 	r->set_dash = rvg_set_dash;
 	r->set_dash8 = rvg_set_dash8;
+	r->save = rvg_save;
+	r->restore = rvg_restore;
+	r->translate = rvg_translate;
+	r->scale = rvg_scale;
+	r->rotate = rvg_rotate;
+	r->transform = rvg_transform;
+	r->set_matrix = rvg_set_matrix;
+	r->get_matrix = rvg_get_matrix;
+	r->identity_matrix = rvg_identity_matrix;
 	// 图案：渐变/图片	// 图案：渐变/图片
 	r->new_surface = rvg_new_surface;
 	r->new_surface_vk = rvg_new_surface_vk;

@@ -577,9 +577,7 @@ typedef void* rvg_pattern_t;
 // 矢量接口
 struct rvg_cb {
 	rvgctx_t* ctx = 0;
-	// 视图
-	size_t(*new_view)(rvgctx_t* ctx, int x, int y, int width, int height);
-	size_t(*get_view)(rvgctx_t* ctx, int* width, int* height);	// 获取当前视图宽高可空，返回idx
+
 	// 路径操作
 	rvg_path_t* (*new_path)(rvgctx_t* ctx);
 	void(*clear_path)(rvg_path_t* path);
@@ -616,7 +614,7 @@ struct rvg_cb {
 	void(*reset_clip)(rvgctx_t* ctx);		// 重置裁剪
 	void(*clip)(rvgctx_t* ctx);				// 路径裁剪，清空当前路径
 	void(*clip_preserve)(rvgctx_t* ctx);	// 路径裁剪
-	void(*scissor)(rvgctx_t* ctx, int x, int y, int width, int height);	// 矩形裁剪
+	void(*scissor)(rvgctx_t* ctx, int x, int y, int width, int height);	// 矩形裁剪，不受状态影响
 	// 配置
 	void(*set_opacity)(rvgctx_t* ctx, float opacity);
 	void(*set_source_color)(rvgctx_t* ctx, uint32_t c);
@@ -627,19 +625,29 @@ struct rvg_cb {
 	void(*set_line_cap)(rvgctx_t* ctx, int cap);
 	void(*set_line_join)(rvgctx_t* ctx, int join);
 	void(*set_source_surface)(rvgctx_t* ctx, rvg_surface_t* surf, float x, float y);
-	void(*set_source)(rvgctx_t* ctx, rvg_pattern_t*pat);
+	void(*set_source)(rvgctx_t* ctx, rvg_pattern_t* pat);
 	void(*set_operator)(rvgctx_t* ctx, int op);
 	void(*set_fill_rule)(rvgctx_t* ctx, int fr);
 	void(*set_dash)(rvgctx_t* ctx, const float* dashes, uint32_t num_dashes, float offset);		// 虚线
 	void(*set_dash8)(rvgctx_t* ctx, uint64_t dashes, uint32_t num_dashes, float offset);								// 虚线,用uint8_t v8[8]表示
+	void(*save)(rvgctx_t* ctx);
+	void(*restore)(rvgctx_t* ctx);
+	void(*translate)(rvgctx_t* ctx, float dx, float dy);
+	void(*scale)(rvgctx_t* ctx, float sx, float sy);
+	void(*rotate)(rvgctx_t* ctx, float radians);
+	void(*transform)(rvgctx_t* ctx, const void* matrix);
+	void(*set_matrix)(rvgctx_t* ctx, const void* matrix);
+	void(*get_matrix)(rvgctx_t* ctx, void* matrix);
+	void(*identity_matrix)(rvgctx_t* ctx);
+
 	// 图案：渐变/图片
 	rvg_surface_t* (*new_surface)(rvgctx_t* ctx, int width, int height, uint32_t* data, int stride, int type);	// stride宽度，type: 0 rgba, 1 bgra
 	rvg_surface_t* (*new_surface_vk)(rvgctx_t* ctx, int width, int height, void* vkimage);						// 输入vkimage做源
 	rvg_pattern_t* (*new_pattern_linear)(rvgctx_t* ctx, float x0, float y0, float x1, float y1);
 	rvg_pattern_t* (*new_pattern_radial)(rvgctx_t* ctx, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
 	rvg_pattern_t* (*new_pattern_sweep)(rvgctx_t* ctx, float cx, float cy, float start_angle, float end_angle);
-	int (*pattern_add_color_stop)(rvg_pattern_t*pat, float o, float r, float g, float b, float a);
-	int (*pattern_set_color_stop)(rvg_pattern_t*pat, int idx, float o, float r, float g, float b, float a);
+	int (*pattern_add_color_stop)(rvg_pattern_t* pat, float o, float r, float g, float b, float a);
+	int (*pattern_set_color_stop)(rvg_pattern_t* pat, int idx, float o, float r, float g, float b, float a);
 	void(*pattern_set_matrix)(rvg_pattern_t* pat, const void* matrix);	// mat3x2
 	void(*pattern_set_extend)(rvg_pattern_t* pat, int extend);
 	void(*pattern_set_filter)(rvg_pattern_t* pat, int filter);
