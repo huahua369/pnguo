@@ -11792,11 +11792,12 @@ void rvg_pattern_destroy(void* pat)
 
 void init_rvg(vgdev_ctx* ptr, rvg_cb* r) {
 	if (!ptr || !r)return;
+	*r = {};
 	r->ctx = ptr;
 	// 视图
 
 	r->new_view = rvg_new_view;
-	r->get_view == rvg_get_view;
+	r->get_view = rvg_get_view;
 	// 路径操作	// 路径操作
 	r->new_path = rvg_new_path;
 	r->clear_path = rvg_clear_path;
@@ -11805,7 +11806,7 @@ void init_rvg(vgdev_ctx* ptr, rvg_cb* r) {
 	r->path_extents = rvg_path_extents;
 	r->get_current_point = rvg_get_current_point;
 	// 添加数据到当前路径，参考path_type_e	// 添加数据到当前路径，参考path_type_e
-	r->add_path = rvg_add_path;
+	//r->add_path = rvg_add_path;
 	r->move_to = rvg_move_to;
 	r->rel_move_to = rvg_rel_move_to;
 	r->line_to = rvg_line_to;
