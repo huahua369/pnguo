@@ -1020,7 +1020,7 @@ void testgui() {
 		appx->draw2d = [=](app_x* ptr, float delta)
 			{
 				void* psem = 0;
-				return psem;// draw_vgtest(surf, img, surfsize, 0);
+				return draw_vgtest(surf, img, surfsize, 0);
 			};
 	}
 

@@ -99,6 +99,7 @@ extern "C" {
 }
 #endif
 
+VkhImage dc_device_create_empty_texture(VkvgDevice dev, VkFormat format, int width, int height, const glm::vec4& color);
 
 void _device_submit_cmd_sem(VkvgDevice dev, VkCommandBuffer* cmd, VkSemaphore waitSemaphore, VkSemaphore signalSemaphore, VkFence fence);
 
@@ -118,6 +119,68 @@ struct pipelinestate_p
 	VkPipeline pipeline;
 };
 pipelinestate_p new_spv_base(VkDevice device, VkRenderPass renderPass, uint8_t blendMode, uint8_t topology_idx, uint8_t type);
+
+struct geoms_ctx {
+	struct Vertex1 {
+		vec3 pos;
+		vec2 uv;
+		uint32_t color;
+	};
+	struct Vertex2 {
+		vec3 pos;
+		vec2 uv;
+		uint32_t color;
+		uint32_t color1;
+	};
+	struct cmd_t {
+		pipelinestate_p* pipeline = nullptr;	// 当前管线
+		glm::mat4 mat = glm::mat4(1.0f);
+		uint32_t indexCount;
+		uint32_t firstIndex;
+		int32_t  vertexOffset;
+	};
+	VkvgDevice dev = {};
+	VkRenderPass renderPass = nullptr;
+	vkh_buffer_t vertices = {};
+	vkh_buffer_t indices = {};
+	uint32_t     sizeVBO = 0;
+	uint32_t     sizeIBO = 0;
+	std::map<uint32_t, pipelinestate_p> pipelines;
+	pipelinestate_p* pipeline = nullptr;	// 当前管线
+	glm::mat4 mat = glm::mat4(1.0f);
+	uint32_t curState = 0;	// 当前状态	
+	t_vector<cmd_t> cmdlist;// 命令列表
+	t_vector<Vertex1> vd1;	// 单面顶点
+	t_vector<Vertex2> vd2;	// 双面顶点
+public:
+	~geoms_ctx();
+	void init(VkvgDevice _dev, VkRenderPass renderPass, uint32_t _sizeVBO, uint32_t _sizeIBO);
+	pipelinestate_p* gen_spv_base(uint8_t blendMode, uint8_t topology_idx, uint8_t type);
+	void destroy();
+	void resize_vbo(uint32_t new_size);
+	void resize_ibo(uint32_t new_size);
+	void upload_vbo(void* data, uint32_t offset, uint32_t size, bool flush);
+	void upload_ibo(void* data, uint32_t offset, uint32_t size, bool flush);
+	void reset();
+public:
+	// 清空命令列表
+	void clear();
+	// 录制渲染
+	void draw(VkCommandBuffer cmd);
+public:
+	void set_state(uint8_t blendMode, uint8_t topology, bool doubleSided, bool depthTestEnable, bool depthWriteEnable, bool stencilTestEnable);
+	void set_matrix(const glm::mat4* matrix);
+	// 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据
+	bool add_geometry(void* texture, const float* xy, int xy_stride
+		, const float* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices);
+	// 添加3D几何数据到缓冲区，xyz顶点坐标，color顶点颜色（双面则要双倍），uv顶点纹理坐标，indices索引数据
+	bool add_geometry3d(void* texture, const float* xyz, int xyz_stride
+		, const float* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices);
+private:
+	// 绑定顶点缓冲和索引缓冲
+	void bind(VkCommandBuffer cmd, size_t offset, size_t ioffset);
+};
+
 
 class vgdev_ctx
 {
@@ -2811,6 +2874,7 @@ void _resize_ibo(VkvgContext ctx, size_t new_size) {
 	LOG(VKVG_LOG_DBG_ARRAYS, "resize IBO: new size: %d\n", ctx->sizeIBO);
 	vkh_buffer_resize(&ctx->indices, ctx->sizeIBO * sizeof(VKVG_IBO_INDEX_TYPE), true);
 }
+
 void _add_vertexf(VkvgContext ctx, float x, float y) {
 	Vertex* pVert = &ctx->vertexCache[ctx->vertCount];
 	pVert->pos.x = x;
@@ -4795,8 +4859,8 @@ void _device_init(VkvgDevice dev, const vkvg_device_create_info_t* info) {
 	_device_createDescriptorSetLayout(dev);
 	_device_setupPipelines(dev);
 
-	_device_create_empty_texture(dev, format, dev->supportedTiling);
-
+	//_device_create_empty_texture(dev, format, dev->supportedTiling);
+	dev->emptyImg = dc_device_create_empty_texture(dev, format, 16, 16, glm::vec4(1.0));
 #ifdef DEBUG
 #if defined(__linux__) && defined(__GLIBC__)
 	_linux_register_error_handler();
@@ -5509,14 +5573,8 @@ void _device_setupPipelines(VkvgDevice dev) {
 	colorBlendState.logicOp = VK_LOGIC_OP_CLEAR;
 	VK_CHECK_RESULT(
 		vkCreateGraphicsPipelines(dev->vkDev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL, &dev->pipe_CLEAR));
-	uint8_t blendMode = 0;
-	uint8_t topology_idx = -1;
-	uint8_t type = 0;
-	//DOUBLESIDED		双面不同颜色
-	//DEPTHTESTENABLE	深度测试启用
-	//DEPTHWRITEENABLE	深度写入启用
-	//STENCILTESTENABLE	模板测试启用
-	pipelinestate_p pl = new_spv_base(dev->vkDev, dev->renderPass, blendMode, topology_idx, type);
+
+
 #ifdef VKVG_WIRED_DEBUG
 	colorBlendState.logicOpEnable = VK_FALSE;
 	blendAttachmentState.blendEnable = VK_TRUE;
@@ -9864,6 +9922,82 @@ void dc_explicit_ms_resolve(VkCommandBuffer cmd, VkvgSurface surf) {
 	UNLOCK_SURFACE(surf)
 }
 
+VkhImage dc_device_create_empty_texture(VkvgDevice dev, VkFormat format, int width, int height, const glm::vec4& color)
+{
+	VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
+	// create empty image to bind to context source descriptor when not in use
+	VkhImage emptyImg = vkh_image_create((VkhDevice)&dev->vkDev, format, width > 0 ? width : 16, height > 0 ? height : 16, tiling, VKH_MEMORY_USAGE_GPU_ONLY,
+		VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+	vkh_image_create_descriptor(emptyImg, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT, VK_FILTER_NEAREST,
+		VK_FILTER_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST,
+		VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+
+	_device_wait_and_reset_device_fence(dev);
+	auto cmd = dev->cmd;
+	vkh_cmd_begin(dev->cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+	VkClearColorValue       cclr = { {color.x, color.y, color.z, color.w} };
+	VkImageSubresourceRange range = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	VkhImage img = emptyImg;
+	vkh_image_set_layout(cmd, img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+	vkCmdClearColorImage(cmd, vkh_image_get_vkimage(img), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &cclr, 1, &range);
+	vkh_image_set_layout(dev->cmd, emptyImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+	vkh_cmd_end(dev->cmd);
+	_device_submit_cmd(dev, &dev->cmd, dev->fence);
+	return emptyImg;
+}
+void dc_clear_surface(VkvgSurface surf, bool col, bool ds, const glm::vec4& color, const glm::vec2& depthstencil)
+{
+	LOCK_SURFACE(surf);
+
+	VkCommandBuffer cmd = surf->cmd;
+	VkImageAspectFlags aspect = 0;
+	if (col)
+		aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+	if (ds)aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+	vkh_cmd_begin(cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+	if (aspect & VK_IMAGE_ASPECT_COLOR_BIT) {
+		VkClearColorValue       cclr = { {color.x, color.y, color.z, color.w} };
+		VkImageSubresourceRange range = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+
+		VkhImage img = surf->imgMS;
+		if (surf->dev->samples == VK_SAMPLE_COUNT_1_BIT)
+			img = surf->img;
+
+		vkh_image_set_layout(cmd, img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+		vkCmdClearColorImage(cmd, vkh_image_get_vkimage(img), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &cclr, 1, &range);
+
+		vkh_image_set_layout(cmd, img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+	}
+	if (aspect & VK_IMAGE_ASPECT_STENCIL_BIT) {
+		VkClearDepthStencilValue clr = { depthstencil.x, depthstencil.y };
+		VkImageSubresourceRange  range = { VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1 };
+
+		vkh_image_set_layout(cmd, surf->stencil, VK_IMAGE_ASPECT_STENCIL_BIT,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+		vkCmdClearDepthStencilImage(cmd, vkh_image_get_vkimage(surf->stencil), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			&clr, 1, &range);
+
+		vkh_image_set_layout(cmd, surf->stencil, VK_IMAGE_ASPECT_STENCIL_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT);
+	}
+	vkh_cmd_end(cmd);
+
+	_surface_submit_cmd(surf);
+
+	UNLOCK_SURFACE(surf)
+}
 void dc_explicit_shader_read(VkCommandBuffer cmd, VkvgSurface surf) {
 	VkImageMemoryBarrier barrier = {};
 	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -12945,8 +13079,152 @@ pipelinestate_p new_spv_base(VkDevice device, VkRenderPass renderPass, uint8_t b
 	VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN };
 	VkPrimitiveTopology topology = topology_idx < 0 || topology_idx > 5 ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST : topologys[topology_idx];
 	auto p = newPipelineState(pd, type & DOUBLESIDED ? 1 : 0, blendMode, topology);
+	p.blendMode = blendMode;
+	p.topology_idx = topology_idx;
 	p.type = type;
+	p.shader = type & DOUBLESIDED ? 1 : 0;
 	return p;
 }
 
 #endif // 1
+
+geoms_ctx::~geoms_ctx()
+{
+	destroy();
+}
+
+void geoms_ctx::init(VkvgDevice _dev, VkRenderPass rpass, uint32_t _sizeVBO, uint32_t _sizeIBO)
+{
+	renderPass = rpass;
+	dev = _dev;
+	sizeVBO = _sizeVBO; sizeIBO = _sizeIBO;
+	vkh_buffer_init(_dev->vkhDev, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeVBO, &vertices, true);
+	vkh_buffer_init(_dev->vkhDev, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeIBO, &indices, true);
+}
+
+pipelinestate_p* geoms_ctx::gen_spv_base(uint8_t blendMode, uint8_t topology_idx, uint8_t type)
+{
+	union {
+		uint8_t btt[4];
+		uint32_t t = 0;
+	}v;
+	v.btt[0] = blendMode; v.btt[1] = topology_idx; v.btt[2] = type;
+	if (curState != v.t) {
+		curState = v.t;
+	}
+	auto& pl = pipelines[v.t];
+	if (!pl.pipeline) {
+		pl = new_spv_base((VkDevice)dev->vkDev, renderPass, blendMode, topology_idx, type);
+	}
+	return &pl;
+}
+
+void geoms_ctx::destroy()
+{
+	vkh_buffer_destroy(&vertices);
+	vkh_buffer_destroy(&indices);
+}
+
+void geoms_ctx::resize_vbo(uint32_t new_size)
+{
+	if (sizeVBO < new_size)
+	{
+		vkh_buffer_resize(&vertices, vgAlignUp(new_size, (uint32_t)64), true);
+	}
+}
+
+void geoms_ctx::resize_ibo(uint32_t new_size)
+{
+	if (sizeIBO < new_size)
+	{
+		sizeIBO = new_size;
+		vkh_buffer_resize(&indices, vgAlignUp(new_size, (uint32_t)64), true);
+	}
+}
+
+void geoms_ctx::upload_vbo(void* data, uint32_t offset, uint32_t size, bool flush)
+{
+	memcpy((char*)vkh_buffer_get_mapped_pointer(&vertices) + offset, data, size);
+	if (flush)
+		vkh_buffer_flush(&vertices);
+}
+
+void geoms_ctx::upload_ibo(void* data, uint32_t offset, uint32_t size, bool flush)
+{
+	memcpy((char*)vkh_buffer_get_mapped_pointer(&indices) + offset, data, size);
+	if (flush)
+		vkh_buffer_flush(&indices);
+}
+
+void geoms_ctx::reset()
+{
+	vkh_buffer_reset(&vertices);
+	vkh_buffer_reset(&indices);
+}
+
+void geoms_ctx::clear()
+{
+	cmdlist.clear();// 命令列表
+	vd1.clear();	// 单面顶点
+	vd2.clear();	// 双面顶点
+}
+
+void geoms_ctx::draw(VkCommandBuffer cmd)
+{
+	if (!cmd)return;
+
+}
+
+void geoms_ctx::bind(VkCommandBuffer cmd, size_t offset, size_t ioffset)
+{
+	VkDeviceSize offsets[1] = { offset };
+	vkCmdBindVertexBuffers(cmd, 0, 1, &vertices.buffer, offsets);
+	vkCmdBindIndexBuffer(cmd, indices.buffer, ioffset, VK_INDEX_TYPE_UINT32);
+}
+
+void geoms_ctx::set_state(uint8_t blendMode, uint8_t topology, bool doubleSided, bool depthTestEnable, bool depthWriteEnable, bool stencilTestEnable)
+{
+	uint8_t type = 0;
+	if (doubleSided)
+		type |= DOUBLESIDED;
+	if (depthTestEnable)
+		type |= DEPTHTESTENABLE;
+	if (depthWriteEnable)
+		type |= DEPTHWRITEENABLE;
+	if (stencilTestEnable)
+		type |= STENCILTESTENABLE;
+
+	union {
+		uint8_t btt[4];
+		uint32_t t = 0;
+	}v;
+	v.btt[0] = blendMode; v.btt[1] = topology; v.btt[2] = type;
+	if (curState != v.t) {
+		curState = v.t;
+	}
+	if (!pipeline)
+	{
+		auto& pl = pipelines[v.t];
+		if (!pl.pipeline) {
+			pipelinestate_p p0 = new_spv_base((VkDevice)dev->vkDev, renderPass, blendMode, topology, type);
+			pl = p0;
+		}
+		if (pl.pipeline)
+			pipeline = &pl;
+	}
+}
+
+void geoms_ctx::set_matrix(const glm::mat4* matrix)
+{
+	mat = *matrix;
+}
+
+bool geoms_ctx::add_geometry(void* texture, const float* xy, int xy_stride, const float* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices)
+{
+	return false;
+}
+
+bool geoms_ctx::add_geometry3d(void* texture, const float* xyz, int xyz_stride, const float* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices)
+{
+	return false;
+}
