@@ -134,10 +134,12 @@ struct geoms_ctx {
 	};
 	struct cmd_t {
 		pipelinestate_p* pipeline = nullptr;	// 当前管线
+		VkhImage texture = nullptr;
 		glm::mat4 mat = glm::mat4(1.0f);
-		uint32_t indexCount;
-		uint32_t firstIndex;
-		int32_t  vertexOffset;
+		uint32_t indexCount = 0;
+		uint32_t firstIndex = 0;
+		int32_t  vertexOffset = 0;
+		size_t offset = 0, ioffset = 0;
 	};
 	VkvgDevice dev = {};
 	VkRenderPass renderPass = nullptr;
@@ -147,6 +149,8 @@ struct geoms_ctx {
 	uint32_t     sizeIBO = 0;
 	std::map<uint32_t, pipelinestate_p> pipelines;
 	pipelinestate_p* pipeline = nullptr;	// 当前管线
+	PFN_vkCmdPushDescriptorSet _vkCmdPushDescriptorSet = {};
+	uint32_t maxPushDescriptors = 0;
 	glm::mat4 mat = glm::mat4(1.0f);
 	uint32_t curState = 0;	// 当前状态	
 	t_vector<cmd_t> cmdlist;// 命令列表
@@ -154,7 +158,7 @@ struct geoms_ctx {
 	t_vector<Vertex2> vd2;	// 双面顶点
 public:
 	~geoms_ctx();
-	void init(VkvgDevice _dev, VkRenderPass renderPass, uint32_t _sizeVBO, uint32_t _sizeIBO);
+	void init(VkvgContext ctx, uint32_t _sizeVBO, uint32_t _sizeIBO);
 	pipelinestate_p* gen_spv_base(uint8_t blendMode, uint8_t topology_idx, uint8_t type);
 	void destroy();
 	void resize_vbo(uint32_t new_size);
@@ -179,6 +183,7 @@ public:
 private:
 	// 绑定顶点缓冲和索引缓冲
 	void bind(VkCommandBuffer cmd, size_t offset, size_t ioffset);
+	void push_update_descriptor_set(VkCommandBuffer cmd, pipelinestate_p* cp, VkhImage img);
 };
 
 
@@ -13093,13 +13098,16 @@ geoms_ctx::~geoms_ctx()
 	destroy();
 }
 
-void geoms_ctx::init(VkvgDevice _dev, VkRenderPass rpass, uint32_t _sizeVBO, uint32_t _sizeIBO)
+void geoms_ctx::init(VkvgContext ctx, uint32_t _sizeVBO, uint32_t _sizeIBO)
 {
-	renderPass = rpass;
-	dev = _dev;
+	if (!ctx)return;
+	dev = ctx->dev;
+	renderPass = dev->renderPass;
+	_vkCmdPushDescriptorSet = ctx->_vkCmdPushDescriptorSet;
+	maxPushDescriptors = ctx->maxPushDescriptors;
 	sizeVBO = _sizeVBO; sizeIBO = _sizeIBO;
-	vkh_buffer_init(_dev->vkhDev, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeVBO, &vertices, true);
-	vkh_buffer_init(_dev->vkhDev, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeIBO, &indices, true);
+	vkh_buffer_init(dev->vkhDev, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeVBO, &vertices, true);
+	vkh_buffer_init(dev->vkhDev, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeIBO, &indices, true);
 }
 
 pipelinestate_p* geoms_ctx::gen_spv_base(uint8_t blendMode, uint8_t topology_idx, uint8_t type)
@@ -13172,7 +13180,21 @@ void geoms_ctx::clear()
 void geoms_ctx::draw(VkCommandBuffer cmd)
 {
 	if (!cmd)return;
-
+	pipelinestate_p* cp = 0;
+	for (auto& it : cmdlist) {
+		if (cp != it.pipeline)
+		{
+			cp = it.pipeline;
+			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cp->pipeline);
+		}
+		if (cp)
+		{
+			vkCmdPushConstants(cmd, cp->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &it.mat);
+			push_update_descriptor_set(cmd, cp, it.texture);
+		}
+		bind(cmd, it.offset, it.ioffset);
+		vkCmdDrawIndexed(cmd, it.indexCount, 1, it.firstIndex, it.vertexOffset, 0);
+	}
 }
 
 void geoms_ctx::bind(VkCommandBuffer cmd, size_t offset, size_t ioffset)
@@ -13180,6 +13202,24 @@ void geoms_ctx::bind(VkCommandBuffer cmd, size_t offset, size_t ioffset)
 	VkDeviceSize offsets[1] = { offset };
 	vkCmdBindVertexBuffers(cmd, 0, 1, &vertices.buffer, offsets);
 	vkCmdBindIndexBuffer(cmd, indices.buffer, ioffset, VK_INDEX_TYPE_UINT32);
+}
+
+void geoms_ctx::push_update_descriptor_set(VkCommandBuffer cmd, pipelinestate_p* cp, VkhImage img)
+{
+	if (maxPushDescriptors || _vkCmdPushDescriptorSet || !img)return;
+	VkDescriptorImageInfo dst0 = vkh_image_get_descriptor(img, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	VkWriteDescriptorSet  wimg = {
+	.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+	.dstSet = 0,
+	.dstBinding = 0,
+	.descriptorCount = 1,
+	.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+	.pImageInfo = 0 };
+	VkWriteDescriptorSet  wds[1] = {};
+	wimg.pImageInfo = &dst0;
+	wds[0] = wimg;
+	wimg.dstBinding = 1;
+	_vkCmdPushDescriptorSet(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cp->pipelineLayout, 0, 1, wds);
 }
 
 void geoms_ctx::set_state(uint8_t blendMode, uint8_t topology, bool doubleSided, bool depthTestEnable, bool depthWriteEnable, bool stencilTestEnable)
