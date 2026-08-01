@@ -1203,18 +1203,22 @@ namespace vkg {
 			pdset = (PFN_vkCmdPushDescriptorSet)vkGetDeviceProcAddr(px->_device, "vkCmdPushDescriptorSet");
 			pdsetKhr = (PFN_vkCmdPushDescriptorSetKHR)vkGetDeviceProcAddr(px->_device, "vkCmdPushDescriptorSetKHR");
 		}
-		//if (dr)
-		//{
-		//	_vkCmdBeginRenderingKHR = (PFN_vkCmdBeginRenderingKHR)vkGetDeviceProcAddr(px->_device, "vkCmdBeginRenderingKHR");
-		//	_vkCmdEndRenderingKHR = (PFN_vkCmdEndRenderingKHR)vkGetDeviceProcAddr(px->_device, "vkCmdEndRenderingKHR");
-		//	_vkCmdSetFrontFace = (PFN_vkCmdSetFrontFace)vkGetDeviceProcAddr(px->_device, "vkCmdSetFrontFace");
-		//	//if (!_vkCmdSetFrontFace)
-		//	//	_vkCmdSetFrontFace = (PFN_vkCmdSetFrontFaceEXT)vkGetDeviceProcAddr(m_device, "vkCmdSetFrontFaceEXT");
-		//}
-		//if (enabledMS)
-		//{
-		//	_vkCmdDrawMeshTasksEXT = reinterpret_cast<PFN_vkCmdDrawMeshTasksEXT>(vkGetDeviceProcAddr(px->_device, "vkCmdDrawMeshTasksEXT"));
-		//}
+		PFN_vkCmdBeginRenderingKHR _vkCmdBeginRenderingKHR = VK_NULL_HANDLE;
+		PFN_vkCmdEndRenderingKHR _vkCmdEndRenderingKHR = VK_NULL_HANDLE;
+		PFN_vkCmdSetFrontFace _vkCmdSetFrontFace;
+		PFN_vkCmdDrawMeshTasksEXT _vkCmdDrawMeshTasksEXT;
+		if (dr)
+		{
+			_vkCmdBeginRenderingKHR = (PFN_vkCmdBeginRenderingKHR)vkGetDeviceProcAddr(px->_device, "vkCmdBeginRenderingKHR");
+			_vkCmdEndRenderingKHR = (PFN_vkCmdEndRenderingKHR)vkGetDeviceProcAddr(px->_device, "vkCmdEndRenderingKHR");
+			_vkCmdSetFrontFace = (PFN_vkCmdSetFrontFace)vkGetDeviceProcAddr(px->_device, "vkCmdSetFrontFace");
+			if (!_vkCmdSetFrontFace)
+				_vkCmdSetFrontFace = (PFN_vkCmdSetFrontFaceEXT)vkGetDeviceProcAddr(px->_device, "vkCmdSetFrontFaceEXT");
+		}
+		if (enabledMS)
+		{
+			_vkCmdDrawMeshTasksEXT = reinterpret_cast<PFN_vkCmdDrawMeshTasksEXT>(vkGetDeviceProcAddr(px->_device, "vkCmdDrawMeshTasksEXT"));
+		}
 
 #ifdef USE_VMA
 		VmaAllocatorCreateInfo allocatorInfo = {};
