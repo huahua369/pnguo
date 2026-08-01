@@ -136,7 +136,7 @@ struct geoms_ctx {
 		pipelinestate_p* pipeline = nullptr;	// 当前管线
 		VkhImage texture = nullptr;
 		glm::mat4 mat = glm::mat4(1.0f);
-		uint32_t indexCount = 0;
+		uint32_t count = 0;
 		uint32_t firstIndex = 0;
 		int32_t  vertexOffset = 0;
 		size_t offset = 0, ioffset = 0;
@@ -153,13 +153,14 @@ struct geoms_ctx {
 	uint32_t maxPushDescriptors = 0;
 	glm::mat4 mat = glm::mat4(1.0f);
 	uint32_t curState = 0;	// 当前状态	
+	uint32_t v2offset = 0;	// 双面顶点偏移	
 	t_vector<cmd_t> cmdlist;// 命令列表
 	t_vector<Vertex1> vd1;	// 单面顶点
 	t_vector<Vertex2> vd2;	// 双面顶点
+	t_vector<uint32_t> ids;	// 索引
 public:
 	~geoms_ctx();
 	void init(VkvgContext ctx, uint32_t _sizeVBO, uint32_t _sizeIBO);
-	pipelinestate_p* gen_spv_base(uint8_t blendMode, uint8_t topology_idx, uint8_t type);
 	void destroy();
 	void resize_vbo(uint32_t new_size);
 	void resize_ibo(uint32_t new_size);
@@ -169,21 +170,24 @@ public:
 public:
 	// 清空命令列表
 	void clear();
-	// 录制渲染
+	// 批量录制渲染
 	void draw(VkCommandBuffer cmd);
 public:
 	void set_state(uint8_t blendMode, uint8_t topology, bool doubleSided, bool depthTestEnable, bool depthWriteEnable, bool stencilTestEnable);
 	void set_matrix(const glm::mat4* matrix);
-	// 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据
+	// 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据，color_type=0表示float4，1表示uint32_t
 	bool add_geometry(void* texture, const float* xy, int xy_stride
-		, const float* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices);
+		, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
 	// 添加3D几何数据到缓冲区，xyz顶点坐标，color顶点颜色（双面则要双倍），uv顶点纹理坐标，indices索引数据
 	bool add_geometry3d(void* texture, const float* xyz, int xyz_stride
-		, const float* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices);
+		, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
 private:
+	pipelinestate_p* gen_spv_base(uint8_t blendMode, uint8_t topology_idx, uint8_t type);
 	// 绑定顶点缓冲和索引缓冲
 	void bind(VkCommandBuffer cmd, size_t offset, size_t ioffset);
 	void push_update_descriptor_set(VkCommandBuffer cmd, pipelinestate_p* cp, VkhImage img);
+	// 上传顶点数据
+	void update_va();
 };
 
 
@@ -13175,12 +13179,28 @@ void geoms_ctx::clear()
 	cmdlist.clear();// 命令列表
 	vd1.clear();	// 单面顶点
 	vd2.clear();	// 双面顶点
+	ids.clear();
+}
+
+void geoms_ctx::update_va()
+{
+	v2offset = vd1.size() * sizeof(Vertex1);
+	auto v2 = vd2.size() * sizeof(Vertex2);
+	resize_vbo(v2offset + v2);
+	resize_ibo(ids.size() * sizeof(int));
+	if (vd1.size())
+		upload_vbo(vd1.data(), 0, v2offset, false);
+	if (vd2.size())
+		upload_vbo(vd2.data(), v2offset, v2, true);
+	if (ids.size())
+		upload_ibo(ids.data(), 0, ids.size() * sizeof(int), true);
 }
 
 void geoms_ctx::draw(VkCommandBuffer cmd)
 {
 	if (!cmd)return;
 	pipelinestate_p* cp = 0;
+	update_va();
 	for (auto& it : cmdlist) {
 		if (cp != it.pipeline)
 		{
@@ -13190,10 +13210,13 @@ void geoms_ctx::draw(VkCommandBuffer cmd)
 		if (cp)
 		{
 			vkCmdPushConstants(cmd, cp->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &it.mat);
-			push_update_descriptor_set(cmd, cp, it.texture);
+			push_update_descriptor_set(cmd, cp, it.texture ? it.texture : dev->emptyImg);
 		}
-		bind(cmd, it.offset, it.ioffset);
-		vkCmdDrawIndexed(cmd, it.indexCount, 1, it.firstIndex, it.vertexOffset, 0);
+		bind(cmd, it.offset * v2offset, it.ioffset);
+		if (it.firstIndex == -1)
+			vkCmdDraw(cmd, it.count, 1, it.vertexOffset, 0);
+		else
+			vkCmdDrawIndexed(cmd, it.count, 1, it.firstIndex, it.vertexOffset, 0);
 	}
 }
 
@@ -13259,12 +13282,246 @@ void geoms_ctx::set_matrix(const glm::mat4* matrix)
 	mat = *matrix;
 }
 
-bool geoms_ctx::add_geometry(void* texture, const float* xy, int xy_stride, const float* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices)
+bool geoms_ctx::add_geometry(void* texture, const float* xy, int xy_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices
+	, const void* indices, int num_indices, int size_indices, int color_type)
 {
-	return false;
+	if (!xy || num_vertices < 1)return false;
+	cmd_t c = {};
+	c.pipeline = pipeline;
+	c.texture = (VkhImage)texture;
+	c.mat = mat;
+	c.ioffset = 0;
+	float scale_x = 1.0, scale_y = 1.0;
+	float u_scale = 1.0, v_scale = 1.0;
+	size_indices = indices ? size_indices : 0;
+	ids.reserve(ids.size() + num_indices);
+	c.firstIndex = ids.size();
+	c.count = num_indices;
+	if (num_indices < 1 || size_indices < 1)
+	{
+		c.count = num_vertices;
+	}
+	if (pipeline && pipeline->type & DOUBLESIDED) {
+		c.vertexOffset = vd2.size();
+		c.offset = 1;
+		vd2.resize(vd2.size() + num_vertices);
+		auto mem = vd2.data() + c.vertexOffset;	// 双面顶点
+		auto verts = mem;
+		for (size_t i = 0; i < num_indices; i++) {
+			int j;
+			float* xy_;
+			if (size_indices == 4) {
+				j = ((const uint32_t*)indices)[i];
+			}
+			else if (size_indices == 2) {
+				j = ((const uint16_t*)indices)[i];
+			}
+			else if (size_indices == 1) {
+				j = ((const uint8_t*)indices)[i];
+			}
+			else {
+				j = i;
+			}
+			ids.push_back(j);
+		}
+		for (size_t i = 0; i < num_vertices; i++) {
+			float* xy_;
+			xy_ = (float*)((char*)xy + i * xy_stride);
+			verts->pos.x = xy_[0] * scale_x;
+			verts->pos.y = xy_[1] * scale_y;
+			if (color_type == 1) {
+				auto c8 = (uint32_t*)((char*)color + i * color_stride);
+				verts->color = *c8; c8++;
+				verts->color1 = *c8;
+			}
+			else
+			{
+				auto c4 = (glm::vec4*)((char*)color + i * color_stride);
+				verts->color = CreateRgbaf(c4->x, c4->y, c4->z, c4->w); c4++;
+				verts->color1 = CreateRgbaf(c4->x, c4->y, c4->z, c4->w);
+			}
+			if (texture && uv) {
+				float* uv_ = (float*)((char*)uv + i * uv_stride);
+				verts->uv.x = uv_[0] * u_scale;
+				verts->uv.y = uv_[1] * v_scale;
+			}
+			else {
+				verts->uv = { 0.0f, 0.0f };
+			}
+			verts += 1;
+		}
+	}
+	else
+	{
+		c.vertexOffset = vd1.size();
+		vd1.resize(vd1.size() + num_vertices);
+		auto mem = vd1.data() + c.vertexOffset;	// 单面顶点
+		auto verts = mem;
+		for (size_t i = 0; i < num_indices; i++) {
+			int j;
+			float* xy_;
+			if (size_indices == 4) {
+				j = ((const uint32_t*)indices)[i];
+			}
+			else if (size_indices == 2) {
+				j = ((const uint16_t*)indices)[i];
+			}
+			else if (size_indices == 1) {
+				j = ((const uint8_t*)indices)[i];
+			}
+			else {
+				j = i;
+			}
+			ids.push_back(j);
+		}
+		for (size_t i = 0; i < num_vertices; i++) {
+			float* xy_;
+			xy_ = (float*)((char*)xy + i * xy_stride);
+			verts->pos.x = xy_[0] * scale_x;
+			verts->pos.y = xy_[1] * scale_y;
+			if (color_type == 1) {
+				auto c8 = (uint32_t*)((char*)color + i * color_stride);
+				verts->color = *c8; c8++;
+			}
+			else
+			{
+				auto c4 = (glm::vec4*)((char*)color + i * color_stride);
+				verts->color = CreateRgbaf(c4->x, c4->y, c4->z, c4->w);
+			}
+			if (texture && uv) {
+				float* uv_ = (float*)((char*)uv + i * uv_stride);
+				verts->uv.x = uv_[0] * u_scale;
+				verts->uv.y = uv_[1] * v_scale;
+			}
+			else {
+				verts->uv = { 0.0f, 0.0f };
+			}
+			verts += 1;
+		}
+	}
+	cmdlist.push_back(c);
+	return true;
 }
 
-bool geoms_ctx::add_geometry3d(void* texture, const float* xyz, int xyz_stride, const float* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices)
+bool geoms_ctx::add_geometry3d(void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices
+	, const void* indices, int num_indices, int size_indices, int color_type)
 {
-	return false;
+	if (!xyz || num_vertices < 1)return false;
+	cmd_t c = {};
+	c.pipeline = pipeline;
+	c.texture = (VkhImage)texture;
+	c.mat = mat;
+	c.ioffset = 0;
+	float scale_x = 1.0, scale_y = 1.0, scale_z = 1.0;
+	float u_scale = 1.0, v_scale = 1.0;
+	size_indices = indices ? size_indices : 0;
+	ids.reserve(ids.size() + num_indices);
+	c.firstIndex = ids.size();
+	c.count = num_indices;
+	if (num_indices < 1 || size_indices < 1)
+	{
+		c.count = num_vertices;
+	}
+	if (pipeline && pipeline->type & DOUBLESIDED) {
+		c.vertexOffset = vd2.size();
+		c.offset = 1;
+		vd2.resize(vd2.size() + num_vertices);
+		auto mem = vd2.data() + c.vertexOffset;	// 双面顶点
+		auto verts = mem;
+		for (size_t i = 0; i < num_indices; i++) {
+			int j;
+			float* xy_;
+			if (size_indices == 4) {
+				j = ((const uint32_t*)indices)[i];
+			}
+			else if (size_indices == 2) {
+				j = ((const uint16_t*)indices)[i];
+			}
+			else if (size_indices == 1) {
+				j = ((const uint8_t*)indices)[i];
+			}
+			else {
+				j = i;
+			}
+			ids.push_back(j);
+		}
+		for (size_t i = 0; i < num_vertices; i++) {
+			float* xyz_;
+			xyz_ = (float*)((char*)xyz + i * xyz_stride);
+			verts->pos.x = xyz_[0] * scale_x;
+			verts->pos.y = xyz_[1] * scale_y;
+			verts->pos.z = xyz_[2] * scale_z;
+			if (color_type == 1) {
+				auto c8 = (uint32_t*)((char*)color + i * color_stride);
+				verts->color = *c8; c8++;
+				verts->color1 = *c8;
+			}
+			else
+			{
+				auto c4 = (glm::vec4*)((char*)color + i * color_stride);
+				verts->color = CreateRgbaf(c4->x, c4->y, c4->z, c4->w); c4++;
+				verts->color1 = CreateRgbaf(c4->x, c4->y, c4->z, c4->w);
+			}
+			if (texture && uv) {
+				float* uv_ = (float*)((char*)uv + i * uv_stride);
+				verts->uv.x = uv_[0] * u_scale;
+				verts->uv.y = uv_[1] * v_scale;
+			}
+			else {
+				verts->uv = { 0.0f, 0.0f };
+			}
+			verts += 1;
+		}
+	}
+	else
+	{
+		c.vertexOffset = vd1.size();
+		vd1.resize(vd1.size() + num_vertices);
+		auto mem = vd1.data() + c.vertexOffset;	// 单面顶点
+		auto verts = mem;
+		for (size_t i = 0; i < num_indices; i++) {
+			int j;
+			float* xy_;
+			if (size_indices == 4) {
+				j = ((const uint32_t*)indices)[i];
+			}
+			else if (size_indices == 2) {
+				j = ((const uint16_t*)indices)[i];
+			}
+			else if (size_indices == 1) {
+				j = ((const uint8_t*)indices)[i];
+			}
+			else {
+				j = i;
+			}
+			ids.push_back(j);
+		}
+		for (size_t i = 0; i < num_vertices; i++) {
+			float* xyz_;
+			xyz_ = (float*)((char*)xyz + i * xyz_stride);
+			verts->pos.x = xyz_[0] * scale_x;
+			verts->pos.y = xyz_[1] * scale_y;
+			verts->pos.z = xyz_[2] * scale_z;
+			if (color_type == 1) {
+				auto c8 = (uint32_t*)((char*)color + i * color_stride);
+				verts->color = *c8; c8++;
+			}
+			else
+			{
+				auto c4 = (glm::vec4*)((char*)color + i * color_stride);
+				verts->color = CreateRgbaf(c4->x, c4->y, c4->z, c4->w);
+			}
+			if (texture && uv) {
+				float* uv_ = (float*)((char*)uv + i * uv_stride);
+				verts->uv.x = uv_[0] * u_scale;
+				verts->uv.y = uv_[1] * v_scale;
+			}
+			else {
+				verts->uv = { 0.0f, 0.0f };
+			}
+			verts += 1;
+		}
+	}
+	cmdlist.push_back(c);
+	return true;
 }
