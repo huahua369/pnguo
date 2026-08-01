@@ -13206,7 +13206,7 @@ void geoms_ctx::bind(VkCommandBuffer cmd, size_t offset, size_t ioffset)
 
 void geoms_ctx::push_update_descriptor_set(VkCommandBuffer cmd, pipelinestate_p* cp, VkhImage img)
 {
-	if (maxPushDescriptors || _vkCmdPushDescriptorSet || !img)return;
+	if (!maxPushDescriptors || !_vkCmdPushDescriptorSet || !img)return;
 	VkDescriptorImageInfo dst0 = vkh_image_get_descriptor(img, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	VkWriteDescriptorSet  wimg = {
 	.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
