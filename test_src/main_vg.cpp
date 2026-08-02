@@ -434,7 +434,7 @@ void r_grid_fill(rvg_cb* cr, glm::vec2 size, glm::ivec2 cols, int width)
 	cr->set_source_color(cr->ctx, c);
 	cr->fill(cr->ctx);
 }
-void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize, bool wait) {
+void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize, bool wait, void** rsem) {
 	const char* filename = "temp/vkvg_gradient.png";
 	static auto dctx = new_vgctx();
 	//free_vgctx(dctx);
@@ -485,7 +485,9 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 
 	//dcb->rectangle(path, 20, 150, 200, 100, 10);
 	//dcb->clip(dctx, path);// 圆角矩形裁剪
-	dcb->set_line_width(dctx, 6);	dcb->translate(dctx, 0, 128);
+	dcb->set_line_width(dctx, 6);
+	dcb->save(dctx);
+	dcb->translate(dctx, 0, 128);
 	dcb->rectangle(path, 12, 12, 232, 70);
 	dcb->new_sub_path(path); dcb->arc(path, 64, 64, 40, 0, 2 * m_pi);
 	dcb->new_sub_path(path); dcb->arc_negative(path, 192, 64, 40, 0, -2 * m_pi);
@@ -495,7 +497,8 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 
 	dcb->set_glutess(dctx, false);
 	dcb->set_source_rgba(dctx, 0, 0, 0, 1);	dcb->stroke(dctx); //描边
-	dcb->translate(dctx, 0, -128);
+	dcb->restore(dctx);
+	//dcb->translate(dctx, 0, -128);
 
 	dcb->clear_path(path);
 	//dcb->clip0(dctx);
@@ -548,7 +551,7 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	rect_shadow_t rs = {};
 	rs.radius = 20;
 	draw_rect_gradient(dcb, 100, 100, &rs, 0);
-
+	dcb->reset_clip(dctx);
 
 	void* sem = 0;
 	dcb->draw(dctx, (VkvgContext)cr, 0, &sem);//批量执行，返回vksem
@@ -582,7 +585,8 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 		vkvg_surface_write_to_png(surf, filename);
 	}
 	vkvg_destroy(cr);
-	return sem;
+	if (rsem)*rsem = sem;
+	return dctx;
 }
 class A
 {
@@ -619,10 +623,7 @@ private:
 };
 
 void testgui() {
-	{
-		vgdev_ctx* a = new_vgctx();
-		free_vgctx(a);
-	}
+
 	//test_vkvg("temp/vgtest0618.png", 0);
 	// 常用分辨率
 	glm::ivec2 dpis[] = {
@@ -981,6 +982,7 @@ void testgui() {
 	glm::ivec2 surfsize = { 260 * 3,256 };
 	VkvgSurface surf = view->_vgdev->new_surface(surfsize.x, surfsize.y);
 	auto img = view->_vgdev->new_surface(R"(E:\za\noto-emoji-2.042\third_party\region-flags\png\GB-WLS.png)");
+	void* vgctx = 0;
 	// 调色板 
 	{
 		auto dvv = colorpicker;
@@ -1020,7 +1022,7 @@ void testgui() {
 
 		//dvv->add_widget(r);
 		if (surf) {
-			draw_vgtest(surf, img, surfsize, 1);
+			vgctx = draw_vgtest(surf, img, surfsize, 1, nullptr);
 		}
 
 		auto ibtn = new image_btn();
@@ -1066,7 +1068,8 @@ void testgui() {
 		appx->draw2d = [=](app_x* ptr, float delta)
 			{
 				void* psem = 0;
-				return draw_vgtest(surf, img, surfsize, 0);
+				draw_vgtest(surf, img, surfsize, 0, &psem);
+				return psem;
 			};
 	}
 
@@ -1076,6 +1079,7 @@ void testgui() {
 
 	view->_vgdev->free_surface(surf);
 	view->_vgdev->free_surface(img);
+	free_vgctx((vgdev_ctx*)vgctx);
 }
 int main() {
 	// 启用内存泄漏检测

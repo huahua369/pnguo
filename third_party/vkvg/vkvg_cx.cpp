@@ -118,7 +118,7 @@ struct pipelinestate_p
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkPipeline pipeline;
 };
-pipelinestate_p new_spv_base(VkDevice device, VkRenderPass renderPass, uint8_t blendMode, uint8_t topology_idx, uint8_t type);
+pipelinestate_p new_spv_base(VkvgDevice device, uint8_t blendMode, uint8_t topology_idx, uint8_t type);
 
 struct geoms_ctx {
 	struct Vertex1 {
@@ -142,7 +142,7 @@ struct geoms_ctx {
 		size_t offset = 0, ioffset = 0;
 	};
 	VkvgDevice dev = {};
-	VkRenderPass renderPass = nullptr;
+	glm::ivec2 bufsize = {};
 	vkh_buffer_t vertices = {};
 	vkh_buffer_t indices = {};
 	uint32_t     sizeVBO = 0;
@@ -161,7 +161,7 @@ struct geoms_ctx {
 public:
 	~geoms_ctx();
 	void init(VkvgContext ctx, uint32_t _sizeVBO, uint32_t _sizeIBO);
-	void destroy();
+	void destroy_va();
 	void reset();
 public:
 	// 清空命令列表
@@ -178,7 +178,7 @@ public:
 	bool add_geometry3d(void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride
 		, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
 private:
-	pipelinestate_p* gen_spv_base(uint8_t blendMode, uint8_t topology_idx, uint8_t type);
+
 	// 绑定顶点缓冲和索引缓冲
 	void bind(VkCommandBuffer cmd, size_t offset, size_t ioffset);
 	void push_update_descriptor_set(VkCommandBuffer cmd, pipelinestate_p* cp, VkhImage img);
@@ -229,6 +229,7 @@ public:
 	paths_t* _dpath = 0;		// 默认路径缓存
 	paths_t* cur_path = 0;		// 当前路径
 	std::stack<state_save_t*> _cst;	// 保存栈 
+	geoms_ctx* gct = 0;
 	int  cmdidx = 0;
 	bool is_glutess = false;
 	bool is_fence = true;
@@ -8642,6 +8643,7 @@ vgdev_ctx::~vgdev_ctx()
 {
 	dc_free_paths(_dpath); _dpath = 0;
 	free_state(t); t = 0;
+	free_geoms(gct); gct = 0;
 }
 
 void vgdev_ctx::clear()
@@ -10321,6 +10323,9 @@ void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 		break;
 		}
 	}
+
+	gct = test_geoms(gct, ctx);
+	gct->draw(ctx->cmd);
 	_end_render_pass(ctx);
 	// 更新渐变ubo
 	vkh_buffer_flush(&ctx->uboGrad);
@@ -12228,7 +12233,7 @@ void init_rvg(vgdev_ctx* ptr, rvg_cb* r) {
 	r->pattern_destroy = rvg_pattern_destroy;
 
 
-};
+}
 
 
 // rvg_x
@@ -12887,21 +12892,46 @@ void freeModule(VkDevice device, VkShaderModule module0)
 
 void set_cblend(VkPipelineColorBlendAttachmentState& opt, const std::array<uint32_t, 6>& b) {
 	opt.srcColorBlendFactor = (VkBlendFactor)b[0];
-	opt.srcAlphaBlendFactor = (VkBlendFactor)b[1];
+	opt.dstColorBlendFactor = (VkBlendFactor)b[1];
 	opt.colorBlendOp = (VkBlendOp)b[2];
-	opt.dstColorBlendFactor = (VkBlendFactor)b[3];
+	opt.srcAlphaBlendFactor = (VkBlendFactor)b[3];
 	opt.dstAlphaBlendFactor = (VkBlendFactor)b[4];
 	opt.alphaBlendOp = (VkBlendOp)b[5];
+}	
+/*
+	VkBlendFactor            srcColorBlendFactor;
+	VkBlendFactor            dstColorBlendFactor;
+	VkBlendOp                colorBlendOp;
+	VkBlendFactor            srcAlphaBlendFactor;
+	VkBlendFactor            dstAlphaBlendFactor;
+	VkBlendOp                alphaBlendOp;
+	VkColorComponentFlags    colorWriteMask;
+*/
+void get_blend(bool blend, VkPipelineColorBlendAttachmentState& out)
+{
+	VkPipelineColorBlendAttachmentState color_blend =
+	{
+		blend ? VK_TRUE : VK_FALSE,                                                      // VkBool32                                       blendEnable
+		VK_BLEND_FACTOR_SRC_ALPHA,                                    // VkBlendFactor                                  srcColorBlendFactor
+		VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,                          // VkBlendFactor                                  dstColorBlendFactor
+		VK_BLEND_OP_ADD,                                              // VkBlendOp                                      colorBlendOp
+		VK_BLEND_FACTOR_ONE,                                          // VkBlendFactor                                  srcAlphaBlendFactor
+		VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,                          // VkBlendFactor                                  dstAlphaBlendFactor
+		VK_BLEND_OP_ADD,                                              // VkBlendOp                                      alphaBlendOp
+		VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |         // VkColorComponentFlags                          colorWriteMask
+		VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+	};
+	out = color_blend;
 }
 #if 1
-#define BLENDMODE_NONE_FULL set_cblend(colorBlendAttachment,{VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD})
-#define BLENDMODE_BLEND_FULL set_cblend(colorBlendAttachment,{VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD})
-#define BLENDMODE_BLEND_PREMULTIPLIED_FULL set_cblend(colorBlendAttachment,{VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD})
-#define BLENDMODE_ADD_FULL set_cblend(colorBlendAttachment,{VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD})
-#define BLENDMODE_ADD_PREMULTIPLIED_FULL set_cblend(colorBlendAttachment,{VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD})
-#define BLENDMODE_MOD_FULL set_cblend(colorBlendAttachment,{VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_SRC_COLOR, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD})
-#define BLENDMODE_MUL_FULL set_cblend(colorBlendAttachment,{VK_BLEND_FACTOR_DST_COLOR, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD})
-#define BLENDMODE_SCREEN_FULL set_cblend(colorBlendAttachment,{VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR, VK_BLEND_OP_ADD})
+#define BLENDMODE_NONE_FULL set_cblend(cba,{VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD})
+#define BLENDMODE_BLEND_FULL set_cblend(cba,{VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD})
+#define BLENDMODE_BLEND_PREMULTIPLIED_FULL set_cblend(cba,{VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD})
+#define BLENDMODE_ADD_FULL set_cblend(cba,{VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD})
+#define BLENDMODE_ADD_PREMULTIPLIED_FULL set_cblend(cba,{VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD})
+#define BLENDMODE_MOD_FULL set_cblend(cba,{VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_SRC_COLOR, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD})
+#define BLENDMODE_MUL_FULL set_cblend(cba,{VK_BLEND_FACTOR_DST_COLOR, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD})
+#define BLENDMODE_SCREEN_FULL set_cblend(cba,{VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR, VK_BLEND_OP_ADD})
 #endif
 
 // Color blend
@@ -12910,6 +12940,7 @@ void set_blend(VkPipelineColorBlendAttachmentState& colorBlendAttachment, uint32
 	colorBlendAttachment = {};
 	colorBlendAttachment.blendEnable = VK_TRUE;
 	auto bm = (blendmode_e)blendMode;
+	auto& cba = colorBlendAttachment;
 	switch (bm)
 	{
 	case blendmode_e::none:
@@ -12943,7 +12974,7 @@ void set_blend(VkPipelineColorBlendAttachmentState& colorBlendAttachment, uint32
 	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 }
 struct pipe_data {
-	VkDevice dev = {};
+	VkvgDevice dev = {};
 	VkShaderModule vert[2] = {};
 	VkShaderModule frag[2] = {};
 	VkRenderPass renderPass = {};
@@ -13010,14 +13041,15 @@ pipelinestate_p newPipelineState(pipe_data* pd, int shader, uint32_t blendMode, 
 	descriptor_layout.pNext = NULL;
 	descriptor_layout.bindingCount = (uint32_t)layoutBindings.size();
 	descriptor_layout.pBindings = layoutBindings.data();
-	result = vkCreateDescriptorSetLayout(pd->dev, &descriptor_layout, NULL, &descriptorSetLayout);
+	descriptor_layout.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT;
+	result = vkCreateDescriptorSetLayout(pd->dev->vkDev, &descriptor_layout, NULL, &descriptorSetLayout);
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
 	pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 	pipelineLayoutCreateInfo.pPushConstantRanges = (VkPushConstantRange*)&pushConstantRange;
 	pipelineLayoutCreateInfo.setLayoutCount = 1;
 	pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
-	result = vkCreatePipelineLayout(pd->dev, &pipelineLayoutCreateInfo, NULL, &pipelineLayout);
+	result = vkCreatePipelineLayout(pd->dev->vkDev, &pipelineLayoutCreateInfo, NULL, &pipelineLayout);
 	/*
 	layout(location = 0) in vec3 pos;
 	layout(location = 1) in vec2 uv;
@@ -13082,7 +13114,7 @@ pipelinestate_p newPipelineState(pipe_data* pd, int shader, uint32_t blendMode, 
 	multisampleStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	VkSampleMask multiSampleMask = 0xFFFFFFFF;
 	multisampleStateCreateInfo.pSampleMask = &multiSampleMask;
-	multisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	multisampleStateCreateInfo.rasterizationSamples = (VkSampleCountFlagBits)pd->dev->samples;
 
 	// Depth Stencil
 	auto& ds = depthStencilStateCreateInfo;
@@ -13104,7 +13136,14 @@ pipelinestate_p newPipelineState(pipe_data* pd, int shader, uint32_t blendMode, 
 	ds.maxDepthBounds = 0;
 	ds.stencilTestEnable = pd->stencilTestEnable;
 	ds.front = ds.back;
-
+	VkStencilOpState clipingOpState = { VK_STENCIL_OP_ZERO,
+									VK_STENCIL_OP_REPLACE,
+									VK_STENCIL_OP_KEEP,
+									VK_COMPARE_OP_EQUAL,
+									STENCIL_FILL_BIT,
+									STENCIL_ALL_BIT,
+									0x2 };
+	ds.back = ds.front = clipingOpState;
 	// Color blend
 	VkPipelineColorBlendAttachmentState colorBlendAttachment = { 0 };
 	colorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -13114,11 +13153,11 @@ pipelinestate_p newPipelineState(pipe_data* pd, int shader, uint32_t blendMode, 
 	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
 	// Renderpass / layout
-	pipelineCreateInfo.renderPass = pd->renderPass;
+	pipelineCreateInfo.renderPass = pd->dev->renderPass;
 	pipelineCreateInfo.subpass = 0;
 	pipelineCreateInfo.layout = pipelineLayout;
 
-	result = vkCreateGraphicsPipelines(pd->dev, VK_NULL_HANDLE, 1, &pipelineCreateInfo, NULL, &pipeline);
+	result = vkCreateGraphicsPipelines(pd->dev->vkDev, VK_NULL_HANDLE, 1, &pipelineCreateInfo, NULL, &pipeline);
 	if (result != VK_SUCCESS) {
 		return {};
 	}
@@ -13131,16 +13170,30 @@ pipelinestate_p newPipelineState(pipe_data* pd, int shader, uint32_t blendMode, 
 	pipelineStates.pipelineLayout = pipelineCreateInfo.layout;
 	return pipelineStates;
 }
-
-pipelinestate_p new_spv_base(VkDevice device, VkRenderPass renderPass, uint8_t blendMode, uint8_t topology_idx, uint8_t type)
+void freePipelineState(VkDevice device, pipelinestate_p* pipelineStates)
 {
-	auto base3d_frag_m = new_module(device, base3d_frag, 0);
-	auto base3d_vert_m = new_module(device, base3d_vert, 0);
-	auto base3d2_frag_m = new_module(device, base3d2_frag, 0);// 双面不同颜色
-	auto base3d2_vert_m = new_module(device, base3d2_vert, 0);
+	if (pipelineStates->pipeline) {
+		vkDestroyPipeline(device, pipelineStates->pipeline, NULL);
+		pipelineStates->pipeline = VK_NULL_HANDLE;
+	}
+	if (pipelineStates->pipelineLayout) {
+		vkDestroyPipelineLayout(device, pipelineStates->pipelineLayout, NULL);
+		pipelineStates->pipelineLayout = VK_NULL_HANDLE;
+	}
+	if (pipelineStates->descriptorSetLayout) {
+		vkDestroyDescriptorSetLayout(device, pipelineStates->descriptorSetLayout, NULL);
+		pipelineStates->descriptorSetLayout = VK_NULL_HANDLE;
+	}
+}
+pipelinestate_p new_spv_base(VkvgDevice device, uint8_t blendMode, uint8_t topology_idx, uint8_t type)
+{
+	auto base3d_frag_m = new_module(device->vkDev, base3d_frag, 0);
+	auto base3d_vert_m = new_module(device->vkDev, base3d_vert, 0);
+	auto base3d2_frag_m = new_module(device->vkDev, base3d2_frag, 0);// 双面不同颜色
+	auto base3d2_vert_m = new_module(device->vkDev, base3d2_vert, 0);
+
 	pipe_data pd[1] = {};
 	pd->dev = device;
-	pd->renderPass = renderPass;
 	pd->depthTestEnable = type & DEPTHTESTENABLE;
 	pd->depthWriteEnable = type & DEPTHWRITEENABLE;
 	pd->stencilTestEnable = type & STENCILTESTENABLE;
@@ -13161,6 +13214,11 @@ pipelinestate_p new_spv_base(VkDevice device, VkRenderPass renderPass, uint8_t b
 	p.topology_idx = topology_idx;
 	p.type = type;
 	p.shader = type & DOUBLESIDED ? 1 : 0;
+
+	freeModule(device->vkDev, base3d_frag_m);
+	freeModule(device->vkDev, base3d_vert_m);
+	freeModule(device->vkDev, base3d2_frag_m);
+	freeModule(device->vkDev, base3d2_vert_m);
 	return p;
 }
 
@@ -13168,42 +13226,28 @@ pipelinestate_p new_spv_base(VkDevice device, VkRenderPass renderPass, uint8_t b
 
 geoms_ctx::~geoms_ctx()
 {
-	destroy();
+	destroy_va();
 }
 
 void geoms_ctx::init(VkvgContext ctx, uint32_t _sizeVBO, uint32_t _sizeIBO)
 {
 	if (!ctx)return;
 	dev = ctx->dev;
-	renderPass = dev->renderPass;
+	bufsize = glm::ivec2(ctx->pSurf->width, ctx->pSurf->height);
 	_vkCmdPushDescriptorSet = ctx->_vkCmdPushDescriptorSet;
 	maxPushDescriptors = ctx->maxPushDescriptors;
 	sizeVBO = _sizeVBO; sizeIBO = _sizeIBO;
-	vkh_buffer_init(dev->vkhDev, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeVBO, &vertices, true);
-	vkh_buffer_init(dev->vkhDev, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeIBO, &indices, true);
+	vkh_buffer_init((VkhDevice)&dev->vkDev, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeVBO, &vertices, true);
+	vkh_buffer_init((VkhDevice)&dev->vkDev, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeIBO, &indices, true);
 }
 
-pipelinestate_p* geoms_ctx::gen_spv_base(uint8_t blendMode, uint8_t topology_idx, uint8_t type)
-{
-	union {
-		uint8_t btt[4];
-		uint32_t t = 0;
-	}v;
-	v.btt[0] = blendMode; v.btt[1] = topology_idx; v.btt[2] = type;
-	if (curState != v.t) {
-		curState = v.t;
-	}
-	auto& pl = pipelines[v.t];
-	if (!pl.pipeline) {
-		pl = new_spv_base((VkDevice)dev->vkDev, renderPass, blendMode, topology_idx, type);
-	}
-	return &pl;
-}
 
-void geoms_ctx::destroy()
+void geoms_ctx::destroy_va()
 {
-	vkh_buffer_destroy(&vertices);
-	vkh_buffer_destroy(&indices);
+	reset();
+	for (auto& [k, p] : pipelines) {
+		freePipelineState((VkDevice)dev->vkDev, &p);
+	}
 }
 
 void geoms_ctx::resize_vbo(uint32_t new_size)
@@ -13270,6 +13314,7 @@ void geoms_ctx::draw(VkCommandBuffer cmd)
 	if (!cmd)return;
 	pipelinestate_p* cp = 0;
 	update_va();
+
 	for (auto& it : cmdlist) {
 		if (cp != it.pipeline)
 		{
@@ -13299,19 +13344,25 @@ void geoms_ctx::bind(VkCommandBuffer cmd, size_t offset, size_t ioffset)
 void geoms_ctx::push_update_descriptor_set(VkCommandBuffer cmd, pipelinestate_p* cp, VkhImage img)
 {
 	if (!maxPushDescriptors || !_vkCmdPushDescriptorSet || !img)return;
-	VkDescriptorImageInfo dst0 = vkh_image_get_descriptor(img, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	VkWriteDescriptorSet  wimg = {
+	//VkDescriptorImageInfo dst0 = vkh_image_get_descriptor(img, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	//VkWriteDescriptorSet  wimg = {
+	//.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+	//.dstSet = 0,
+	//.dstBinding = 0,
+	//.descriptorCount = 1,
+	//.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+	//.pImageInfo = 0 };
+	//wimg.pImageInfo = &dst0;
+	//_vkCmdPushDescriptorSet(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cp->pipelineLayout, 0, 1, &wimg);
+	VkDescriptorImageInfo descSrcTex = vkh_image_get_descriptor(img, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	VkWriteDescriptorSet  writeDescriptorSet = {
 	.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 	.dstSet = 0,
-	.dstBinding = 0,
+	.dstBinding = 1,
 	.descriptorCount = 1,
 	.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-	.pImageInfo = 0 };
-	VkWriteDescriptorSet  wds[1] = {};
-	wimg.pImageInfo = &dst0;
-	wds[0] = wimg;
-	wimg.dstBinding = 1;
-	_vkCmdPushDescriptorSet(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cp->pipelineLayout, 0, 1, wds);
+	.pImageInfo = &descSrcTex };
+	_vkCmdPushDescriptorSet(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cp->pipelineLayout, 0, 1, &writeDescriptorSet);
 }
 
 void geoms_ctx::set_state(uint8_t blendMode, uint8_t topology, bool doubleSided, bool depthTestEnable, bool depthWriteEnable, bool stencilTestEnable)
@@ -13338,7 +13389,7 @@ void geoms_ctx::set_state(uint8_t blendMode, uint8_t topology, bool doubleSided,
 	{
 		auto& pl = pipelines[v.t];
 		if (!pl.pipeline) {
-			pipelinestate_p p0 = new_spv_base((VkDevice)dev->vkDev, renderPass, blendMode, topology, type);
+			pipelinestate_p p0 = new_spv_base(dev, blendMode, topology, type);
 			pl = p0;
 		}
 		if (pl.pipeline)
@@ -13593,4 +13644,75 @@ bool geoms_ctx::add_geometry3d(void* texture, const float* xyz, int xyz_stride, 
 	}
 	cmdlist.push_back(c);
 	return true;
+}
+
+geoms_ctx* new_geoms(VkvgContext ctx, uint32_t _sizeVBO, uint32_t _sizeIBO)
+{
+	auto p = new geoms_ctx();
+	p->init(ctx, _sizeVBO, _sizeIBO);
+	return p;
+}
+
+void free_geoms(geoms_ctx* p)
+{
+	if (p)
+		delete p;
+}
+
+// 清空命令列表
+void gctx_clear(geoms_ctx* ctx) {
+	if (ctx)ctx->clear();
+}
+// 批量录制渲染
+void gctx_draw(geoms_ctx* ctx, VkCommandBuffer cmd) {
+	if (ctx && cmd)ctx->draw(cmd);
+}
+void gctx_set_state(geoms_ctx* ctx, uint8_t blendMode, uint8_t topology, bool doubleSided, bool depthTestEnable, bool depthWriteEnable, bool stencilTestEnable) {
+	if (ctx)ctx->set_state(blendMode, topology, doubleSided, depthTestEnable, depthWriteEnable, stencilTestEnable);
+}
+void gctx_set_matrix(geoms_ctx* ctx, const glm::mat4* matrix) {
+	if (ctx && matrix)ctx->set_matrix(matrix);
+}
+// 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据，color_type=0表示float4，1表示uint32_t
+void gctx_add_geometry(geoms_ctx* ctx, void* texture, const float* xy, int xy_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type) {
+	if (ctx)ctx->add_geometry(texture, xy, xy_stride, color, color_stride, uv, uv_stride, num_vertices, indices, num_indices, size_indices, color_type);
+}
+// 添加3D几何数据到缓冲区，xyz顶点坐标，color顶点颜色（双面则要双倍），uv顶点纹理坐标，indices索引数据
+void gctx_add_geometry3d(geoms_ctx* ctx, void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type) {
+	if (ctx)ctx->add_geometry3d(texture, xyz, xyz_stride, color, color_stride, uv, uv_stride, num_vertices, indices, num_indices, size_indices, color_type);
+}
+
+glm::mat4 ortho(float width, float height, float znear, float zfar, bool is_top)
+{
+	return is_top ? glm::ortho(0.0f, width, height, 0.0f, znear, zfar) : glm::ortho(0.0f, width, 0.0f, height, znear, zfar);
+}
+geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx)
+{
+	if (!gctx)
+		gctx = new_geoms(ctx, 1024 * 1024, 1024 * 1024);
+	gctx->clear();
+	gctx_set_state(gctx, (int)blendmode_e::normal, 3, false, false, false, true);
+	glm::vec2 surfSize = { (float)ctx->pSurf->width, (float)ctx->pSurf->height };
+	glm::mat4 mat = ortho(surfSize.x, surfSize.y, -1.0f, 1.0f, 0);
+	gctx_set_matrix(gctx, &mat);
+
+	uint32_t color[2] = { 0x8f0080FF,0xFF8000FF };
+	uint32_t indices[15] = { 0,1,2,0,2,3,0,3,4,0,4,5,0,5,1 };
+	glm::vec3 v[6] = {};
+	glm::vec2 uv[6] = {};
+	double r = 100.0;
+	glm::vec3 pos = { 126,126,0 };
+	v[0] = glm::vec3(0.0f) + pos;
+	auto t = v;
+	t++;
+	for (int i = 0; i < 5; ++i) {
+		double angle = 2.0 * M_PI * i / 5; // 五边形角度
+		double x = r * cos(angle + M_PI / 2); // 旋转90°使顶点朝上
+		double y = r * sin(angle + M_PI / 2);
+		*t++ = glm::vec3(x, y, 0.0f) + pos;
+	}
+	auto vm = mat * glm::vec4(v[0], 1.0f);
+	gctx_add_geometry(gctx, nullptr, (float*)v, sizeof(glm::vec3), color, 0
+		, (float*)uv, sizeof(glm::vec2) * 0, 6, indices, 15, sizeof(uint32_t), 1);
+	return gctx;
 }

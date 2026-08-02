@@ -166,3 +166,17 @@ void free_vgctx(vgdev_ctx* p);
 struct rvg_cb;
 void init_rvg(vgdev_ctx* ptr, rvg_cb* r);
 
+class geoms_ctx;
+geoms_ctx* new_geoms(VkvgContext ctx, uint32_t _sizeVBO, uint32_t _sizeIBO);
+void free_geoms(geoms_ctx* p);
+void gctx_clear(geoms_ctx* ctx);
+// 批量录制渲染
+void gctx_draw(geoms_ctx* ctx, VkCommandBuffer cmd);
+void gctx_set_state(geoms_ctx* ctx, uint8_t blendMode, uint8_t topology, bool doubleSided, bool depthTestEnable, bool depthWriteEnable, bool stencilTestEnable);
+void gctx_set_matrix(geoms_ctx* ctx, const glm::mat4* matrix);
+// 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据，color_type=0表示float4，1表示uint32_t
+void gctx_add_geometry(geoms_ctx* ctx, void* texture, const float* xy, int xy_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
+// 添加3D几何数据到缓冲区，xyz顶点坐标，color顶点颜色（双面则要双倍），uv顶点纹理坐标，indices索引数据
+void gctx_add_geometry3d(geoms_ctx* ctx, void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
+
+geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx);
