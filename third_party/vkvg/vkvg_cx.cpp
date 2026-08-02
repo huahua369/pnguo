@@ -1590,7 +1590,7 @@ vkvg_clip_state_t _get_previous_clip_state(VkvgContext ctx) {
 		return vkvg_clip_state_clear;
 	return ctx->pSavedCtxs->clippingState;
 }
-static const VkClearAttachment clearStencil = { VK_IMAGE_ASPECT_STENCIL_BIT, 1, {{{0}}} };
+static const VkClearAttachment clearStencil = { VK_IMAGE_ASPECT_STENCIL_BIT, 1, {{{1,0}}} };
 static const VkClearAttachment clearColorAttach = { VK_IMAGE_ASPECT_COLOR_BIT, 0, {{{0}}} };
 
 void _reset_clip(VkvgContext ctx) {
@@ -5297,8 +5297,9 @@ VkRenderPass _device_createRenderPassNoResolve(VkvgDevice dev, VkAttachmentLoadO
 										.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
 	VkAttachmentDescription attDS = { .format = dev->stencilFormat,
 										.samples = (VkSampleCountFlagBits)dev->samples,
-										.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-										.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+										.loadOp = stencilLoadOp,
+										.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+										//.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 										.stencilLoadOp = stencilLoadOp,
 										.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
 										.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
@@ -5352,8 +5353,8 @@ VkRenderPass _device_createRenderPassMS(VkvgDevice dev, VkAttachmentLoadOp loadO
 											   .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
 	VkAttachmentDescription attDS = { .format = dev->stencilFormat,
 											   .samples = (VkSampleCountFlagBits)dev->samples,
-											   .loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-											   .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+											   .loadOp = stencilLoadOp,
+											   .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
 											   .stencilLoadOp = stencilLoadOp,
 											   .stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
 											   .initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
@@ -6949,7 +6950,8 @@ void _create_surface_secondary_images(VkvgSurface surf) {
 		VKH_MEMORY_USAGE_GPU_ONLY,
 		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
 		VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
-	vkh_image_create_descriptor(surf->stencil, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_STENCIL_BIT, VK_FILTER_NEAREST,
+	// todo 深度
+	vkh_image_create_descriptor(surf->stencil, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_STENCIL_BIT | VK_IMAGE_ASPECT_DEPTH_BIT, VK_FILTER_NEAREST,
 		VK_FILTER_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST,
 		VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 #if defined(DEBUG) && defined(VKVG_DBG_UTILS)
@@ -13146,7 +13148,7 @@ pipelinestate_p newPipelineState(pipe_data* pd, int shader, uint32_t blendMode, 
 									STENCIL_FILL_BIT,
 									STENCIL_ALL_BIT,
 									0x2 };
-	ds.back = ds.front = clipingOpState;
+	//ds.back = ds.front = clipingOpState;
 	// Color blend
 	VkPipelineColorBlendAttachmentState colorBlendAttachment = { 0 };
 	colorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -13804,7 +13806,7 @@ geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx)
 	glm::mat4 projection = glm::perspective(glm::radians(fov), (float)(surfSize.x * 1.0 / surfSize.y), 0.1f, 1000.0f);
 	// 视图矩阵：摄像机位于(0,1,5)，看向原点，上方向为(0,1,0)
 	glm::mat4 view = glm::lookAt(
-		glm::vec3(0.0f, 1.0f, 5.0f),
+		glm::vec3(0.50f, 1.0f, 5.0f),
 		glm::vec3(0.0f, 0.0f, 0.0f),
 		glm::vec3(0.0f, 1.0f, 0.0f)
 	);
