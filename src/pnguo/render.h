@@ -799,7 +799,7 @@ public:
 	vg_vector<text_vx> opt; vg_vector<uint32_t> idx;
 	hz::usp_ac* ac = 0;
 	vkvg_dev* _vgdev = 0;
-	vkvg_func_t* vgcb = 0;
+	//vkvg_func_t* vgcb = 0;
 	texture_cb* rcb = 0;	// 渲染器接口
 	void* rptr = 0;			// 渲染器指针
 	void* _tex = 0;
@@ -807,6 +807,7 @@ public:
 	glm::ivec4 _view = { 0,0,2048,2048 };	// 视口，超出范围部分不会渲染
 	void* cctx = 0;
 	vgdev_ctx* dctx = 0;
+	rvg_cb* vgcb = 0;
 	uint32_t color = 0;
 	float stwidth = 2.0;
 	bool tex_batch = true;

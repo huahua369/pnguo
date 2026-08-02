@@ -3411,11 +3411,8 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 			//ctx_end(ctx);
 		}
 	}
-	//if (!dra->dctx)
-	//	dra->dctx = new_vgctx();
+	//dra->vgcb->begin_frame(dra->vgcb->ctx);
 	translate_cc tcc = {};
-	//void free_vgctx(vgdev_ctx * p);
-	//drawctx_t dcb = get_drawctx(dra->dctx);
 	auto d = rvg->_cmd.data();
 	auto didx = rvg->_cmd_pos.data();
 	size_t ps = 0;
@@ -3647,6 +3644,8 @@ drawable_cx::~drawable_cx()
 		delete v;
 	}
 	_dobj.clear();
+	// vgcb
+	free_vgctx(dctx);
 	if (ac)
 	{
 		opt.allfree();  idx.allfree();
@@ -3663,7 +3662,12 @@ void drawable_cx::init(texture_cb* cb, const glm::ivec4& view, vkvg_dev* vgdev)
 	}
 	if (vgdev) {
 		_vgdev = vgdev;
-		vgcb = vgdev->get_fun();
+		//vgcb = vgdev->get_fun();
+		if (!vgcb)
+			vgcb = ac->new_obj<rvg_cb>();
+		if (!dctx)
+			dctx = new_vgctx();
+		init_rvg(dctx, vgcb);
 	}
 }
 
