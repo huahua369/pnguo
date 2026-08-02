@@ -5299,11 +5299,11 @@ VkRenderPass _device_createRenderPassNoResolve(VkvgDevice dev, VkAttachmentLoadO
 										.samples = (VkSampleCountFlagBits)dev->samples,
 										.loadOp = stencilLoadOp,
 										.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-										//.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-										.stencilLoadOp = stencilLoadOp,
-										.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
-										.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-										.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+		//.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.stencilLoadOp = stencilLoadOp,
+		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
+		.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
 
 	VkAttachmentDescription attachments[] = { attColor, attDS };
 	VkAttachmentReference   colorRef = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
@@ -13763,6 +13763,79 @@ void generateSphere(int sides, std::vector<uint32_t>& outIndices, std::vector<gl
 		}
 	}
 }
+void generateCube(std::vector<glm::vec3>& vertices, std::vector<unsigned int>& indices, float r)
+{
+	std::vector<glm::vec3> v = {
+		glm::vec3{ -r, -r, -r }, glm::vec3{ r, -r, -r },
+			glm::vec3{ -r,  r, -r }, glm::vec3{ r,  r, -r },
+			glm::vec3{ -r, -r,  r }, glm::vec3{ r, -r,  r },
+			glm::vec3{ -r,  r,  r }, glm::vec3{ r,  r,  r }
+	};
+	std::vector<uint32_t> idx = {
+		0, 2, 3, 1,  4,5,7,6 ,
+		 0,1,5,4 ,  1,3,7,5 ,
+		 3,2,6,7 ,  2,0,4,6 ,
+	};
+	std::vector<uint32_t> triangles = {
+	0,3,2,  0,1,3,     // 第一个四边形 0,2,3,1 
+	4,7,5,  4,6,7,     // 第二个四边形 4,5,7,6 
+	0,5,1,  0,4,5,     // 第三个四边形 0,1,5,4 
+	1,7,3,  1,5,7,     // 第四个四边形 1,3,7,5 
+	3,6,2,  3,7,6,     // 第五个四边形 3,2,6,7 
+	2,4,0,  2,6,4      // 第六个四边形 2,0,4,6 
+	};
+	vertices = v;
+	indices = triangles;
+}
+void generateTorus(std::vector<glm::vec3>& vertices, std::vector<glm::vec3>& normals, std::vector<glm::vec2>& texCoords, std::vector<unsigned int>& indices,
+	float R, float r, int numSegments, int numRings)
+{
+	auto idx = vertices.size();
+	auto idxs = indices.size();
+	vertices.reserve(idx + (numRings + 1) * (numSegments + 1));
+	indices.reserve(idxs + numRings * numSegments * 6);
+	normals.reserve(idx + (numRings + 1) * (numSegments + 1));
+	texCoords.reserve(idx + (numRings + 1) * (numSegments + 1));
+	for (int i = 0; i <= numRings; ++i) {
+		float ringAngle = 2 * glm::pi<float>() * i / numRings;
+		glm::mat4 ringRotate = glm::rotate(glm::mat4(1.0f), ringAngle, glm::vec3(0, 1, 0));
+
+		for (int j = 0; j <= numSegments; ++j) {
+			float segAngle = 2 * glm::pi<float>() * j / numSegments;
+			glm::vec3 basePoint(r * cos(segAngle), r * sin(segAngle), R);
+
+			// 顶点位置（应用旋转变换）
+			glm::vec4 worldPos = ringRotate * glm::vec4(basePoint, 1.0f);
+			vertices.push_back(glm::vec3(worldPos));
+
+			// 法向量（圆心到顶点的方向）
+			auto n = glm::vec3(worldPos - ringRotate * glm::vec4(0, 0, R, 1));
+			glm::vec3 normal = glm::normalize(n);
+			normals.push_back(normal);
+
+			// 纹理坐标（避免接缝处拉伸）
+			float u = static_cast<float>(i) / numRings;
+			float v = static_cast<float>(j) / numSegments;
+			texCoords.push_back(glm::vec2(u, v));
+		}
+	}
+	for (int i = 0; i < numRings; ++i) {
+		for (int j = 0; j < numSegments; ++j) {
+			int current = i * (numSegments + 1) + j;
+			int next = current + numSegments + 1;
+			current += idx;
+			next += idx;
+			// 四边形拆分为两个三角形 
+			indices.push_back(current);
+			indices.push_back(next);
+			indices.push_back(current + 1);
+
+			indices.push_back(next);
+			indices.push_back(next + 1);
+			indices.push_back(current + 1);
+		}
+	}
+}
 geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx)
 {
 	if (!gctx)
@@ -13800,13 +13873,16 @@ geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx)
 
 	std::vector<uint32_t> indices3; std::vector<glm::vec3> vertices3;
 	generateSphere(16, indices3, vertices3);
+	std::vector<glm::vec3>vertices, normals; std::vector<glm::vec2>  texCoords; std::vector<unsigned int> indices4;
+	//generateTorus(vertices3, normals, texCoords, indices3, 2.0f, 1.0f, 32, 64);
+	generateCube(vertices, indices4, 1.2f);
 	glm::mat4 model = glm::mat4(1.0f);
 	//model = glm::translate(glm::mat4(1.0), glm::vec3(2, 0, 0));
 	float fov = 45;
 	glm::mat4 projection = glm::perspective(glm::radians(fov), (float)(surfSize.x * 1.0 / surfSize.y), 0.1f, 1000.0f);
 	// 视图矩阵：摄像机位于(0,1,5)，看向原点，上方向为(0,1,0)
 	glm::mat4 view = glm::lookAt(
-		glm::vec3(0.50f, 1.0f, 5.0f),
+		glm::vec3(0.50f, 2.0f, 5.0f),
 		glm::vec3(0.0f, 0.0f, 0.0f),
 		glm::vec3(0.0f, 1.0f, 0.0f)
 	);
@@ -13821,9 +13897,13 @@ geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx)
 	info.stencilTestEnable = false;
 	gctx_set_state(gctx, &info);
 	gctx_add_geometry3d(gctx, nullptr, (float*)vertices3.data(), sizeof(glm::vec3), &color[1], 0, (float*)uv, sizeof(glm::vec2), vertices3.size(), indices3.data(), indices3.size(), sizeof(uint32_t), 1);
+	gctx_add_geometry3d(gctx, nullptr, (float*)vertices.data(), sizeof(glm::vec3), &color[1], 0, (float*)uv, sizeof(glm::vec2), vertices.size(), indices4.data(), indices4.size(), sizeof(uint32_t), 1);
 	info.polygon = 1;// 线框模式
+	info.doubleSided = false;
 	gctx_set_state(gctx, &info);
-	uint32_t color1[2] = { 0xFF8000FF,0xFFf55555 };
+	uint32_t color1[2] = { 0xFF000000,0xFFf55555 };
 	gctx_add_geometry3d(gctx, nullptr, (float*)vertices3.data(), sizeof(glm::vec3), color1, 0, (float*)uv, sizeof(glm::vec2), vertices3.size(), indices3.data(), indices3.size(), sizeof(uint32_t), 1);
+	gctx_add_geometry3d(gctx, nullptr, (float*)vertices.data(), sizeof(glm::vec3), color1, 0, (float*)uv, sizeof(glm::vec2), vertices.size(), indices4.data(), indices4.size(), sizeof(uint32_t), 1);
+
 	return gctx;
 }
