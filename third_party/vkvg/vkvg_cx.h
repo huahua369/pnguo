@@ -172,7 +172,21 @@ void free_geoms(geoms_ctx* p);
 void gctx_clear(geoms_ctx* ctx);
 // 批量录制渲染
 void gctx_draw(geoms_ctx* ctx, VkCommandBuffer cmd);
-void gctx_set_state(geoms_ctx* ctx, uint8_t blendMode, uint8_t topology, bool doubleSided, bool depthTestEnable, bool depthWriteEnable, bool stencilTestEnable);
+/*
+	VK_POLYGON_MODE_FILL = 0,
+	VK_POLYGON_MODE_LINE = 1,
+	VK_POLYGON_MODE_POINT = 2,
+	*/
+struct gem_info_s {
+	uint8_t blendMode = 0;
+	uint8_t topology = 0;
+	uint8_t polygon = 0;
+	bool doubleSided = false;
+	bool depthTestEnable = false;
+	bool depthWriteEnable = false;
+	bool stencilTestEnable = false;
+};
+void gctx_set_state(geoms_ctx* ctx, gem_info_s* info);
 void gctx_set_matrix(geoms_ctx* ctx, const glm::mat4* matrix);
 // 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据，color_type=0表示float4，1表示uint32_t
 void gctx_add_geometry(geoms_ctx* ctx, void* texture, const float* xy, int xy_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);

@@ -118,7 +118,7 @@ struct pipelinestate_p
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkPipeline pipeline;
 };
-pipelinestate_p new_spv_base(VkvgDevice device, uint8_t blendMode, uint8_t topology_idx, uint8_t type);
+pipelinestate_p new_spv_base(VkvgDevice device, uint8_t blendMode, uint8_t topology_idx, uint8_t type, uint8_t polygon);
 
 struct geoms_ctx {
 	struct Vertex1 {
@@ -169,7 +169,7 @@ public:
 	// 批量录制渲染
 	void draw(VkCommandBuffer cmd);
 public:
-	void set_state(uint8_t blendMode, uint8_t topology, bool doubleSided, bool depthTestEnable, bool depthWriteEnable, bool stencilTestEnable);
+	void set_state(gem_info_s* info);
 	void set_matrix(const glm::mat4* matrix);
 	// 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据，color_type=0表示float4，1表示uint32_t
 	bool add_geometry(void* texture, const float* xy, int xy_stride, const void* color, int color_stride
@@ -5761,8 +5761,9 @@ void _device_create_empty_texture(VkvgDevice dev, VkFormat format, VkImageTiling
 	_device_submit_cmd(dev, &dev->cmd, dev->fence);
 }
 void _device_check_best_image_tiling(VkvgDevice dev, VkFormat format) {
-	VkFlags            stencilFormats[] = { VK_FORMAT_S8_UINT, VK_FORMAT_D16_UNORM_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT,
-										   VK_FORMAT_D32_SFLOAT_S8_UINT };
+	VkFlags stencilFormats[] = { VK_FORMAT_D32_SFLOAT_S8_UINT,VK_FORMAT_D32_SFLOAT,
+		VK_FORMAT_S8_UINT, VK_FORMAT_D16_UNORM_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT,
+	};
 	VkFormatProperties phyStencilProps = { 0 }, phyImgProps = { 0 };
 
 	// check png blit format
@@ -5797,7 +5798,7 @@ void _device_check_best_image_tiling(VkvgDevice dev, VkFormat format) {
 			vkGetPhysicalDeviceFormatProperties(dev->phy, (VkFormat)stencilFormats[i], &phyStencilProps);
 			if (phyStencilProps.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
 				dev->stencilFormat = (VkFormat)stencilFormats[i];
-				if (i > 0)
+				if (i != 2)
 					dev->stencilAspectFlag |= VK_IMAGE_ASPECT_DEPTH_BIT;
 				dev->supportedTiling = VK_IMAGE_TILING_OPTIMAL;
 				return;
@@ -5809,7 +5810,7 @@ void _device_check_best_image_tiling(VkvgDevice dev, VkFormat format) {
 			vkGetPhysicalDeviceFormatProperties(dev->phy, (VkFormat)stencilFormats[i], &phyStencilProps);
 			if (phyStencilProps.linearTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
 				dev->stencilFormat = (VkFormat)stencilFormats[i];
-				if (i > 0)
+				if (i != 2)
 					dev->stencilAspectFlag |= VK_IMAGE_ASPECT_DEPTH_BIT;
 				dev->supportedTiling = VK_IMAGE_TILING_LINEAR;
 				return;
@@ -10155,6 +10156,7 @@ void dc_clear(VkvgContext ctx) {
 		return;
 	}
 	VkClearAttachment ca[2] = { clearColorAttach, clearStencil };
+	ca[1].clearValue.depthStencil.depth = 1;
 	vkCmdClearAttachments(ctx->cmd, 2, ca, 1, &ctx->clearRect);
 }
 
@@ -10306,6 +10308,7 @@ void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 			}
 			else {
 				auto cs = clearStencil;
+				cs.clearValue.depthStencil.depth = 1;
 				cs.clearValue.depthStencil.stencil = 0;
 				vkCmdClearAttachments(ctx->cmd, 1, &cs, 1, &ctx->clearRect);
 			}
@@ -12980,7 +12983,7 @@ struct pipe_data {
 	VkRenderPass renderPass = {};
 	bool depthTestEnable, depthWriteEnable, stencilTestEnable;
 };
-pipelinestate_p newPipelineState(pipe_data* pd, int shader, uint32_t blendMode, VkPrimitiveTopology topology)
+pipelinestate_p newPipelineState(pipe_data* pd, int shader, uint32_t blendMode, VkPrimitiveTopology topology, uint8_t polygon)
 {
 	pipelinestate_p pipelineStates = {};
 	VkPipeline pipeline = VK_NULL_HANDLE;
@@ -13102,7 +13105,7 @@ pipelinestate_p newPipelineState(pipe_data* pd, int shader, uint32_t blendMode, 
 	rasterizationStateCreateInfo.depthClampEnable = VK_FALSE;
 	rasterizationStateCreateInfo.rasterizerDiscardEnable = VK_FALSE;
 	rasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
-	rasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterizationStateCreateInfo.polygonMode = (VkPolygonMode)polygon;
 	rasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterizationStateCreateInfo.depthBiasEnable = VK_FALSE;
 	rasterizationStateCreateInfo.depthBiasConstantFactor = 0.0f;
@@ -13185,7 +13188,7 @@ void freePipelineState(VkDevice device, pipelinestate_p* pipelineStates)
 		pipelineStates->descriptorSetLayout = VK_NULL_HANDLE;
 	}
 }
-pipelinestate_p new_spv_base(VkvgDevice device, uint8_t blendMode, uint8_t topology_idx, uint8_t type)
+pipelinestate_p new_spv_base(VkvgDevice device, uint8_t blendMode, uint8_t topology_idx, uint8_t type, uint8_t polygon)
 {
 	auto base3d_frag_m = new_module(device->vkDev, base3d_frag, 0);
 	auto base3d_vert_m = new_module(device->vkDev, base3d_vert, 0);
@@ -13209,7 +13212,7 @@ pipelinestate_p new_spv_base(VkvgDevice device, uint8_t blendMode, uint8_t topol
 	VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
 	VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN };
 	VkPrimitiveTopology topology = topology_idx < 0 || topology_idx > 5 ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST : topologys[topology_idx];
-	auto p = newPipelineState(pd, type & DOUBLESIDED ? 1 : 0, blendMode, topology);
+	auto p = newPipelineState(pd, type & DOUBLESIDED ? 1 : 0, blendMode, topology, polygon);
 	p.blendMode = blendMode;
 	p.topology_idx = topology_idx;
 	p.type = type;
@@ -13365,8 +13368,15 @@ void geoms_ctx::push_update_descriptor_set(VkCommandBuffer cmd, pipelinestate_p*
 	_vkCmdPushDescriptorSet(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cp->pipelineLayout, 0, 1, &writeDescriptorSet);
 }
 
-void geoms_ctx::set_state(uint8_t blendMode, uint8_t topology, bool doubleSided, bool depthTestEnable, bool depthWriteEnable, bool stencilTestEnable)
+void geoms_ctx::set_state(gem_info_s* info)
 {
+	uint8_t blendMode = info->blendMode;
+	uint8_t topology = info->topology;
+	bool doubleSided = info->doubleSided;
+	bool depthTestEnable = info->depthTestEnable;
+	bool depthWriteEnable = info->depthWriteEnable;
+	bool stencilTestEnable = info->stencilTestEnable;
+
 	uint8_t type = 0;
 	if (doubleSided)
 		type |= DOUBLESIDED;
@@ -13381,14 +13391,14 @@ void geoms_ctx::set_state(uint8_t blendMode, uint8_t topology, bool doubleSided,
 		uint8_t btt[4];
 		uint32_t t = 0;
 	}v;
-	v.btt[0] = blendMode; v.btt[1] = topology; v.btt[2] = type;
+	v.btt[0] = blendMode; v.btt[1] = topology; v.btt[2] = type; v.btt[3] = info->polygon;
 
 	if (!pipeline || curState != v.t)
 	{
 		curState = v.t;
 		auto& pl = pipelines[v.t];
 		if (!pl.pipeline) {
-			pipelinestate_p p0 = new_spv_base(dev, blendMode, topology, type);
+			pipelinestate_p p0 = new_spv_base(dev, blendMode, topology, type, info->polygon);
 			pl = p0;
 		}
 		if (pl.pipeline)
@@ -13549,7 +13559,6 @@ bool geoms_ctx::add_geometry3d(void* texture, const float* xyz, int xyz_stride, 
 		auto verts = mem;
 		for (size_t i = 0; i < num_indices; i++) {
 			int j;
-			float* xy_;
 			if (size_indices == 4) {
 				j = ((const uint32_t*)indices)[i];
 			}
@@ -13600,7 +13609,6 @@ bool geoms_ctx::add_geometry3d(void* texture, const float* xyz, int xyz_stride, 
 		auto verts = mem;
 		for (size_t i = 0; i < num_indices; i++) {
 			int j;
-			float* xy_;
 			if (size_indices == 4) {
 				j = ((const uint32_t*)indices)[i];
 			}
@@ -13666,8 +13674,8 @@ void gctx_clear(geoms_ctx* ctx) {
 void gctx_draw(geoms_ctx* ctx, VkCommandBuffer cmd) {
 	if (ctx && cmd)ctx->draw(cmd);
 }
-void gctx_set_state(geoms_ctx* ctx, uint8_t blendMode, uint8_t topology, bool doubleSided, bool depthTestEnable, bool depthWriteEnable, bool stencilTestEnable) {
-	if (ctx)ctx->set_state(blendMode, topology, doubleSided, depthTestEnable, depthWriteEnable, stencilTestEnable);
+void gctx_set_state(geoms_ctx* ctx, gem_info_s* info) {
+	if (ctx)ctx->set_state(info);
 }
 void gctx_set_matrix(geoms_ctx* ctx, const glm::mat4* matrix) {
 	if (ctx && matrix)ctx->set_matrix(matrix);
@@ -13685,35 +13693,71 @@ glm::mat4 ortho(float width, float height, float znear, float zfar, bool is_top)
 {
 	return is_top ? glm::ortho(0.0f, width, height, 0.0f, znear, zfar) : glm::ortho(0.0f, width, 0.0f, height, znear, zfar);
 }
-glm::vec4 polarToVector(float yaw, float pitch)
-{
-	return glm::vec4(sinf(yaw) * cosf(pitch), sinf(pitch), cosf(yaw) * cosf(pitch), 0);
+//glm::vec4 polarToVector(float yaw, float pitch)
+//{
+//	return glm::vec4(sinf(yaw) * cosf(pitch), sinf(pitch), cosf(yaw) * cosf(pitch), 0);
+//}
+//void generateSphere(int sides, std::vector<uint32_t>& outIndices, std::vector<glm::vec3>& outVertices)
+//{
+//	int i = 0;
+//	auto XM_PI = glm::pi<float>();
+//	outIndices.clear();
+//	outVertices.clear();
+//	outVertices.reserve(sides * sides * 3);
+//	outIndices.reserve(sides * sides * 4);
+//	for (int roll = 0; roll < sides; roll++)
+//	{
+//		for (int pitch = 0; pitch < sides; pitch++)
+//		{
+//			outIndices.push_back(i);
+//			outIndices.push_back(i + 1);
+//			outIndices.push_back(i);
+//			outIndices.push_back(i + 2);
+//			i += 3;
+//
+//			glm::vec4 v1 = polarToVector((roll) * (2.0f * XM_PI) / sides, (pitch) * (2.0f * XM_PI) / sides);
+//			glm::vec4 v2 = polarToVector((roll + 1) * (2.0f * XM_PI) / sides, (pitch) * (2.0f * XM_PI) / sides);
+//			glm::vec4 v3 = polarToVector((roll) * (2.0f * XM_PI) / sides, (pitch + 1) * (2.0f * XM_PI) / sides);
+//
+//			outVertices.push_back(v1);
+//			outVertices.push_back(v2);
+//			outVertices.push_back(v3);
+//		}
+//	}
+//}
+glm::vec3 polarToVector(float yaw, float pitch) {
+	return glm::vec3(
+		sinf(yaw) * sinf(pitch),  // x = sin(yaw) * sin(pitch)
+		cosf(pitch),              // y = cos(pitch)
+		cosf(yaw) * sinf(pitch)   // z = cos(yaw) * sin(pitch)
+	);
 }
-void generateSphere(int sides, std::vector<uint32_t>& outIndices, std::vector<glm::vec3>& outVertices)
-{
-	int i = 0;
-	auto XM_PI = glm::pi<float>();
+
+void generateSphere(int sides, std::vector<uint32_t>& outIndices, std::vector<glm::vec3>& outVertices) {
 	outIndices.clear();
 	outVertices.clear();
-	outVertices.reserve(sides * sides * 3);
-	outIndices.reserve(sides * sides * 4);
-	for (int roll = 0; roll < sides; roll++)
-	{
-		for (int pitch = 0; pitch < sides; pitch++)
-		{
-			outIndices.push_back(i);
-			outIndices.push_back(i + 1);
-			outIndices.push_back(i);
-			outIndices.push_back(i + 2);
-			i += 3;
+	outVertices.reserve((sides + 1) * (sides + 1));  // 调整预留大小 
+	outIndices.reserve(sides * sides * 6);          // 每个网格生成 2 个三角形（6 个索引）
 
-			glm::vec4 v1 = polarToVector((roll) * (2.0f * XM_PI) / sides, (pitch) * (2.0f * XM_PI) / sides);
-			glm::vec4 v2 = polarToVector((roll + 1) * (2.0f * XM_PI) / sides, (pitch) * (2.0f * XM_PI) / sides);
-			glm::vec4 v3 = polarToVector((roll) * (2.0f * XM_PI) / sides, (pitch + 1) * (2.0f * XM_PI) / sides);
+	for (int roll = 0; roll <= sides; roll++) {    // 改为闭合区间 
+		float phi = roll * (glm::pi<float>() * 2.0f) / sides;  // yaw 覆盖 0-2π
+		for (int theta = 0; theta <= sides; theta++) {        // pitch 覆盖 0-π
+			float thetaRad = theta * glm::pi<float>() / sides;
+			outVertices.push_back(polarToVector(phi, thetaRad));
+		}
+	}
 
-			outVertices.push_back(v1);
-			outVertices.push_back(v2);
-			outVertices.push_back(v3);
+	// 生成索引（参考球面经纬网格连接逻辑）
+	for (int i = 0; i < sides; i++) {
+		for (int j = 0; j < sides; j++) {
+			uint32_t currentRow = i * (sides + 1);
+			uint32_t nextRow = (i + 1) * (sides + 1);
+			outIndices.push_back(currentRow + j);
+			outIndices.push_back(nextRow + j);
+			outIndices.push_back(nextRow + j + 1);
+			outIndices.push_back(currentRow + j);
+			outIndices.push_back(nextRow + j + 1);
+			outIndices.push_back(currentRow + j + 1);
 		}
 	}
 }
@@ -13722,13 +13766,19 @@ geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx)
 	if (!gctx)
 		gctx = new_geoms(ctx, 1024 * 1024, 1024 * 1024);
 	gctx->clear();
-	bool doubleSided = false, depthTestEnable = true, depthWriteEnable = false, stencilTestEnable = false;
-	gctx_set_state(gctx, (int)blendmode_e::normal, 3, doubleSided, depthTestEnable, depthWriteEnable, stencilTestEnable);
+	gem_info_s info;
+	info.blendMode = (uint8_t)blendmode_e::normal;
+	info.topology = 3;
+	info.doubleSided = false;
+	info.depthTestEnable = false;
+	info.depthWriteEnable = false;
+	info.stencilTestEnable = true;
+	gctx_set_state(gctx, &info);
 	glm::vec2 surfSize = { (float)ctx->pSurf->width, (float)ctx->pSurf->height };
 	glm::mat4 mat = ortho(surfSize.x, surfSize.y, -1.0f, 1.0f, 0);
 	gctx_set_matrix(gctx, &mat);
 
-	uint32_t color[3] = { 0x8f0080FF,0xFF8000FF,0xFF555555 };
+	uint32_t color[3] = { 0x8f0080FF,0xFF80FF00,0xFF555555 };
 	uint32_t indices[15] = { 0,1,2,0,2,3,0,3,4,0,4,5,0,5,1 };
 	glm::vec3 v[6] = {};
 	glm::vec2 uv[6] = {};
@@ -13748,11 +13798,30 @@ geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx)
 
 	std::vector<uint32_t> indices3; std::vector<glm::vec3> vertices3;
 	generateSphere(16, indices3, vertices3);
-	mat = glm::mat4(1.0f);
+	glm::mat4 model = glm::mat4(1.0f);
+	//model = glm::translate(glm::mat4(1.0), glm::vec3(2, 0, 0));
+	float fov = 45;
+	glm::mat4 projection = glm::perspective(glm::radians(fov), (float)(surfSize.x * 1.0 / surfSize.y), 0.1f, 1000.0f);
+	// 视图矩阵：摄像机位于(0,1,5)，看向原点，上方向为(0,1,0)
+	glm::mat4 view = glm::lookAt(
+		glm::vec3(0.0f, 1.0f, 5.0f),
+		glm::vec3(0.0f, 0.0f, 0.0f),
+		glm::vec3(0.0f, 1.0f, 0.0f)
+	);
+	mat = projection * view * model;
 	gctx_set_matrix(gctx, &mat);
-	doubleSided = true;
-	depthWriteEnable = true;
-	gctx_set_state(gctx, (int)blendmode_e::normal, 3, doubleSided, depthTestEnable, depthWriteEnable, stencilTestEnable);
+	//gem_info_s info;
+	info.blendMode = (uint8_t)blendmode_e::normal;
+	info.topology = 3;
+	info.doubleSided = true;
+	info.depthTestEnable = true;
+	info.depthWriteEnable = true;
+	info.stencilTestEnable = false;
+	gctx_set_state(gctx, &info);
 	gctx_add_geometry3d(gctx, nullptr, (float*)vertices3.data(), sizeof(glm::vec3), &color[1], 0, (float*)uv, sizeof(glm::vec2), vertices3.size(), indices3.data(), indices3.size(), sizeof(uint32_t), 1);
+	info.polygon = 1;// 线框模式
+	gctx_set_state(gctx, &info);
+	uint32_t color1[2] = { 0xFF8000FF,0xFFf55555 };
+	gctx_add_geometry3d(gctx, nullptr, (float*)vertices3.data(), sizeof(glm::vec3), color1, 0, (float*)uv, sizeof(glm::vec2), vertices3.size(), indices3.data(), indices3.size(), sizeof(uint32_t), 1);
 	return gctx;
 }
