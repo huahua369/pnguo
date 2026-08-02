@@ -12897,7 +12897,7 @@ void set_cblend(VkPipelineColorBlendAttachmentState& opt, const std::array<uint3
 	opt.srcAlphaBlendFactor = (VkBlendFactor)b[3];
 	opt.dstAlphaBlendFactor = (VkBlendFactor)b[4];
 	opt.alphaBlendOp = (VkBlendOp)b[5];
-}	
+}
 /*
 	VkBlendFactor            srcColorBlendFactor;
 	VkBlendFactor            dstColorBlendFactor;
@@ -13382,11 +13382,10 @@ void geoms_ctx::set_state(uint8_t blendMode, uint8_t topology, bool doubleSided,
 		uint32_t t = 0;
 	}v;
 	v.btt[0] = blendMode; v.btt[1] = topology; v.btt[2] = type;
-	if (curState != v.t) {
-		curState = v.t;
-	}
-	if (!pipeline)
+
+	if (!pipeline || curState != v.t)
 	{
+		curState = v.t;
 		auto& pl = pipelines[v.t];
 		if (!pl.pipeline) {
 			pipelinestate_p p0 = new_spv_base(dev, blendMode, topology, type);
@@ -13686,17 +13685,50 @@ glm::mat4 ortho(float width, float height, float znear, float zfar, bool is_top)
 {
 	return is_top ? glm::ortho(0.0f, width, height, 0.0f, znear, zfar) : glm::ortho(0.0f, width, 0.0f, height, znear, zfar);
 }
+glm::vec4 polarToVector(float yaw, float pitch)
+{
+	return glm::vec4(sinf(yaw) * cosf(pitch), sinf(pitch), cosf(yaw) * cosf(pitch), 0);
+}
+void generateSphere(int sides, std::vector<uint32_t>& outIndices, std::vector<glm::vec3>& outVertices)
+{
+	int i = 0;
+	auto XM_PI = glm::pi<float>();
+	outIndices.clear();
+	outVertices.clear();
+	outVertices.reserve(sides * sides * 3);
+	outIndices.reserve(sides * sides * 4);
+	for (int roll = 0; roll < sides; roll++)
+	{
+		for (int pitch = 0; pitch < sides; pitch++)
+		{
+			outIndices.push_back(i);
+			outIndices.push_back(i + 1);
+			outIndices.push_back(i);
+			outIndices.push_back(i + 2);
+			i += 3;
+
+			glm::vec4 v1 = polarToVector((roll) * (2.0f * XM_PI) / sides, (pitch) * (2.0f * XM_PI) / sides);
+			glm::vec4 v2 = polarToVector((roll + 1) * (2.0f * XM_PI) / sides, (pitch) * (2.0f * XM_PI) / sides);
+			glm::vec4 v3 = polarToVector((roll) * (2.0f * XM_PI) / sides, (pitch + 1) * (2.0f * XM_PI) / sides);
+
+			outVertices.push_back(v1);
+			outVertices.push_back(v2);
+			outVertices.push_back(v3);
+		}
+	}
+}
 geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx)
 {
 	if (!gctx)
 		gctx = new_geoms(ctx, 1024 * 1024, 1024 * 1024);
 	gctx->clear();
-	gctx_set_state(gctx, (int)blendmode_e::normal, 3, false, false, false, true);
+	bool doubleSided = false, depthTestEnable = true, depthWriteEnable = false, stencilTestEnable = false;
+	gctx_set_state(gctx, (int)blendmode_e::normal, 3, doubleSided, depthTestEnable, depthWriteEnable, stencilTestEnable);
 	glm::vec2 surfSize = { (float)ctx->pSurf->width, (float)ctx->pSurf->height };
 	glm::mat4 mat = ortho(surfSize.x, surfSize.y, -1.0f, 1.0f, 0);
 	gctx_set_matrix(gctx, &mat);
 
-	uint32_t color[2] = { 0x8f0080FF,0xFF8000FF };
+	uint32_t color[3] = { 0x8f0080FF,0xFF8000FF,0xFF555555 };
 	uint32_t indices[15] = { 0,1,2,0,2,3,0,3,4,0,4,5,0,5,1 };
 	glm::vec3 v[6] = {};
 	glm::vec2 uv[6] = {};
@@ -13711,8 +13743,16 @@ geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx)
 		double y = r * sin(angle + M_PI / 2);
 		*t++ = glm::vec3(x, y, 0.0f) + pos;
 	}
-	auto vm = mat * glm::vec4(v[0], 1.0f);
-	gctx_add_geometry(gctx, nullptr, (float*)v, sizeof(glm::vec3), color, 0
-		, (float*)uv, sizeof(glm::vec2) * 0, 6, indices, 15, sizeof(uint32_t), 1);
+	auto vm = mat * glm::vec4(v[0], 1.0f);// 颜色结构0则读取第一个颜色，UV也一样
+	gctx_add_geometry(gctx, nullptr, (float*)v, sizeof(glm::vec3), color, 0, (float*)uv, sizeof(glm::vec2), 6, indices, 15, sizeof(uint32_t), 1);
+
+	std::vector<uint32_t> indices3; std::vector<glm::vec3> vertices3;
+	generateSphere(16, indices3, vertices3);
+	mat = glm::mat4(1.0f);
+	gctx_set_matrix(gctx, &mat);
+	doubleSided = true;
+	depthWriteEnable = true;
+	gctx_set_state(gctx, (int)blendmode_e::normal, 3, doubleSided, depthTestEnable, depthWriteEnable, stencilTestEnable);
+	gctx_add_geometry3d(gctx, nullptr, (float*)vertices3.data(), sizeof(glm::vec3), &color[1], 0, (float*)uv, sizeof(glm::vec2), vertices3.size(), indices3.data(), indices3.size(), sizeof(uint32_t), 1);
 	return gctx;
 }
