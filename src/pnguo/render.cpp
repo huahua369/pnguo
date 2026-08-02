@@ -3415,7 +3415,7 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 	//	dra->dctx = new_vgctx();
 	translate_cc tcc = {};
 	//void free_vgctx(vgdev_ctx * p);
-	drawctx_t dcb = get_drawctx(dra->dctx);
+	//drawctx_t dcb = get_drawctx(dra->dctx);
 	auto d = rvg->_cmd.data();
 	auto didx = rvg->_cmd_pos.data();
 	size_t ps = 0;

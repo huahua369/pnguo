@@ -162,10 +162,6 @@ public:
 	~geoms_ctx();
 	void init(VkvgContext ctx, uint32_t _sizeVBO, uint32_t _sizeIBO);
 	void destroy();
-	void resize_vbo(uint32_t new_size);
-	void resize_ibo(uint32_t new_size);
-	void upload_vbo(void* data, uint32_t offset, uint32_t size, bool flush);
-	void upload_ibo(void* data, uint32_t offset, uint32_t size, bool flush);
 	void reset();
 public:
 	// 清空命令列表
@@ -176,11 +172,11 @@ public:
 	void set_state(uint8_t blendMode, uint8_t topology, bool doubleSided, bool depthTestEnable, bool depthWriteEnable, bool stencilTestEnable);
 	void set_matrix(const glm::mat4* matrix);
 	// 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据，color_type=0表示float4，1表示uint32_t
-	bool add_geometry(void* texture, const float* xy, int xy_stride
-		, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
+	bool add_geometry(void* texture, const float* xy, int xy_stride, const void* color, int color_stride
+		, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
 	// 添加3D几何数据到缓冲区，xyz顶点坐标，color顶点颜色（双面则要双倍），uv顶点纹理坐标，indices索引数据
-	bool add_geometry3d(void* texture, const float* xyz, int xyz_stride
-		, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
+	bool add_geometry3d(void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride
+		, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
 private:
 	pipelinestate_p* gen_spv_base(uint8_t blendMode, uint8_t topology_idx, uint8_t type);
 	// 绑定顶点缓冲和索引缓冲
@@ -188,6 +184,10 @@ private:
 	void push_update_descriptor_set(VkCommandBuffer cmd, pipelinestate_p* cp, VkhImage img);
 	// 上传顶点数据
 	void update_va();
+	void resize_vbo(uint32_t new_size);
+	void resize_ibo(uint32_t new_size);
+	void upload_vbo(void* data, uint32_t offset, uint32_t size, bool flush);
+	void upload_ibo(void* data, uint32_t offset, uint32_t size, bool flush);
 };
 
 
@@ -227,7 +227,7 @@ public:
 	uint32_t gCount = 0;		// ubo数量
 	state_save_t* t = 0;
 	paths_t* _dpath = 0;		// 默认路径缓存
-	paths_t* cur_dpath = 0;		// 当前路径
+	paths_t* cur_path = 0;		// 当前路径
 	std::stack<state_save_t*> _cst;	// 保存栈 
 	int  cmdidx = 0;
 	bool is_glutess = false;
@@ -4868,8 +4868,8 @@ void _device_init(VkvgDevice dev, const vkvg_device_create_info_t* info) {
 	_device_createDescriptorSetLayout(dev);
 	_device_setupPipelines(dev);
 
-	//_device_create_empty_texture(dev, format, dev->supportedTiling);
-	dev->emptyImg = dc_device_create_empty_texture(dev, format, 16, 16, glm::vec4(1.0));
+	_device_create_empty_texture(dev, format, dev->supportedTiling);
+	dev->emptyImg1 = dc_device_create_empty_texture(dev, format, 16, 16, glm::vec4(1.0));
 #ifdef DEBUG
 #if defined(__linux__) && defined(__GLIBC__)
 	_linux_register_error_handler();
@@ -4897,6 +4897,7 @@ void _device_init(VkvgDevice dev, const vkvg_device_create_info_t* info) {
 	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_PIPELINE, (uint64_t)dev->pipe_CLEAR, "PL draw Clear");
 
 	vkh_image_set_name(dev->emptyImg, "empty IMG");
+	vkh_image_set_name(dev->emptyImg1, "empty IMG white");
 	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)vkh_image_get_view(dev->emptyImg),
 		"empty IMG VIEW");
 	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_SAMPLER, (uint64_t)vkh_image_get_sampler(dev->emptyImg),
@@ -5165,6 +5166,7 @@ void vkvg_device_destroy(VkvgDevice dev) {
 	vkDeviceWaitIdle(dev->vkDev);
 
 	vkh_image_destroy(dev->emptyImg);
+	vkh_image_destroy(dev->emptyImg1);
 
 	vkDestroyDescriptorSetLayout(dev->vkDev, dev->dslGrad, NULL);
 	vkDestroyDescriptorSetLayout(dev->vkDev, dev->dslPushDset, NULL);
@@ -9813,7 +9815,7 @@ void vgdev_ctx::stroke(paths_t* p)
 
 void vgdev_ctx::paint()
 {
-	auto ph = cur_dpath ? cur_dpath : get_path();
+	auto ph = cur_path ? cur_path : get_path();
 	dc_finish_path(ph);
 	if (ph->pathPtr) {
 		fill(ph);
@@ -9936,7 +9938,7 @@ VkhImage dc_device_create_empty_texture(VkvgDevice dev, VkFormat format, int wid
 	VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
 	// create empty image to bind to context source descriptor when not in use
 	VkhImage emptyImg = vkh_image_create((VkhDevice)&dev->vkDev, format, width > 0 ? width : 16, height > 0 ? height : 16, tiling, VKH_MEMORY_USAGE_GPU_ONLY,
-		VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+		VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 	vkh_image_create_descriptor(emptyImg, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT, VK_FILTER_NEAREST,
 		VK_FILTER_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST,
 		VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
@@ -9948,6 +9950,9 @@ VkhImage dc_device_create_empty_texture(VkvgDevice dev, VkFormat format, int wid
 	VkClearColorValue       cclr = { {color.x, color.y, color.z, color.w} };
 	VkImageSubresourceRange range = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 	VkhImage img = emptyImg;
+	//vkh_image_set_layout(dev->cmd, img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+	//	VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+	//	VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 	vkh_image_set_layout(cmd, img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 	vkCmdClearColorImage(cmd, vkh_image_get_vkimage(img), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &cclr, 1, &range);
@@ -10338,8 +10343,8 @@ void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 		void* ws = 0;
 		if (waitSemaphore)
 		{
-			if (!(*waitSemaphore))
-				*waitSemaphore = ctx->pSurf->sem0;
+			//if (!(*waitSemaphore))
+			//	*waitSemaphore = ctx->pSurf->sem0;
 			ws = *waitSemaphore;
 		}
 		vkResetFences(ctx->dev->vkDev, 1, &cwait);
@@ -10360,6 +10365,7 @@ void _device_submit_cmd_sem(VkvgDevice dev, VkCommandBuffer* cmd, VkSemaphore wa
 
 void vgdev_ctx::begin_frame()
 {
+	cur_path = 0;
 	_curVertOffset = 0;
 	gCount = 0;
 	mac.release();
@@ -10438,8 +10444,13 @@ void dc_stroke_preserve(vgdev_ctx* ctx, paths_t* p) {
 		ctx->stroke_preserve(p);
 }
 
-void* dc_draw(vgdev_ctx* ctx, VkvgContext ctxvg, void** waitSemaphore) {
-	return (ctx && ctxvg) ? ctx->draw(ctxvg, waitSemaphore) : nullptr;
+void dc_draw(vgdev_ctx* ctx, VkvgContext ctxvg, void** waitSemaphore, void** signalSemaphore) {
+	if (ctx && ctxvg)
+	{
+		auto sem = ctx->draw(ctxvg, waitSemaphore);
+		if (signalSemaphore)
+			*signalSemaphore = sem;
+	}
 }
 void dc_begin_frame(vgdev_ctx* ctx) {
 	if (ctx)ctx->begin_frame();
@@ -10517,13 +10528,13 @@ void dc_clip_rc(vgdev_ctx* ctx, float* rc) {
 		return;
 	glm::ivec4 r = { rc[0],rc[1],rc[2],rc[3] };
 	ctx->clip(&r);
-	dc_clear_path(ctx->cur_dpath ? ctx->cur_dpath : ctx->get_path());
+	dc_clear_path(ctx->cur_path ? ctx->cur_path : ctx->get_path());
 }
 void dc_clip0(vgdev_ctx* ctx) {
 	if (!ctx) // nothing to clip
 		return;
 	ctx->clip0();
-	dc_clear_path(ctx->cur_dpath ? ctx->cur_dpath : ctx->get_path());
+	dc_clear_path(ctx->cur_path ? ctx->cur_path : ctx->get_path());
 }
 
 void dc_clip(vgdev_ctx* ctx, paths_t* p) {
@@ -11505,7 +11516,7 @@ void dc_grid_fill(vgdev_ctx* cr, glm::vec2 size, glm::ivec2 cols, int width)
 	int yn = size.y / width;
 	if (x > 0)xn++;
 	if (y > 0)yn++;
-	auto path = cr->cur_dpath ? cr->cur_dpath : cr->get_path();
+	auto path = cr->cur_path ? cr->cur_path : cr->get_path();
 	dc_rectangle(path, 0, 0, size.x, size.y, 0);
 	dc_clip(cr, path);
 	for (size_t i = 0; i < yn; i++)
@@ -11543,48 +11554,96 @@ void dc_set_fence(vgdev_ctx* ctx, bool enable) {
 	if (ctx)ctx->is_fence = enable;
 }
 
-drawctx_t get_drawctx(vgdev_ctx* p)
-{
-	drawctx_t r = {};
-	if (p) {
-		r.ptr = p;
-		r.set_fence = dc_set_fence;
-		r.set_glutess = dc_set_glutess;
-		r.clip_preserve = dc_clip_preserve;
-		r.fill_preserve = dc_fill_preserve;
-		r.stroke_preserve = dc_stroke_preserve;
-		r.clip = dc_clip;
-		r.clip_rc = dc_clip_rc;
-		r.clip0 = dc_clip0;
-		r.fill = dc_fill;
-		r.stroke = dc_stroke;
-		r.clear_path = dc_clear_path;
-		r.draw = dc_draw;
-		r.begin_frame = dc_begin_frame;
-		r.end_frame = dc_end_frame;
-		r.get_paths = dc_get_paths;
-		r.new_paths = dc_new_paths;
-		r.new_sub_path = dc_finish_path;
-		r.arc = dc_arc;
-		r.arc_negative = dc_arc_negative;
-		r.set_line_cap = dc_set_line_cap;
-		r.set_line_join = dc_set_line_join;
-		r.set_fill_rule = dc_set_fill_rule;
-		r.set_color = dc_set_color;
-		r.set_source_rgba = dc_set_source_rgba;
-		r.set_operator = dc_set_operator;
-		r.set_source = dc_set_source;
-		r.new_pattern_linear = dc_pattern_create_linear;
-		r.new_pattern_radial = dc_pattern_create_radial;
-		r.new_pattern_sweep = dc_pattern_create_sweep;
-		r.pattern_set_color_stop = dc_pattern_set_color_stop;
-		r.grid_fill = dc_grid_fill;
-		r.rectangle = dc_rectangle;
-		r.translate = dc_translate;
-		r.set_line_width = dc_set_line_width;
-	}
-	return r;
-}
+//struct drawctx_t {
+//	vgdev_ctx* ptr;
+//	void (*set_fence)(vgdev_ctx* ctx, bool enable);
+//	void* (*get_signal_sem)(vgdev_ctx* ctx);//signal_semaphore
+//	void (*set_glutess)(vgdev_ctx* ctx, bool enable);
+//	void (*begin_frame)(vgdev_ctx* ctx);
+//	void (*end_frame)(vgdev_ctx* ctx);
+//	void* (*draw)(vgdev_ctx* ctx, VkvgContext ctxvg, void** waitSemaphore);
+//	void (*clip_preserve)(vgdev_ctx* ctx, paths_t* p);
+//	void (*fill_preserve)(vgdev_ctx* ctx, paths_t* p);
+//	void (*stroke_preserve)(vgdev_ctx* ctx, paths_t* p);
+//	void (*clip)(vgdev_ctx* ctx, paths_t* p);
+//	void (*clip_rc)(vgdev_ctx* ctx, float* p);
+//	void (*clip0)(vgdev_ctx* ctx);
+//	void (*fill)(vgdev_ctx* ctx, paths_t* p);
+//	void (*stroke)(vgdev_ctx* ctx, paths_t* p);
+//	void (*clear_path)(paths_t* ctx);
+//
+//
+//	void (*set_line_cap)(vgdev_ctx* ctx, vkvg_line_cap_t lineCap);
+//	void (*set_line_join)(vgdev_ctx* ctx, vkvg_line_join_t lineJoin);
+//	void (*set_fill_rule)(vgdev_ctx* ctx, vkvg_fill_rule_t fillRule);
+//	void (*set_color)(vgdev_ctx* ctx, uint32_t color);
+//	void (*set_source_rgba)(vgdev_ctx* ctx, float r, float g, float b, float a);
+//	void (*set_source)(vgdev_ctx* ctx, VkvgPattern pat);
+//	void (*set_operator)(vgdev_ctx* ctx, vkvg_operator_t op);
+//
+//	VkvgPattern(*new_pattern_linear)(vgdev_ctx* ctx, float x0, float y0, float x1, float y1);
+//	VkvgPattern(*new_pattern_radial)(vgdev_ctx* ctx, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
+//	VkvgPattern(*new_pattern_sweep)(vgdev_ctx* ctx, float cx, float cy, float start_angle, float end_angle);
+//	vkvg_status_t(*pattern_set_color_stop)(VkvgPattern pat, int idx, float o, float r, float g, float b, float a);
+//
+//	paths_t* (*get_paths)(vgdev_ctx* ctx);
+//	paths_t* (*new_paths)(vgdev_ctx* ctx);
+//	void (*free_paths)(paths_t* ctx);
+//	void (*new_sub_path)(paths_t* ctx);
+//	void (*arc)(paths_t* ctx0, float xc, float yc, float radius, float a1, float a2);
+//	void (*arc_negative)(paths_t* ctx0, float xc, float yc, float radius, float a1, float a2);
+//
+//	void (*grid_fill)(vgdev_ctx* cr, glm::vec2 size, glm::ivec2 cols, int width);
+//
+//	void (*translate)(vgdev_ctx* ctx, float dx, float dy);
+//
+//	void(*set_line_width)(vgdev_ctx* ctx, float width);
+//	int (*rectangle)(paths_t* ctx, float x, float y, float w, float h, float r);
+//
+//};
+
+//drawctx_t get_drawctx(vgdev_ctx* p)
+//{
+//	drawctx_t r = {};
+//	if (p) {
+//		r.ptr = p;
+//		r.set_fence = dc_set_fence;
+//		r.set_glutess = dc_set_glutess;
+//		r.clip_preserve = dc_clip_preserve;
+//		r.fill_preserve = dc_fill_preserve;
+//		r.stroke_preserve = dc_stroke_preserve;
+//		r.clip = dc_clip;
+//		r.clip_rc = dc_clip_rc;
+//		r.clip0 = dc_clip0;
+//		r.fill = dc_fill;
+//		r.stroke = dc_stroke;
+//		r.clear_path = dc_clear_path;
+//		r.draw = dc_draw;
+//		r.begin_frame = dc_begin_frame;
+//		r.end_frame = dc_end_frame;
+//		r.get_paths = dc_get_paths;
+//		r.new_paths = dc_new_paths;
+//		r.new_sub_path = dc_finish_path;
+//		r.arc = dc_arc;
+//		r.arc_negative = dc_arc_negative;
+//		r.set_line_cap = dc_set_line_cap;
+//		r.set_line_join = dc_set_line_join;
+//		r.set_fill_rule = dc_set_fill_rule;
+//		r.set_color = dc_set_color;
+//		r.set_source_rgba = dc_set_source_rgba;
+//		r.set_operator = dc_set_operator;
+//		r.set_source = dc_set_source;
+//		r.new_pattern_linear = dc_pattern_create_linear;
+//		r.new_pattern_radial = dc_pattern_create_radial;
+//		r.new_pattern_sweep = dc_pattern_create_sweep;
+//		r.pattern_set_color_stop = dc_pattern_set_color_stop;
+//		r.grid_fill = dc_grid_fill;
+//		r.rectangle = dc_rectangle;
+//		r.translate = dc_translate;
+//		r.set_line_width = dc_set_line_width;
+//	}
+//	return r;
+//}
 
 void _rvg_path_extents(paths_t* ctx, bool transformed, float* x1, float* y1, float* x2, float* y2) {
 	uint32_t ptrPath = 0;
@@ -11654,7 +11713,7 @@ void rvg_path_destroy(rvg_path_t* path) {
 void rvg_set_path(rvgctx_t* ctx, rvg_path_t* path) {
 	if (!ctx || !path)return;
 	PRI_CTX;
-	cr->cur_dpath = (paths_t*)path;
+	cr->cur_path = (paths_t*)path;
 }
 rvg_path_t* rvg_get_path(rvgctx_t* ctx)
 {
@@ -11813,25 +11872,25 @@ void rvg_rel_elliptic_arc_to(rvg_path_t* path, float x, float y, bool large_arc_
 void rvg_stroke(rvgctx_t* ctx)
 {
 	auto p = (vgdev_ctx*)ctx;
-	auto ph = p->cur_dpath;
+	auto ph = p->cur_path;
 	p->stroke(ph ? ph : p->get_path());
 }
 void rvg_stroke_preserve(rvgctx_t* ctx)
 {
 	auto p = (vgdev_ctx*)ctx;
-	auto ph = p->cur_dpath;
+	auto ph = p->cur_path;
 	p->stroke_preserve(ph ? ph : p->get_path());
 }
 void rvg_fill(rvgctx_t* ctx)
 {
 	auto p = (vgdev_ctx*)ctx;
-	auto ph = p->cur_dpath;
+	auto ph = p->cur_path;
 	p->fill(ph ? ph : p->get_path());
 }
 void rvg_fill_preserve(rvgctx_t* ctx)
 {
 	auto p = (vgdev_ctx*)ctx;
-	auto ph = p->cur_dpath;
+	auto ph = p->cur_path;
 	p->fill_preserve(ph ? ph : p->get_path());
 }
 void rvg_paint(rvgctx_t* ctx)			// 全屏渲染
@@ -11853,13 +11912,13 @@ void rvg_reset_clip(rvgctx_t* ctx)		// 重置裁剪
 void rvg_clip(rvgctx_t* ctx)				// 路径裁剪，清空当前路径
 {
 	auto p = (vgdev_ctx*)ctx;
-	auto ph = p->cur_dpath;
+	auto ph = p->cur_path;
 	p->clip(ph ? ph : p->get_path());
 }
 void rvg_clip_preserve(rvgctx_t* ctx)	// 路径裁剪
 {
 	auto p = (vgdev_ctx*)ctx;
-	auto ph = p->cur_dpath;
+	auto ph = p->cur_path;
 	p->clip_preserve(ph ? ph : p->get_path());
 }
 void rvg_scissor(rvgctx_t* ctx, int x, int y, int width, int height)	// 矩形裁剪
@@ -12073,10 +12132,20 @@ void rvg_pattern_destroy(rvg_pattern_t* pat)
 	assert(p);// mac创建会自动释放
 }
 
+
+typedef void (*rboolcb)(rvgctx_t* ctx, bool enable);
+typedef void (*rvoidcb)(rvgctx_t* ctx);
+typedef void (*rdrawcb)(rvgctx_t* ctx, void* ctxvg, void** waitSemaphore, void** signalSemaphore);
+
 void init_rvg(vgdev_ctx* ptr, rvg_cb* r) {
 	if (!ptr || !r)return;
 	*r = {};
 	r->ctx = (rvgctx_t*)ptr;
+	r->set_fence = (rboolcb)dc_set_fence;
+	r->set_glutess = (rboolcb)dc_set_glutess;
+	r->begin_frame = (rvoidcb)dc_begin_frame;
+	r->end_frame = (rvoidcb)dc_end_frame;
+	r->draw = (rdrawcb)dc_draw;
 	// 视图
 
 	//r->new_view = rvg_new_view;
@@ -12186,7 +12255,7 @@ void rvg_x::submit(fill_style_d* st)
 	bool stroke = st && st->thickness > 0 && st->color > 0;
 	if (!ctx || !st || !ctx->t)return;
 	auto cr = ctx;
-	auto path = ctx->cur_dpath ? ctx->cur_dpath : ctx->get_path();
+	auto path = ctx->cur_path ? ctx->cur_path : ctx->get_path();
 	if (st->fill)
 	{
 		dc_set_color(ctx, st->fill);
@@ -13210,7 +13279,7 @@ void geoms_ctx::draw(VkCommandBuffer cmd)
 		if (cp)
 		{
 			vkCmdPushConstants(cmd, cp->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &it.mat);
-			push_update_descriptor_set(cmd, cp, it.texture ? it.texture : dev->emptyImg);
+			push_update_descriptor_set(cmd, cp, it.texture ? it.texture : dev->emptyImg1);
 		}
 		bind(cmd, it.offset * v2offset, it.ioffset);
 		if (it.firstIndex == -1)

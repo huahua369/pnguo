@@ -721,6 +721,7 @@ typedef struct _vkvg_device_t {
 
 	VkhImage           emptyImg;        /**< prevent unbound descriptor to trigger Validation error 61 */
 	VkSampleCountFlags samples;         /**< samples count common to all surfaces */
+	VkhImage           emptyImg1;
 	bool               deferredResolve; /**< if true, resolve only on context destruction and set as source */
 
 	font_cache_t* fontCache; /**< Store everything relative to common font caching system */

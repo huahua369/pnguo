@@ -389,103 +389,150 @@ void draw_rect_gradient(rvg_cb* cr, int width, int height, const rect_shadow_t* 
 	cr->pattern_destroy(lg_bottom);
 	cr->pattern_destroy(lg_left);
 	cr->pattern_destroy(lg_right);
+	cr->path_destroy(ph);
 }
 
+void r_grid_fill(rvg_cb* cr, glm::vec2 size, glm::ivec2 cols, int width)
+{
+	int x = fmod(size.x, width);
+	int y = fmod(size.y, width);
+	int xn = size.x / width;
+	int yn = size.y / width;
+	if (x > 0)xn++;
+	if (y > 0)yn++;
+	auto path = cr->get_path(cr->ctx);
+	cr->rectangle(path, 0, 0, size.x, size.y);
+	cr->clip(cr->ctx);
+	for (size_t i = 0; i < yn; i++)
+	{
+		auto iw = i * width;
+		for (size_t j = 0; j < xn; j++)
+		{
+			bool k0 = (j & 1);
+			bool k1 = !(j & 1);
+			auto k = !(i & 1) ? k0 : k1;
+			if (k)
+				cr->rectangle(path, j * width, iw, width, width);
+		}
+	}
+	auto c = cols[0];
+	cr->set_source_color(cr->ctx, c);
+	cr->fill(cr->ctx);
+	for (size_t i = 0; i < yn; i++)
+	{
+		auto iw = i * width;
+		for (size_t j = 0; j < xn; j++)
+		{
+			bool k0 = (j & 1);
+			bool k1 = !(j & 1);
+			auto k = (i & 1) ? k0 : k1;
+			if (k)
+				cr->rectangle(path, j * width, iw, width, width);
+		}
+	}
+	c = cols[1];
+	cr->set_source_color(cr->ctx, c);
+	cr->fill(cr->ctx);
+}
 void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize, bool wait) {
 	const char* filename = "temp/vkvg_gradient.png";
 	static auto dctx = new_vgctx();
 	//free_vgctx(dctx);
 	auto m_pi = glm::pi<float>();
-	drawctx_t dcb = get_drawctx(dctx);
+	static rvg_cb dcb[1] = {};
+	init_rvg(dctx, dcb);
+
 	auto cr = vkvg_create(surf);
 
 #if 1
-	dcb.set_fence(dctx, wait);
-	dcb.begin_frame(dctx);
-	paths_t* path = dcb.get_paths(dctx);
-	dcb.set_fill_rule(dctx, VKVG_FILL_RULE_NON_ZERO);
+	dcb->set_fence(dctx, wait);
+	dcb->begin_frame(dctx);
+	dcb->clear(dctx);
+	auto path = dcb->get_path(dctx);
+	dcb->set_fill_rule(dctx, VKVG_FILL_RULE_NON_ZERO);
 
-	//dcb.clip0(dctx);
-	//dcb.rectangle(path, 200, 0, 300, 200, 10);
-	//dcb.clip(dctx, path);// 圆角矩形裁剪
-	dcb.grid_fill(dctx, surfsize, glm::ivec2(-1, 0xffdfdfdf), 20);
-	dcb.clip0(dctx);	// 取消所有裁剪
-	//dcb.rectangle(path, 0, 0, 300, 160, 10);
-	//dcb.clip(dctx, path);// 圆角矩形裁剪
+	//dcb->clip0(dctx);
+	//dcb->rectangle(path, 200, 0, 300, 200, 10);
+	//dcb->clip(dctx, path);// 圆角矩形裁剪
+	r_grid_fill(dcb, surfsize, glm::ivec2(-1, 0xffdfdfdf), 20);
+	dcb->reset_clip(dctx);	// 取消所有裁剪
+	//dcb->rectangle(path, 0, 0, 300, 160, 10);
+	//dcb->clip(dctx, path);// 圆角矩形裁剪
 	float rc0[4] = { 0,0,-1,-1 };
-	//dcb.clip_rc(dctx, rc0);
-	dcb.rectangle(path, 200, 12, 300, 200, 10);
-	dcb.set_line_width(dctx, 6);	dcb.set_source_rgba(dctx, 0, 0.51, 1, 1);
+	//dcb->clip_rc(dctx, rc0);
+	dcb->rounded_rectangle(path, 200, 12, 300, 200, 10);
+	dcb->set_line_width(dctx, 6);	dcb->set_source_rgba(dctx, 0, 0.51, 1, 1);
 
-	auto pat = dcb.new_pattern_linear(dctx, 0.0, 0.0, 0.0, 256.0);
-	vkvg_pattern_add_color_stop_rgba(pat, 0, 0, 0, 1, 0);// 蓝
-	vkvg_pattern_add_color_stop_rgba(pat, 1, 1, 0, 0, 1);// 红
-	dcb.set_source(dctx, pat);
+	auto pat = dcb->new_pattern_linear(dctx, 0.0, 0.0, 0.0, 256.0);
+	dcb->pattern_add_color_stop(pat, 0, 0, 0, 1, 0);// 蓝
+	dcb->pattern_add_color_stop(pat, 1, 1, 0, 0, 1);// 红
+	dcb->set_source(dctx, pat);
 
-	dcb.fill_preserve(dctx, path);// 填充
-	dcb.set_color(dctx, 0xff1181f1);
-	dcb.stroke(dctx, path);//描边
+	dcb->fill_preserve(dctx);// 填充
+	dcb->set_source_color(dctx, 0xff1181f1);
+	dcb->stroke(dctx);//描边
 
 
 	//float rc[4] = { 0, 0, 60, 100 };
-	//dcb.clip_rc(dctx, rc);
-	dcb.set_line_width(dctx, 6);
-	dcb.rectangle(path, 12, 12, 232, 70, 0);
-	dcb.new_sub_path(path);	dcb.arc(path, 64, 64, 40, 0, 2 * m_pi);
-	dcb.new_sub_path(path);	dcb.arc_negative(path, 192, 64, 40, 0, -2 * m_pi);
-	dcb.set_fill_rule(dctx, VKVG_FILL_RULE_EVEN_ODD);
-	dcb.set_source_rgba(dctx, 0, 0.7, 0, 1);	dcb.fill_preserve(dctx, path);//填充
-	dcb.set_source_rgba(dctx, 0, 0, 0, 1);	dcb.stroke(dctx, path); //描边
+	//dcb->clip_rc(dctx, rc);
+	dcb->set_line_width(dctx, 6);
+	dcb->rectangle(path, 12, 12, 232, 70);
+	dcb->new_sub_path(path);	dcb->arc(path, 64, 64, 40, 0, 2 * m_pi);
+	dcb->new_sub_path(path);	dcb->arc_negative(path, 192, 64, 40, 0, -2 * m_pi);
+	dcb->set_fill_rule(dctx, VKVG_FILL_RULE_EVEN_ODD);
+	dcb->set_source_rgba(dctx, 0, 0.7, 0, 1);	dcb->fill_preserve(dctx);//填充
+	dcb->set_source_rgba(dctx, 0, 0, 0, 1);	dcb->stroke(dctx); //描边
 
-	//dcb.rectangle(path, 20, 150, 200, 100, 10);
-	//dcb.clip(dctx, path);// 圆角矩形裁剪
-	dcb.set_line_width(dctx, 6);	dcb.translate(dctx, 0, 128);
-	dcb.rectangle(path, 12, 12, 232, 70, 0);
-	dcb.new_sub_path(path); dcb.arc(path, 64, 64, 40, 0, 2 * m_pi);
-	dcb.new_sub_path(path); dcb.arc_negative(path, 192, 64, 40, 0, -2 * m_pi);
-	dcb.set_glutess(dctx, true);
-	dcb.set_fill_rule(dctx, VKVG_FILL_RULE_NON_ZERO);
-	dcb.set_source_rgba(dctx, 0, 0, 0.9, 1);	dcb.fill_preserve(dctx, path);// 填充
+	//dcb->rectangle(path, 20, 150, 200, 100, 10);
+	//dcb->clip(dctx, path);// 圆角矩形裁剪
+	dcb->set_line_width(dctx, 6);	dcb->translate(dctx, 0, 128);
+	dcb->rectangle(path, 12, 12, 232, 70);
+	dcb->new_sub_path(path); dcb->arc(path, 64, 64, 40, 0, 2 * m_pi);
+	dcb->new_sub_path(path); dcb->arc_negative(path, 192, 64, 40, 0, -2 * m_pi);
+	dcb->set_glutess(dctx, true);
+	dcb->set_fill_rule(dctx, VKVG_FILL_RULE_NON_ZERO);
+	dcb->set_source_rgba(dctx, 0, 0, 0.9, 1);	dcb->fill_preserve(dctx);// 填充
 
-	dcb.set_glutess(dctx, false);
-	dcb.set_source_rgba(dctx, 0, 0, 0, 1);	dcb.stroke(dctx, path); //描边
-	dcb.translate(dctx, 0, -128);
+	dcb->set_glutess(dctx, false);
+	dcb->set_source_rgba(dctx, 0, 0, 0, 1);	dcb->stroke(dctx); //描边
+	dcb->translate(dctx, 0, -128);
 
-	//dcb.clip0(dctx);
-	dcb.translate(dctx, 528, 0);
+	dcb->clear_path(path);
+	//dcb->clip0(dctx);
+	dcb->translate(dctx, 528, 0);
 #if 0
-	auto sg = dcb.new_pattern_sweep(dctx, 128, 128, 0, 2);
+	auto sg = dcb->new_pattern_sweep(dctx, 128, 128, 0, 2);
 	vkvg_pattern_add_color_stop(sg, 0.0, white, 1);
 	vkvg_pattern_add_color_stop(sg, 0.25, red, 1);
 	vkvg_pattern_add_color_stop(sg, 0.50, green, 1);
 	vkvg_pattern_add_color_stop(sg, 0.75, blue, 1);
 	vkvg_pattern_add_color_stop(sg, 1.00, white, 1);
-	dcb.set_source(dctx, sg);
-	//dcb.rectangle(path, 0, 0, 256, 256, 0);
-	dcb.arc(path, 128.0, 128.0, 80, 0, 2 * glm::pi<float>());
-	dcb.fill(dctx, path);
+	dcb->set_source(dctx, sg);
+	//dcb->rectangle(path, 0, 0, 256, 256, 0);
+	dcb->arc(path, 128.0, 128.0, 80, 0, 2 * glm::pi<float>());
+	dcb->fill(dctx, path);
 #endif
-	//dcb.clip0(dctx);
-	//dcb.translate(dctx, -300, 0);
-	//dcb.set_color(dctx, 0x800020ff);
-	//dcb.rectangle(path, 5, 5, 100, 100, 10);
-	//dcb.clip(dctx, path);
-	//dcb.rectangle(path, 0, 0, 256, 256, 0);
-	//dcb.fill(dctx, path);
-	//dcb.clip0(dctx);
-	//dcb.rectangle(path, 60, 60, 60, 100, 0);
-	//dcb.clip(dctx, path);
+	//dcb->clip0(dctx);
+	//dcb->translate(dctx, -300, 0);
+	//dcb->set_color(dctx, 0x800020ff);
+	//dcb->rectangle(path, 5, 5, 100, 100, 10);
+	//dcb->clip(dctx, path);
+	//dcb->rectangle(path, 0, 0, 256, 256, 0);
+	//dcb->fill(dctx, path);
+	//dcb->clip0(dctx);
+	//dcb->rectangle(path, 60, 60, 60, 100, 0);
+	//dcb->clip(dctx, path);
 	//float rc[4] = { 60, 60, 60, 100 };
-	////dcb.clip_rc(dctx, rc);
-	//dcb.set_color(dctx, 0x80ff8000);
-	//dcb.set_line_width(dctx, 10);
-	//dcb.rectangle(path, 90, 90, 60, 60, 0);
-	//dcb.stroke(dctx, path);
-	//dcb.translate(dctx, 260, 0);
-	//dcb.set_color(dctx, 0xffff8000);
-	//dcb.arc(path, 128.0, 128.0, 76.8, 0, 2 * glm::pi<float>());
+	////dcb->clip_rc(dctx, rc);
+	//dcb->set_color(dctx, 0x80ff8000);
+	//dcb->set_line_width(dctx, 10);
+	//dcb->rectangle(path, 90, 90, 60, 60, 0);
+	//dcb->stroke(dctx, path);
+	//dcb->translate(dctx, 260, 0);
+	//dcb->set_color(dctx, 0xffff8000);
+	//dcb->arc(path, 128.0, 128.0, 76.8, 0, 2 * glm::pi<float>());
 	////vkvg_rectangle(cr, 0, 0, 256, 256);
-	//dcb.fill(dctx, path);
+	//dcb->fill(dctx, path);
 
 	struct rect_shadow_taa
 	{
@@ -499,14 +546,13 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 		cubic_v cubic = { {0.0,0.6},{0.5,0.39},{0.4,0.1},{1.0,0.0 } };
 	};
 	rect_shadow_t rs = {};
-	static rvg_cb rb[1] = {};
-	init_rvg(dctx, rb);
 	rs.radius = 20;
-	draw_rect_gradient(rb, 100, 100, &rs, 0);
+	draw_rect_gradient(dcb, 100, 100, &rs, 0);
 
 
-	auto sem = dcb.draw(dctx, (VkvgContext)cr, 0);//批量执行，返回vksem
-	dcb.end_frame(dctx);
+	void* sem = 0;
+	dcb->draw(dctx, (VkvgContext)cr, 0, &sem);//批量执行，返回vksem
+	dcb->end_frame(dctx);
 #else 
 	vkvg_set_source_color(cr, 0xff0020ff);
 	vkvg_rectangle(cr, 5, 5, 100, 100);

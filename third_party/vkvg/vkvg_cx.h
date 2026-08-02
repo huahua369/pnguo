@@ -159,56 +159,10 @@ extern "C" {
 #ifdef __cplusplus 
 }
 #endif
-struct drawctx_t {
-	vgdev_ctx* ptr;
-	void (*set_fence)(vgdev_ctx* ctx, bool enable);
-	void* (*get_signal_sem)(vgdev_ctx* ctx);//signal_semaphore
-	void (*set_glutess)(vgdev_ctx* ctx, bool enable);
-	void (*clip_preserve)(vgdev_ctx* ctx, paths_t* p);
-	void (*fill_preserve)(vgdev_ctx* ctx, paths_t* p);
-	void (*stroke_preserve)(vgdev_ctx* ctx, paths_t* p);
-	void (*clip)(vgdev_ctx* ctx, paths_t* p);
-	void (*clip_rc)(vgdev_ctx* ctx, float* p);
-	void (*clip0)(vgdev_ctx* ctx);
-	void (*fill)(vgdev_ctx* ctx, paths_t* p);
-	void (*stroke)(vgdev_ctx* ctx, paths_t* p);
-	void (*clear_path)(paths_t* ctx);
-	void* (*draw)(vgdev_ctx* ctx, VkvgContext ctxvg, void** waitSemaphore);
-	void (*begin_frame)(vgdev_ctx* ctx);
-	void (*end_frame)(vgdev_ctx* ctx);
-
-	void (*set_line_cap)(vgdev_ctx* ctx, vkvg_line_cap_t lineCap);
-	void (*set_line_join)(vgdev_ctx* ctx, vkvg_line_join_t lineJoin);
-	void (*set_fill_rule)(vgdev_ctx* ctx, vkvg_fill_rule_t fillRule);
-	void (*set_color)(vgdev_ctx* ctx, uint32_t color);
-	void (*set_source_rgba)(vgdev_ctx* ctx, float r, float g, float b, float a);
-	void (*set_source)(vgdev_ctx* ctx, VkvgPattern pat);
-	void (*set_operator)(vgdev_ctx* ctx, vkvg_operator_t op);
-
-	VkvgPattern(*new_pattern_linear)(vgdev_ctx* ctx, float x0, float y0, float x1, float y1);
-	VkvgPattern(*new_pattern_radial)(vgdev_ctx* ctx, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
-	VkvgPattern(*new_pattern_sweep)(vgdev_ctx* ctx, float cx, float cy, float start_angle, float end_angle);
-	vkvg_status_t(*pattern_set_color_stop)(VkvgPattern pat, int idx, float o, float r, float g, float b, float a);
-
-	paths_t* (*get_paths)(vgdev_ctx* ctx);
-	paths_t* (*new_paths)(vgdev_ctx* ctx);
-	void (*free_paths)(paths_t* ctx);
-	void (*new_sub_path)(paths_t* ctx);
-	void (*arc)(paths_t* ctx0, float xc, float yc, float radius, float a1, float a2);
-	void (*arc_negative)(paths_t* ctx0, float xc, float yc, float radius, float a1, float a2);
-
-	void (*grid_fill)(vgdev_ctx* cr, glm::vec2 size, glm::ivec2 cols, int width);
-
-	void (*translate)(vgdev_ctx* ctx, float dx, float dy);
-
-	void(*set_line_width)(vgdev_ctx* ctx, float width);
-	int (*rectangle)(paths_t* ctx, float x, float y, float w, float h, float r);
-
-};
 
 vgdev_ctx* new_vgctx();
 void free_vgctx(vgdev_ctx* p);
-drawctx_t get_drawctx(vgdev_ctx* p);
+
 struct rvg_cb;
 void init_rvg(vgdev_ctx* ptr, rvg_cb* r);
 

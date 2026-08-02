@@ -569,14 +569,20 @@ struct texture_cb
 	bool (*get_viewport)(void* renderer, glm::ivec4* rect);
 	bool (*get_cliprect)(void* renderer, glm::ivec4* rect);
 };
-typedef void* rvgctx_t;
-typedef void* rvg_path_t;
-typedef void* rvg_surface_t;
-typedef void* rvg_pattern_t;
+typedef void rvgctx_t;
+typedef void rvg_path_t;
+typedef void rvg_surface_t;
+typedef void rvg_pattern_t;
 
 // 矢量接口
 struct rvg_cb {
 	rvgctx_t* ctx = 0;
+	// ctx操作
+	void (*set_fence)(rvgctx_t* ctx, bool enable);
+	void (*set_glutess)(rvgctx_t* ctx, bool enable);
+	void (*begin_frame)(rvgctx_t* ctx);
+	void (*end_frame)(rvgctx_t* ctx);
+	void (*draw)(rvgctx_t* ctx, void* ctxvg, void** waitSemaphore, void** signalSemaphore);
 	// 路径操作
 	rvg_path_t* (*new_path)(rvgctx_t* ctx);
 	void(*path_destroy)(rvg_path_t* path);
