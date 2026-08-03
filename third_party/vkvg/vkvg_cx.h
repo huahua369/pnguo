@@ -187,11 +187,11 @@ struct gem_info_s {
 	uint8_t blendMode = 0;
 	uint8_t topology = 0;
 	uint8_t polygon = 0;
+	uint8_t frontFace = 0;    //COUNTER_CLOCKWISE = 0, CLOCKWISE = 1,
 	bool doubleSided = false;
 	bool depthTestEnable = false;
 	bool depthWriteEnable = false;
 	bool stencilTestEnable = false;
-	bool dynamicrenderingEnable = false;
 };
 void gctx_set_state(geoms_ctx* ctx, gem_info_s* info);
 void gctx_set_matrix(geoms_ctx* ctx, const glm::mat4* matrix);

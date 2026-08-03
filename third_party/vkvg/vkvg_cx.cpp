@@ -13125,8 +13125,8 @@ pipelinestate_p newPipelineState(pipe_data* pd, gem_info_s* info)
 	rasterizationStateCreateInfo.depthClampEnable = VK_FALSE;
 	rasterizationStateCreateInfo.rasterizerDiscardEnable = VK_FALSE;
 	rasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
-	rasterizationStateCreateInfo.polygonMode = (VkPolygonMode)info->polygon;
-	rasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+	rasterizationStateCreateInfo.polygonMode = (VkPolygonMode)(info->polygon > VK_POLYGON_MODE_POINT ? 0 : info->polygon);
+	rasterizationStateCreateInfo.frontFace = (VkFrontFace)(info->frontFace > VK_FRONT_FACE_COUNTER_CLOCKWISE ? VK_FRONT_FACE_CLOCKWISE : VK_FRONT_FACE_COUNTER_CLOCKWISE);
 	rasterizationStateCreateInfo.depthBiasEnable = VK_FALSE;
 	rasterizationStateCreateInfo.depthBiasConstantFactor = 0.0f;
 	rasterizationStateCreateInfo.depthBiasClamp = 0.0f;
@@ -13186,10 +13186,10 @@ pipelinestate_p newPipelineState(pipe_data* pd, gem_info_s* info)
 	.depthAttachmentFormat = pd->depthFormat,
 	.stencilAttachmentFormat = pd->depthFormat
 	};
-	if (info->dynamicrenderingEnable)
-		pipelineCreateInfo.pNext = &pipelineRenderingCreateInfo;
-	else
-		pipelineCreateInfo.renderPass = pd->dev->renderPass;
+	//if (info->dynamicrenderingEnable)
+	pipelineCreateInfo.pNext = &pipelineRenderingCreateInfo;
+	//else
+	//	pipelineCreateInfo.renderPass = pd->dev->renderPass;
 	result = vkCreateGraphicsPipelines(pd->dev->vkDev, VK_NULL_HANDLE, 1, &pipelineCreateInfo, NULL, &pipeline);
 	if (result != VK_SUCCESS) {
 		return {};
@@ -14017,7 +14017,7 @@ geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx)
 	info.depthTestEnable = false;
 	info.depthWriteEnable = false;
 	info.stencilTestEnable = true;
-	info.dynamicrenderingEnable = true;
+	info.frontFace = 0;
 	auto info2d = info;
 	glm::vec2 surfSize = { (float)ctx->pSurf->width, (float)ctx->pSurf->height };
 
