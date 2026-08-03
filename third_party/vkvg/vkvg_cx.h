@@ -176,6 +176,12 @@ void gctx_draw(geoms_ctx* ctx, VkCommandBuffer cmd);
 	VK_POLYGON_MODE_FILL = 0,
 	VK_POLYGON_MODE_LINE = 1,
 	VK_POLYGON_MODE_POINT = 2,
+	VK_PRIMITIVE_TOPOLOGY_POINT_LIST=0,
+	VK_PRIMITIVE_TOPOLOGY_LINE_LIST=1,
+	VK_PRIMITIVE_TOPOLOGY_LINE_STRIP=2,
+	VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST=3,
+	VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP=4,
+	VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN=5
 	*/
 struct gem_info_s {
 	uint8_t blendMode = 0;
@@ -185,6 +191,7 @@ struct gem_info_s {
 	bool depthTestEnable = false;
 	bool depthWriteEnable = false;
 	bool stencilTestEnable = false;
+	bool dynamicrenderingEnable = false;
 };
 void gctx_set_state(geoms_ctx* ctx, gem_info_s* info);
 void gctx_set_matrix(geoms_ctx* ctx, const glm::mat4* matrix);

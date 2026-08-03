@@ -103,22 +103,13 @@ VkhImage dc_device_create_empty_texture(VkvgDevice dev, VkFormat format, int wid
 
 void _device_submit_cmd_sem(VkvgDevice dev, VkCommandBuffer* cmd, VkSemaphore waitSemaphore, VkSemaphore signalSemaphore, VkFence fence);
 
-#define DOUBLESIDED			0x01
-#define DEPTHTESTENABLE		0x02
-#define DEPTHWRITEENABLE	0x04
-#define STENCILTESTENABLE	0x08
 struct pipelinestate_p
 {
-	uint8_t blendMode;
-	uint8_t topology_idx;
-	uint8_t type;
-	uint8_t shader;			// 0: base3d, 1: base3d2
-	VkPrimitiveTopology topology;
+	VkPipeline pipeline;
 	VkPipelineLayout pipelineLayout;
 	VkDescriptorSetLayout descriptorSetLayout;
-	VkPipeline pipeline;
+	gem_info_s info = {};
 };
-pipelinestate_p new_spv_base(VkvgDevice device, uint8_t blendMode, uint8_t topology_idx, uint8_t type, uint8_t polygon);
 
 struct geoms_ctx {
 	struct Vertex1 {
@@ -141,24 +132,32 @@ struct geoms_ctx {
 		int32_t  vertexOffset = 0;
 		size_t offset = 0, ioffset = 0;
 	};
+public:
 	VkvgDevice dev = {};
+	USP_CX ac;				// 内存分配器
 	glm::ivec2 bufsize = {};
 	vkh_buffer_t vertices = {};
 	vkh_buffer_t indices = {};
 	uint32_t     sizeVBO = 0;
 	uint32_t     sizeIBO = 0;
-	std::map<uint32_t, pipelinestate_p> pipelines;
+	std::map<uint64_t, pipelinestate_p> pipelines;
 	pipelinestate_p* pipeline = nullptr;	// 当前管线
+
+	PFN_vkCmdBeginRenderingKHR _vkCmdBeginRenderingKHR = VK_NULL_HANDLE;
+	PFN_vkCmdEndRenderingKHR _vkCmdEndRenderingKHR = VK_NULL_HANDLE;
+
 	PFN_vkCmdPushDescriptorSet _vkCmdPushDescriptorSet = {};
 	uint32_t maxPushDescriptors = 0;
 	glm::mat4 mat = glm::mat4(1.0f);
-	uint32_t curState = 0;	// 当前状态	
+	uint64_t curState = 0;	// 当前状态	
 	uint32_t v2offset = 0;	// 双面顶点偏移	
 	t_vector<cmd_t> cmdlist;// 命令列表
 	t_vector<Vertex1> vd1;	// 单面顶点
 	t_vector<Vertex2> vd2;	// 双面顶点
 	t_vector<uint32_t> ids;	// 索引
+	VkShaderModule shaderModule[4] = {};	// 基础shader
 public:
+	geoms_ctx();
 	~geoms_ctx();
 	void init(VkvgContext ctx, uint32_t _sizeVBO, uint32_t _sizeIBO);
 	void destroy_va();
@@ -168,6 +167,7 @@ public:
 	void clear();
 	// 批量录制渲染
 	void draw(VkCommandBuffer cmd);
+	void draw_dynamic(VkCommandBuffer cmd, VkhImage image, VkhImage depthStencil);
 public:
 	void set_state(gem_info_s* info);
 	void set_matrix(const glm::mat4* matrix);
@@ -179,6 +179,7 @@ public:
 		, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
 private:
 
+	pipelinestate_p new_spv_base(gem_info_s* info);
 	// 绑定顶点缓冲和索引缓冲
 	void bind(VkCommandBuffer cmd, size_t offset, size_t ioffset);
 	void push_update_descriptor_set(VkCommandBuffer cmd, pipelinestate_p* cp, VkhImage img);
@@ -10234,6 +10235,8 @@ void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 	}
 	auto cwait_last = ctx->cmdFence[cmdidx];
 	ctx->cmdStarted = false;
+	gct = test_geoms(gct, ctx);
+#if 1
 	dc_clear(ctx);
 	VkRect2D cuclip = {};
 	for (auto& it : cmdlist)
@@ -10329,9 +10332,13 @@ void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 		}
 	}
 
-	gct = test_geoms(gct, ctx);
-	gct->draw(ctx->cmd);
+	//gct->draw(ctx->cmd);
 	_end_render_pass(ctx);
+#endif
+	ctx->cmdStarted = true;
+	//vkh_cmd_begin(ctx->cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	gct->draw_dynamic(ctx->cmd, ctx->pSurf->imgMS ? ctx->pSurf->imgMS : ctx->pSurf->img, ctx->pSurf->stencil);
+
 	// 更新渐变ubo
 	vkh_buffer_flush(&ctx->uboGrad);
 	if (ctx->dev->deferredResolve)
@@ -12983,9 +12990,20 @@ struct pipe_data {
 	VkShaderModule vert[2] = {};
 	VkShaderModule frag[2] = {};
 	VkRenderPass renderPass = {};
-	bool depthTestEnable, depthWriteEnable, stencilTestEnable;
+	uint32_t colorCount = 0;
+	VkFormat colorFormat[8];
+	VkFormat depthFormat;
 };
-pipelinestate_p newPipelineState(pipe_data* pd, int shader, uint32_t blendMode, VkPrimitiveTopology topology, uint8_t polygon)
+struct gem_inafo_s {
+	uint8_t blendMode = 0;
+	uint8_t topology = 0;
+	uint8_t polygon = 0;
+	bool doubleSided = false;
+	bool depthTestEnable = false;
+	bool depthWriteEnable = false;
+	bool stencilTestEnable = false;
+};
+pipelinestate_p newPipelineState(pipe_data* pd, gem_info_s* info)
 {
 	pipelinestate_p pipelineStates = {};
 	VkPipeline pipeline = VK_NULL_HANDLE;
@@ -13014,7 +13032,7 @@ pipelinestate_p newPipelineState(pipe_data* pd, int shader, uint32_t blendMode, 
 	pipelineCreateInfo.pDepthStencilState = &depthStencilStateCreateInfo;
 	pipelineCreateInfo.pColorBlendState = &colorBlendStateCreateInfo;
 	pipelineCreateInfo.pDynamicState = &dynamicStateCreateInfo;
-
+	int shader = info->doubleSided;
 	// Shaders
 	const char* name = "main";
 	for (uint32_t i = 0; i < 2; i++) {
@@ -13086,7 +13104,7 @@ pipelinestate_p newPipelineState(pipe_data* pd, int shader, uint32_t blendMode, 
 
 	// Input assembly
 	inputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	inputAssemblyStateCreateInfo.topology = topology;
+	inputAssemblyStateCreateInfo.topology = (VkPrimitiveTopology)(info->topology > VK_PRIMITIVE_TOPOLOGY_PATCH_LIST ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST : info->topology);
 	inputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE;
 
 	viewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -13107,7 +13125,7 @@ pipelinestate_p newPipelineState(pipe_data* pd, int shader, uint32_t blendMode, 
 	rasterizationStateCreateInfo.depthClampEnable = VK_FALSE;
 	rasterizationStateCreateInfo.rasterizerDiscardEnable = VK_FALSE;
 	rasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
-	rasterizationStateCreateInfo.polygonMode = (VkPolygonMode)polygon;
+	rasterizationStateCreateInfo.polygonMode = (VkPolygonMode)info->polygon;
 	rasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterizationStateCreateInfo.depthBiasEnable = VK_FALSE;
 	rasterizationStateCreateInfo.depthBiasConstantFactor = 0.0f;
@@ -13126,8 +13144,8 @@ pipelinestate_p newPipelineState(pipe_data* pd, int shader, uint32_t blendMode, 
 	ds.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 	ds.pNext = NULL;
 	ds.flags = 0;
-	ds.depthTestEnable = pd->depthTestEnable;
-	ds.depthWriteEnable = pd->depthWriteEnable;
+	ds.depthTestEnable = info->depthTestEnable;
+	ds.depthWriteEnable = info->depthWriteEnable;
 	ds.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 	ds.back.failOp = VK_STENCIL_OP_KEEP;
 	ds.back.passOp = VK_STENCIL_OP_KEEP;
@@ -13139,7 +13157,7 @@ pipelinestate_p newPipelineState(pipe_data* pd, int shader, uint32_t blendMode, 
 	ds.depthBoundsTestEnable = VK_FALSE;
 	ds.minDepthBounds = 0;
 	ds.maxDepthBounds = 0;
-	ds.stencilTestEnable = pd->stencilTestEnable;
+	ds.stencilTestEnable = info->stencilTestEnable;
 	ds.front = ds.back;
 	VkStencilOpState clipingOpState = { VK_STENCIL_OP_ZERO,
 									VK_STENCIL_OP_REPLACE,
@@ -13154,22 +13172,30 @@ pipelinestate_p newPipelineState(pipe_data* pd, int shader, uint32_t blendMode, 
 	colorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 	colorBlendStateCreateInfo.attachmentCount = 1;
 	colorBlendStateCreateInfo.pAttachments = &colorBlendAttachment;
-	set_blend(colorBlendAttachment, blendMode);
+	set_blend(colorBlendAttachment, info->blendMode);
 	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
 	// Renderpass / layout
-	pipelineCreateInfo.renderPass = pd->dev->renderPass;
+
 	pipelineCreateInfo.subpass = 0;
 	pipelineCreateInfo.layout = pipelineLayout;
-
+	VkPipelineRenderingCreateInfoKHR pipelineRenderingCreateInfo{
+	.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
+	.colorAttachmentCount = pd->colorCount,
+	.pColorAttachmentFormats = pd->colorFormat,
+	.depthAttachmentFormat = pd->depthFormat,
+	.stencilAttachmentFormat = pd->depthFormat
+	};
+	if (info->dynamicrenderingEnable)
+		pipelineCreateInfo.pNext = &pipelineRenderingCreateInfo;
+	else
+		pipelineCreateInfo.renderPass = pd->dev->renderPass;
 	result = vkCreateGraphicsPipelines(pd->dev->vkDev, VK_NULL_HANDLE, 1, &pipelineCreateInfo, NULL, &pipeline);
 	if (result != VK_SUCCESS) {
 		return {};
 	}
 
-	pipelineStates.shader = shader;
-	pipelineStates.blendMode = blendMode;
-	pipelineStates.topology = topology;
+	pipelineStates.info = *info;
 	pipelineStates.pipeline = pipeline;
 	pipelineStates.descriptorSetLayout = descriptorSetLayout;
 	pipelineStates.pipelineLayout = pipelineCreateInfo.layout;
@@ -13190,56 +13216,54 @@ void freePipelineState(VkDevice device, pipelinestate_p* pipelineStates)
 		pipelineStates->descriptorSetLayout = VK_NULL_HANDLE;
 	}
 }
-pipelinestate_p new_spv_base(VkvgDevice device, uint8_t blendMode, uint8_t topology_idx, uint8_t type, uint8_t polygon)
+pipelinestate_p geoms_ctx::new_spv_base(gem_info_s* info)
 {
-	auto base3d_frag_m = new_module(device->vkDev, base3d_frag, 0);
-	auto base3d_vert_m = new_module(device->vkDev, base3d_vert, 0);
-	auto base3d2_frag_m = new_module(device->vkDev, base3d2_frag, 0);// 双面不同颜色
-	auto base3d2_vert_m = new_module(device->vkDev, base3d2_vert, 0);
-
 	pipe_data pd[1] = {};
-	pd->dev = device;
-	pd->depthTestEnable = type & DEPTHTESTENABLE;
-	pd->depthWriteEnable = type & DEPTHWRITEENABLE;
-	pd->stencilTestEnable = type & STENCILTESTENABLE;
-	pd->frag[0] = base3d_frag_m;
-	pd->vert[0] = base3d_vert_m;
-	pd->frag[1] = base3d2_frag_m;
-	pd->vert[1] = base3d2_vert_m;
-	VkPrimitiveTopology topologys[6] = {
-	VK_PRIMITIVE_TOPOLOGY_POINT_LIST,
-	VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
-	VK_PRIMITIVE_TOPOLOGY_LINE_STRIP,
-	VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-	VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
-	VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN };
-	VkPrimitiveTopology topology = topology_idx < 0 || topology_idx > 5 ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST : topologys[topology_idx];
-	auto p = newPipelineState(pd, type & DOUBLESIDED ? 1 : 0, blendMode, topology, polygon);
-	p.blendMode = blendMode;
-	p.topology_idx = topology_idx;
-	p.type = type;
-	p.shader = type & DOUBLESIDED ? 1 : 0;
+	pd->dev = dev;
+	pd->vert[0] = shaderModule[0];
+	pd->frag[0] = shaderModule[1];
+	pd->vert[1] = shaderModule[2];
+	pd->frag[1] = shaderModule[3];
+	pd->colorCount = 1;		// 一个输出随件
+	pd->colorFormat[0] = FB_COLOR_FORMAT;
+	pd->depthFormat = dev->stencilFormat;
+	auto p = newPipelineState(pd, info);
 
-	freeModule(device->vkDev, base3d_frag_m);
-	freeModule(device->vkDev, base3d_vert_m);
-	freeModule(device->vkDev, base3d2_frag_m);
-	freeModule(device->vkDev, base3d2_vert_m);
 	return p;
 }
 
 #endif // 1
 
+geoms_ctx::geoms_ctx() {
+
+}
+
 geoms_ctx::~geoms_ctx()
 {
+	for (size_t i = 0; i < 4; i++)
+	{
+		freeModule(dev->vkDev, shaderModule[i]);
+		shaderModule[i] = 0;
+	}
+
 	destroy_va();
 }
 
 void geoms_ctx::init(VkvgContext ctx, uint32_t _sizeVBO, uint32_t _sizeIBO)
 {
-	if (!ctx)return;
+	if (!ctx || dev)return;
 	dev = ctx->dev;
+	shaderModule[0] = new_module(dev->vkDev, base3d_vert, 0);
+	shaderModule[1] = new_module(dev->vkDev, base3d_frag, 0);
+	shaderModule[2] = new_module(dev->vkDev, base3d2_vert, 0);
+	shaderModule[3] = new_module(dev->vkDev, base3d2_frag, 0);// 双面不同颜色
+
 	bufsize = glm::ivec2(ctx->pSurf->width, ctx->pSurf->height);
 	_vkCmdPushDescriptorSet = ctx->_vkCmdPushDescriptorSet;
+
+	_vkCmdBeginRenderingKHR = reinterpret_cast<PFN_vkCmdBeginRenderingKHR>(vkGetDeviceProcAddr(dev->vkDev, "vkCmdBeginRenderingKHR"));
+	_vkCmdEndRenderingKHR = reinterpret_cast<PFN_vkCmdEndRenderingKHR>(vkGetDeviceProcAddr(dev->vkDev, "vkCmdEndRenderingKHR"));
+
 	maxPushDescriptors = ctx->maxPushDescriptors;
 	sizeVBO = _sizeVBO; sizeIBO = _sizeIBO;
 	vkh_buffer_init((VkhDevice)&dev->vkDev, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeVBO, &vertices, true);
@@ -13314,6 +13338,72 @@ void geoms_ctx::update_va()
 		upload_ibo(ids.data(), 0, ids.size() * sizeof(int), true);
 }
 
+void geoms_ctx::draw_dynamic(VkCommandBuffer cmd, VkhImage image, VkhImage depthStencil)
+{
+	if (!cmd || !_vkCmdBeginRenderingKHR)return;
+	update_va();
+	VkImageSubresourceRange crange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }; VkImageSubresourceRange dsrange = { VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1 };
+	vkh_image_set_layout_subres(cmd, image, crange, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+	vkh_image_set_layout_subres(cmd, depthStencil, dsrange, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT);
+	VkRenderingAttachmentInfoKHR colorAttachment{
+	.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
+	.imageView = image->view,
+	.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,// VK_ATTACHMENT_LOAD_OP_CLEAR,
+	.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+	.clearValue = {.color = {0.0f,0.0f,0.0f,0.0f} },
+	};
+	VkRenderingAttachmentInfoKHR depthStencilAttachment{
+		.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
+		.imageView = depthStencil->view,
+		.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+		.clearValue = {.depthStencil = {1.0f,  0} }
+	};
+	VkRenderingInfoKHR renderingInfo{
+		.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR,
+		.renderArea = { 0, 0, image->infos.extent.width, image->infos.extent.height },
+		.layerCount = 1,
+		.colorAttachmentCount = 1,
+		.pColorAttachments = &colorAttachment,
+		.pDepthAttachment = &depthStencilAttachment,
+		.pStencilAttachment = &depthStencilAttachment
+	};
+	_vkCmdBeginRenderingKHR(cmd, &renderingInfo);
+	VkViewport viewport = { 0.0f,0.0f,(float)image->infos.extent.width, (float)image->infos.extent.height, 0.0f, 1.0f };
+	vkCmdSetViewport(cmd, 0, 1, &viewport);
+	VkRect2D scissor = { 0, 0, image->infos.extent.width, image->infos.extent.height };
+	vkCmdSetScissor(cmd, 0, 1, &scissor);
+	pipelinestate_p* cp = 0;
+	for (auto& it : cmdlist) {
+		if (cp != it.pipeline)
+		{
+			cp = it.pipeline;
+			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cp->pipeline);
+		}
+		if (cp)
+		{
+			vkCmdPushConstants(cmd, cp->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &it.mat);
+			push_update_descriptor_set(cmd, cp, it.texture ? it.texture : dev->emptyImg1);
+		}
+		bind(cmd, it.offset * v2offset, it.ioffset);
+		if (it.firstIndex == -1)
+			vkCmdDraw(cmd, it.count, 1, it.vertexOffset, 0);
+		else
+			vkCmdDrawIndexed(cmd, it.count, 1, it.firstIndex, it.vertexOffset, 0);
+	}
+	_vkCmdEndRenderingKHR(cmd);
+	//vkh_image_set_layout_subres(cmd, image, crange,
+	//	VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	//	VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+	//	VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+	//	VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT
+	//);
+
+}
 void geoms_ctx::draw(VkCommandBuffer cmd)
 {
 	if (!cmd)return;
@@ -13337,7 +13427,9 @@ void geoms_ctx::draw(VkCommandBuffer cmd)
 		else
 			vkCmdDrawIndexed(cmd, it.count, 1, it.firstIndex, it.vertexOffset, 0);
 	}
+
 }
+
 
 void geoms_ctx::bind(VkCommandBuffer cmd, size_t offset, size_t ioffset)
 {
@@ -13372,35 +13464,13 @@ void geoms_ctx::push_update_descriptor_set(VkCommandBuffer cmd, pipelinestate_p*
 
 void geoms_ctx::set_state(gem_info_s* info)
 {
-	uint8_t blendMode = info->blendMode;
-	uint8_t topology = info->topology;
-	bool doubleSided = info->doubleSided;
-	bool depthTestEnable = info->depthTestEnable;
-	bool depthWriteEnable = info->depthWriteEnable;
-	bool stencilTestEnable = info->stencilTestEnable;
-
-	uint8_t type = 0;
-	if (doubleSided)
-		type |= DOUBLESIDED;
-	if (depthTestEnable)
-		type |= DEPTHTESTENABLE;
-	if (depthWriteEnable)
-		type |= DEPTHWRITEENABLE;
-	if (stencilTestEnable)
-		type |= STENCILTESTENABLE;
-
-	union {
-		uint8_t btt[4];
-		uint32_t t = 0;
-	}v;
-	v.btt[0] = blendMode; v.btt[1] = topology; v.btt[2] = type; v.btt[3] = info->polygon;
-
-	if (!pipeline || curState != v.t)
+	uint64_t v = *(uint64_t*)info;
+	if (!pipeline || curState != v)
 	{
-		curState = v.t;
-		auto& pl = pipelines[v.t];
+		curState = v;
+		auto& pl = pipelines[v];
 		if (!pl.pipeline) {
-			pipelinestate_p p0 = new_spv_base(dev, blendMode, topology, type, info->polygon);
+			pipelinestate_p p0 = new_spv_base(info);
 			pl = p0;
 		}
 		if (pl.pipeline)
@@ -13432,7 +13502,7 @@ bool geoms_ctx::add_geometry(void* texture, const float* xy, int xy_stride, cons
 	{
 		c.count = num_vertices;
 	}
-	if (pipeline && pipeline->type & DOUBLESIDED) {
+	if (pipeline && pipeline->info.doubleSided) {
 		c.vertexOffset = vd2.size();
 		c.offset = 1;
 		vd2.resize(vd2.size() + num_vertices);
@@ -13553,7 +13623,7 @@ bool geoms_ctx::add_geometry3d(void* texture, const float* xyz, int xyz_stride, 
 	{
 		c.count = num_vertices;
 	}
-	if (pipeline && pipeline->type & DOUBLESIDED) {
+	if (pipeline && pipeline->info.doubleSided) {
 		c.vertexOffset = vd2.size();
 		c.offset = 1;
 		vd2.resize(vd2.size() + num_vertices);
@@ -13763,7 +13833,7 @@ void generateSphere(int sides, std::vector<uint32_t>& outIndices, std::vector<gl
 		}
 	}
 }
-void generateCube(std::vector<glm::vec3>& vertices, std::vector<unsigned int>& indices, float r)
+void generateCube(std::vector<glm::vec3>& vertices, std::vector<unsigned int>& indices, float r, const glm::vec3& pos)
 {
 	std::vector<glm::vec3> v = {
 		glm::vec3{ -r, -r, -r }, glm::vec3{ r, -r, -r },
@@ -13785,6 +13855,7 @@ void generateCube(std::vector<glm::vec3>& vertices, std::vector<unsigned int>& i
 	2,4,0,  2,6,4      // 第六个四边形 2,0,4,6 
 	};
 	vertices = v;
+	for (auto& it : vertices)it += pos;
 	indices = triangles;
 }
 void generateTorus(std::vector<glm::vec3>& vertices, std::vector<glm::vec3>& normals, std::vector<glm::vec2>& texCoords, std::vector<unsigned int>& indices,
@@ -13841,13 +13912,14 @@ geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx)
 	if (!gctx)
 		gctx = new_geoms(ctx, 1024 * 1024, 1024 * 1024);
 	gctx->clear();
-	gem_info_s info;
+	gem_info_s info = {};
 	info.blendMode = (uint8_t)blendmode_e::normal;
 	info.topology = 3;
 	info.doubleSided = false;
 	info.depthTestEnable = false;
 	info.depthWriteEnable = false;
 	info.stencilTestEnable = true;
+	info.dynamicrenderingEnable = true;
 	gctx_set_state(gctx, &info);
 	glm::vec2 surfSize = { (float)ctx->pSurf->width, (float)ctx->pSurf->height };
 	glm::mat4 mat = ortho(surfSize.x, surfSize.y, -1.0f, 1.0f, 0);
@@ -13875,7 +13947,7 @@ geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx)
 	generateSphere(16, indices3, vertices3);
 	std::vector<glm::vec3>vertices, normals; std::vector<glm::vec2>  texCoords; std::vector<unsigned int> indices4;
 	//generateTorus(vertices3, normals, texCoords, indices3, 2.0f, 1.0f, 32, 64);
-	generateCube(vertices, indices4, 1.2f);
+	generateCube(vertices, indices4, 1.2f, glm::vec3(2.5, 0, 0));
 	glm::mat4 model = glm::mat4(1.0f);
 	//model = glm::translate(glm::mat4(1.0), glm::vec3(2, 0, 0));
 	float fov = 45;

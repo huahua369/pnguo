@@ -552,7 +552,10 @@ namespace vkg {
 			VK_KHR_BIND_MEMORY_2_EXTENSION_NAME,
 			VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
 			VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
-			VK_KHR_MAINTENANCE_5_EXTENSION_NAME
+			 VK_KHR_MAINTENANCE_4_EXTENSION_NAME,
+			VK_KHR_MAINTENANCE_5_EXTENSION_NAME,
+			 VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
+			 VK_EXT_ROBUSTNESS_2_EXTENSION_NAME
 			});
 		pDp->AddDeviceExtensionName({
 			// mesh shader
@@ -562,13 +565,10 @@ namespace vkg {
 			 // dynamic_rendering
 			 // The sample uses the extension (instead of Vulkan 1.2, where dynamic rendering is core)
 			 VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
-			 //VK_KHR_MAINTENANCE_2_EXTENSION_NAME,
-			 VK_KHR_MAINTENANCE_4_EXTENSION_NAME,
+			 VK_KHR_MAINTENANCE_2_EXTENSION_NAME,
 			 VK_KHR_MULTIVIEW_EXTENSION_NAME,
 			 VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME,
-			 VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
-			 VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
-			 VK_EXT_ROBUSTNESS_2_EXTENSION_NAME
+			 VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME
 			});
 	}
 
@@ -624,6 +624,7 @@ namespace vkg {
 		uint32_t score = 0;
 		VkPhysicalDeviceProperties deviceProperties = {};
 		vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
+		deviceProperties.limits.maxColorAttachments;
 		//score += deviceProperties.limits.maxImageDimension1D;
 		switch (deviceProperties.deviceType)
 		{
