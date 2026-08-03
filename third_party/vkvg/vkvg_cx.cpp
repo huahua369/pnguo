@@ -13907,6 +13907,104 @@ void generateTorus(std::vector<glm::vec3>& vertices, std::vector<glm::vec3>& nor
 		}
 	}
 }
+
+struct mesh3d_vi {
+	std::vector<glm::vec3> vertices;
+	std::vector<uint32_t> indices; // 三角形索引，每三个一组表示一个三角形 
+};
+
+// 获取边的唯一键 
+inline size_t getEdgeKey(size_t i0, size_t i1) {
+	if (i0 > i1) std::swap(i0, i1);
+	return (i0 << 32) | i1;
+}
+
+// 获取或创建边中点 
+size_t getMidpoint(std::unordered_map<size_t, size_t>& midCache,
+	std::vector<glm::vec3>& vertices,
+	size_t i0, size_t i1) {
+	size_t key = getEdgeKey(i0, i1);
+	auto it = midCache.find(key);
+	if (it != midCache.end())
+		return it->second;
+
+	glm::vec3 mid = glm::normalize((vertices[i0] + vertices[i1]) * 0.5f);
+	size_t index = vertices.size();
+	vertices.push_back(mid);
+	midCache[key] = index;
+	return index;
+}
+
+void createIcosphere(mesh3d_vi* shphere, size_t subdivisions, float radius, const glm::vec3& pos)
+{
+	const float t = (1.0f + std::sqrt(5.0f)) / 2.0f;
+
+	if (!(radius > 1.0f)) {
+		shphere->vertices.clear();
+		shphere->indices.clear();
+		return;
+	}
+	// 初始二十面体的12个顶点 
+	std::vector<glm::vec3> verts = {
+		glm::normalize(glm::vec3(-1,  t,  0)),
+		glm::normalize(glm::vec3(1,  t,  0)),
+		glm::normalize(glm::vec3(-1, -t,  0)),
+		glm::normalize(glm::vec3(1, -t,  0)),
+		glm::normalize(glm::vec3(0, -1,  t)),
+		glm::normalize(glm::vec3(0,  1,  t)),
+		glm::normalize(glm::vec3(0, -1, -t)),
+		glm::normalize(glm::vec3(0,  1, -t)),
+		glm::normalize(glm::vec3(t,  0, -1)),
+		glm::normalize(glm::vec3(t,  0,  1)),
+		glm::normalize(glm::vec3(-t,  0, -1)),
+		glm::normalize(glm::vec3(-t,  0,  1))
+	};
+
+	// 初始二十面体的20个三角形面 
+	std::vector<unsigned int> triangles = {
+		0,11,5,  0,5,1,  0,1,7,  0,7,10,  0,10,11,
+		1,5,9,  5,11,4,  11,10,2,  10,7,6,  7,1,8,
+		3,9,4,  3,4,2,  3,2,6,  3,6,8,  3,8,9,
+		4,9,5,  2,4,11, 6,2,10, 8,6,7,  9,8,1
+	};
+	auto length = triangles.size() / 3;
+	for (size_t i = 0; i < length; i++)
+	{
+		std::swap(triangles[i * 3 + 1], triangles[i * 3 + 2]); // 翻转三角形顶点顺序
+	}
+	std::unordered_map<size_t, size_t> midCache;
+	std::vector<unsigned int> newTriangles;
+	// 递归细分 
+	for (unsigned int i = 0; i < subdivisions; ++i) {
+		midCache.clear();
+		newTriangles.clear();
+		for (size_t j = 0; j < triangles.size(); j += 3) {
+			size_t v0 = triangles[j];
+			size_t v1 = triangles[j + 1];
+			size_t v2 = triangles[j + 2];
+
+			size_t a = getMidpoint(midCache, verts, v0, v1);
+			size_t b = getMidpoint(midCache, verts, v1, v2);
+			size_t c = getMidpoint(midCache, verts, v2, v0);
+
+			newTriangles.insert(newTriangles.end(), {
+				(unsigned)v0, (unsigned)a, (unsigned)c,
+				(unsigned)v1, (unsigned)b, (unsigned)a,
+				(unsigned)v2, (unsigned)c, (unsigned)b,
+				(unsigned)a, (unsigned)b, (unsigned)c
+				});
+		}
+		triangles.swap(newTriangles);
+	}
+	shphere->vertices = verts;
+	shphere->indices = triangles;
+	glm::vec3 sc = { 1,1,1 };
+	if ((radius > 0.0f && radius < 1.0f) || radius > 1.0f)
+	{
+		sc = { radius,radius,radius };
+	}
+	for (auto& it : shphere->vertices)it = pos + it * sc;
+}
 geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx)
 {
 	if (!gctx)
@@ -13920,10 +14018,8 @@ geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx)
 	info.depthWriteEnable = false;
 	info.stencilTestEnable = true;
 	info.dynamicrenderingEnable = true;
-	gctx_set_state(gctx, &info);
+	auto info2d = info;
 	glm::vec2 surfSize = { (float)ctx->pSurf->width, (float)ctx->pSurf->height };
-	glm::mat4 mat = ortho(surfSize.x, surfSize.y, -1.0f, 1.0f, 0);
-	gctx_set_matrix(gctx, &mat);
 
 	uint32_t color[3] = { 0x8f0080FF,0xFF80FF00,0xFF555555 };
 	uint32_t indices[15] = { 0,1,2,0,2,3,0,3,4,0,4,5,0,5,1 };
@@ -13940,25 +14036,27 @@ geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx)
 		double y = r * sin(angle + M_PI / 2);
 		*t++ = glm::vec3(x, y, 0.0f) + pos;
 	}
-	auto vm = mat * glm::vec4(v[0], 1.0f);// 颜色结构0则读取第一个颜色，UV也一样
-	gctx_add_geometry(gctx, nullptr, (float*)v, sizeof(glm::vec3), color, 0, (float*)uv, sizeof(glm::vec2), 6, indices, 15, sizeof(uint32_t), 1);
 
 	std::vector<uint32_t> indices3; std::vector<glm::vec3> vertices3;
 	generateSphere(16, indices3, vertices3);
 	std::vector<glm::vec3>vertices, normals; std::vector<glm::vec2>  texCoords; std::vector<unsigned int> indices4;
 	//generateTorus(vertices3, normals, texCoords, indices3, 2.0f, 1.0f, 32, 64);
 	generateCube(vertices, indices4, 1.2f, glm::vec3(2.5, 0, 0));
+
+	mesh3d_vi shphere;
+	createIcosphere(&shphere, 2, 2, glm::vec3(-3.2, 0, 0));
+
 	glm::mat4 model = glm::mat4(1.0f);
 	//model = glm::translate(glm::mat4(1.0), glm::vec3(2, 0, 0));
 	float fov = 45;
 	glm::mat4 projection = glm::perspective(glm::radians(fov), (float)(surfSize.x * 1.0 / surfSize.y), 0.1f, 1000.0f);
 	// 视图矩阵：摄像机位于(0,1,5)，看向原点，上方向为(0,1,0)
 	glm::mat4 view = glm::lookAt(
-		glm::vec3(0.50f, 2.0f, 5.0f),
+		glm::vec3(0.0f, 0.0f, 8.0f),
 		glm::vec3(0.0f, 0.0f, 0.0f),
 		glm::vec3(0.0f, 1.0f, 0.0f)
 	);
-	mat = projection * view * model;
+	glm::mat4 mat = projection * view * model;
 	gctx_set_matrix(gctx, &mat);
 	//gem_info_s info;
 	info.blendMode = (uint8_t)blendmode_e::normal;
@@ -13970,12 +14068,22 @@ geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx)
 	gctx_set_state(gctx, &info);
 	gctx_add_geometry3d(gctx, nullptr, (float*)vertices3.data(), sizeof(glm::vec3), &color[1], 0, (float*)uv, sizeof(glm::vec2), vertices3.size(), indices3.data(), indices3.size(), sizeof(uint32_t), 1);
 	gctx_add_geometry3d(gctx, nullptr, (float*)vertices.data(), sizeof(glm::vec3), &color[1], 0, (float*)uv, sizeof(glm::vec2), vertices.size(), indices4.data(), indices4.size(), sizeof(uint32_t), 1);
+
+	uint32_t color2[2] = { 0xFF9678B4,0xFFf55555 };
+	gctx_add_geometry3d(gctx, nullptr, (float*)shphere.vertices.data(), sizeof(glm::vec3), color2, 0, (float*)uv, sizeof(glm::vec2), shphere.vertices.size(), shphere.indices.data(), shphere.indices.size(), sizeof(uint32_t), 1);
 	info.polygon = 1;// 线框模式
 	info.doubleSided = false;
 	gctx_set_state(gctx, &info);
 	uint32_t color1[2] = { 0xFF000000,0xFFf55555 };
 	gctx_add_geometry3d(gctx, nullptr, (float*)vertices3.data(), sizeof(glm::vec3), color1, 0, (float*)uv, sizeof(glm::vec2), vertices3.size(), indices3.data(), indices3.size(), sizeof(uint32_t), 1);
 	gctx_add_geometry3d(gctx, nullptr, (float*)vertices.data(), sizeof(glm::vec3), color1, 0, (float*)uv, sizeof(glm::vec2), vertices.size(), indices4.data(), indices4.size(), sizeof(uint32_t), 1);
+	gctx_add_geometry3d(gctx, nullptr, (float*)shphere.vertices.data(), sizeof(glm::vec3), color1, 0, (float*)uv, sizeof(glm::vec2), shphere.vertices.size(), shphere.indices.data(), shphere.indices.size(), sizeof(uint32_t), 1);
+
+	mat = ortho(surfSize.x, surfSize.y, -1.0f, 1.0f, 0);
+	gctx_set_state(gctx, &info2d);
+	gctx_set_matrix(gctx, &mat);
+	auto vm = mat * glm::vec4(v[0], 1.0f);// 颜色结构0则读取第一个颜色，UV也一样
+	gctx_add_geometry(gctx, nullptr, (float*)v, sizeof(glm::vec3), color, 0, (float*)uv, sizeof(glm::vec2), 6, indices, 15, sizeof(uint32_t), 1);
 
 	return gctx;
 }
