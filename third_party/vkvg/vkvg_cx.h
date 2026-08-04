@@ -167,7 +167,7 @@ struct rvg_cb;
 void init_rvg(vgdev_ctx* ptr, rvg_cb* r);
 
 class geoms_ctx;
-geoms_ctx* new_geoms(VkvgContext ctx, uint32_t _sizeVBO, uint32_t _sizeIBO);
+geoms_ctx* new_geoms(VkvgDevice ctx, uint32_t _sizeVBO, uint32_t _sizeIBO);
 void free_geoms(geoms_ctx* p);
 void gctx_clear(geoms_ctx* ctx);
 // 批量录制渲染
@@ -176,6 +176,11 @@ void gctx_draw(geoms_ctx* ctx, VkCommandBuffer cmd);
 	VK_POLYGON_MODE_FILL = 0,
 	VK_POLYGON_MODE_LINE = 1,
 	VK_POLYGON_MODE_POINT = 2,
+	VK_CULL_MODE_NONE = 0,		// 不剔除
+	VK_CULL_MODE_FRONT_BIT = 0x00000001,正面剔除
+	VK_CULL_MODE_BACK_BIT = 0x00000002,背面剔除
+	VK_CULL_MODE_FRONT_AND_BACK = 0x00000003,全部剔除
+
 	VK_PRIMITIVE_TOPOLOGY_POINT_LIST=0,
 	VK_PRIMITIVE_TOPOLOGY_LINE_LIST=1,
 	VK_PRIMITIVE_TOPOLOGY_LINE_STRIP=2,
@@ -183,16 +188,23 @@ void gctx_draw(geoms_ctx* ctx, VkCommandBuffer cmd);
 	VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP=4,
 	VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN=5
 	*/
+#ifndef d_doubleSided
+#define d_doubleSided 0x01
+#define d_depthTestEnable 0x02
+#define d_depthWriteEnable 0x04
+#define d_stencilTestEnable 0x08
+#endif // !d_doubleSided
 struct gem_info_s {
 	uint8_t blendMode = 0;
 	uint8_t topology = 0;
 	uint8_t polygon = 0;
-	uint8_t frontFace = 0;    //COUNTER_CLOCKWISE = 0, CLOCKWISE = 1,
-	bool doubleSided = false;
-	bool depthTestEnable = false;
-	bool depthWriteEnable = false;
-	bool stencilTestEnable = false;
+	uint8_t frontFace = 0;     // COUNTER_CLOCKWISE = 0, CLOCKWISE = 1,
+	uint8_t cullMode = 0;      // NONE=0, FRONT=1, BACK=2, FRONT_AND_BACK=3
+	uint8_t flags = 0;         // doubleSided, depthTestEnable, depthWriteEnable, stencilTestEnable
+	uint8_t lineWidth = 1;
+	uint8_t pad[1] = { 0 };
 };
+
 void gctx_set_state(geoms_ctx* ctx, gem_info_s* info);
 void gctx_set_matrix(geoms_ctx* ctx, const glm::mat4* matrix);
 // 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据，color_type=0表示float4，1表示uint32_t

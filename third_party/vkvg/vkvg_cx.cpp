@@ -51,6 +51,8 @@ extern "C" {
 
 #include <font_core.h>
 #include "vkvg_cx.h"
+#include "gpu_vk.h"
+
 /*
 命令行
 glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_main_frag1_spv -o vkvg_main.frag.h
@@ -135,7 +137,7 @@ struct geoms_ctx {
 public:
 	VkvgDevice dev = {};
 	USP_CX ac;				// 内存分配器
-	glm::ivec2 bufsize = {};
+	//glm::ivec2 bufsize = {};
 	vkh_buffer_t vertices = {};
 	vkh_buffer_t indices = {};
 	uint32_t     sizeVBO = 0;
@@ -159,7 +161,7 @@ public:
 public:
 	geoms_ctx();
 	~geoms_ctx();
-	void init(VkvgContext ctx, uint32_t _sizeVBO, uint32_t _sizeIBO);
+	void init(VkvgDevice ctx, uint32_t _sizeVBO, uint32_t _sizeIBO);
 	void destroy_va();
 	void reset();
 public:
@@ -13032,7 +13034,7 @@ pipelinestate_p newPipelineState(pipe_data* pd, gem_info_s* info)
 	pipelineCreateInfo.pDepthStencilState = &depthStencilStateCreateInfo;
 	pipelineCreateInfo.pColorBlendState = &colorBlendStateCreateInfo;
 	pipelineCreateInfo.pDynamicState = &dynamicStateCreateInfo;
-	int shader = info->doubleSided;
+	int shader = info->flags & d_doubleSided;
 	// Shaders
 	const char* name = "main";
 	for (uint32_t i = 0; i < 2; i++) {
@@ -13131,7 +13133,7 @@ pipelinestate_p newPipelineState(pipe_data* pd, gem_info_s* info)
 	rasterizationStateCreateInfo.depthBiasConstantFactor = 0.0f;
 	rasterizationStateCreateInfo.depthBiasClamp = 0.0f;
 	rasterizationStateCreateInfo.depthBiasSlopeFactor = 0.0f;
-	rasterizationStateCreateInfo.lineWidth = 1.0f;
+	rasterizationStateCreateInfo.lineWidth = info->lineWidth;
 
 	// MSAA state
 	multisampleStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -13144,8 +13146,8 @@ pipelinestate_p newPipelineState(pipe_data* pd, gem_info_s* info)
 	ds.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 	ds.pNext = NULL;
 	ds.flags = 0;
-	ds.depthTestEnable = info->depthTestEnable;
-	ds.depthWriteEnable = info->depthWriteEnable;
+	ds.depthTestEnable = info->flags & d_depthTestEnable;
+	ds.depthWriteEnable = info->flags & d_depthWriteEnable;
 	ds.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 	ds.back.failOp = VK_STENCIL_OP_KEEP;
 	ds.back.passOp = VK_STENCIL_OP_KEEP;
@@ -13157,7 +13159,7 @@ pipelinestate_p newPipelineState(pipe_data* pd, gem_info_s* info)
 	ds.depthBoundsTestEnable = VK_FALSE;
 	ds.minDepthBounds = 0;
 	ds.maxDepthBounds = 0;
-	ds.stencilTestEnable = info->stencilTestEnable;
+	ds.stencilTestEnable = info->flags & d_stencilTestEnable;
 	ds.front = ds.back;
 	VkStencilOpState clipingOpState = { VK_STENCIL_OP_ZERO,
 									VK_STENCIL_OP_REPLACE,
@@ -13249,25 +13251,26 @@ geoms_ctx::~geoms_ctx()
 	destroy_va();
 }
 
-void geoms_ctx::init(VkvgContext ctx, uint32_t _sizeVBO, uint32_t _sizeIBO)
+void geoms_ctx::init(VkvgDevice ctx, uint32_t _sizeVBO, uint32_t _sizeIBO)
 {
 	if (!ctx || dev)return;
-	dev = ctx->dev;
+	dev = ctx;
 	shaderModule[0] = new_module(dev->vkDev, base3d_vert, 0);
 	shaderModule[1] = new_module(dev->vkDev, base3d_frag, 0);
 	shaderModule[2] = new_module(dev->vkDev, base3d2_vert, 0);
 	shaderModule[3] = new_module(dev->vkDev, base3d2_frag, 0);// 双面不同颜色
 
-	bufsize = glm::ivec2(ctx->pSurf->width, ctx->pSurf->height);
-	_vkCmdPushDescriptorSet = ctx->_vkCmdPushDescriptorSet;
+	_vkCmdPushDescriptorSet = (PFN_vkCmdPushDescriptorSet)vkGetDeviceProcAddr(dev->vkDev, "vkCmdPushDescriptorSet");
+	if (!_vkCmdPushDescriptorSet) _vkCmdPushDescriptorSet = (PFN_vkCmdPushDescriptorSet)vkGetInstanceProcAddr(dev->instance, "vkCmdPushDescriptorSet");
+
 
 	_vkCmdBeginRenderingKHR = reinterpret_cast<PFN_vkCmdBeginRenderingKHR>(vkGetDeviceProcAddr(dev->vkDev, "vkCmdBeginRenderingKHR"));
 	_vkCmdEndRenderingKHR = reinterpret_cast<PFN_vkCmdEndRenderingKHR>(vkGetDeviceProcAddr(dev->vkDev, "vkCmdEndRenderingKHR"));
 
-	maxPushDescriptors = ctx->maxPushDescriptors;
+	//maxPushDescriptors = ctx->maxPushDescriptors;
 	sizeVBO = _sizeVBO; sizeIBO = _sizeIBO;
-	vkh_buffer_init((VkhDevice)&dev->vkDev, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeVBO, &vertices, true);
-	vkh_buffer_init((VkhDevice)&dev->vkDev, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeIBO, &indices, true);
+	vkh_buffer_init((VkhDevice)&dev->vkhDev, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeVBO, &vertices, true);
+	vkh_buffer_init((VkhDevice)&dev->vkhDev, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeIBO, &indices, true);
 }
 
 
@@ -13440,7 +13443,7 @@ void geoms_ctx::bind(VkCommandBuffer cmd, size_t offset, size_t ioffset)
 
 void geoms_ctx::push_update_descriptor_set(VkCommandBuffer cmd, pipelinestate_p* cp, VkhImage img)
 {
-	if (!maxPushDescriptors || !_vkCmdPushDescriptorSet || !img)return;
+	if (!_vkCmdPushDescriptorSet || !img)return;
 	//VkDescriptorImageInfo dst0 = vkh_image_get_descriptor(img, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	//VkWriteDescriptorSet  wimg = {
 	//.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -13502,7 +13505,7 @@ bool geoms_ctx::add_geometry(void* texture, const float* xy, int xy_stride, cons
 	{
 		c.count = num_vertices;
 	}
-	if (pipeline && pipeline->info.doubleSided) {
+	if (pipeline && pipeline->info.flags & d_doubleSided) {
 		c.vertexOffset = vd2.size();
 		c.offset = 1;
 		vd2.resize(vd2.size() + num_vertices);
@@ -13623,7 +13626,7 @@ bool geoms_ctx::add_geometry3d(void* texture, const float* xyz, int xyz_stride, 
 	{
 		c.count = num_vertices;
 	}
-	if (pipeline && pipeline->info.doubleSided) {
+	if (pipeline && pipeline->info.flags & d_doubleSided) {
 		c.vertexOffset = vd2.size();
 		c.offset = 1;
 		vd2.resize(vd2.size() + num_vertices);
@@ -13725,7 +13728,7 @@ bool geoms_ctx::add_geometry3d(void* texture, const float* xyz, int xyz_stride, 
 	return true;
 }
 
-geoms_ctx* new_geoms(VkvgContext ctx, uint32_t _sizeVBO, uint32_t _sizeIBO)
+geoms_ctx* new_geoms(VkvgDevice ctx, uint32_t _sizeVBO, uint32_t _sizeIBO)
 {
 	auto p = new geoms_ctx();
 	p->init(ctx, _sizeVBO, _sizeIBO);
@@ -14008,16 +14011,18 @@ void createIcosphere(mesh3d_vi* shphere, size_t subdivisions, float radius, cons
 geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx)
 {
 	if (!gctx)
-		gctx = new_geoms(ctx, 1024 * 1024, 1024 * 1024);
+		gctx = new_geoms(ctx->dev, 1024 * 1024, 1024 * 1024);
 	gctx->clear();
 	gem_info_s info = {};
 	info.blendMode = (uint8_t)blendmode_e::normal;
 	info.topology = 3;
-	info.doubleSided = false;
-	info.depthTestEnable = false;
-	info.depthWriteEnable = false;
-	info.stencilTestEnable = true;
+	//info.doubleSided = false;
+	//info.depthTestEnable = false;
+	//info.depthWriteEnable = false;
+	//info.stencilTestEnable = true;
+	info.flags = d_stencilTestEnable;
 	info.frontFace = 0;
+	info.cullMode = 0;
 	auto info2d = info;
 	glm::vec2 surfSize = { (float)ctx->pSurf->width, (float)ctx->pSurf->height };
 
@@ -14058,21 +14063,23 @@ geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx)
 	);
 	glm::mat4 mat = projection * view * model;
 	gctx_set_matrix(gctx, &mat);
+	info.lineWidth = 1;
 	//gem_info_s info;
 	info.blendMode = (uint8_t)blendmode_e::normal;
 	info.topology = 3;
-	info.doubleSided = true;
-	info.depthTestEnable = true;
-	info.depthWriteEnable = true;
-	info.stencilTestEnable = false;
+	//info.doubleSided = true;
+	//info.depthTestEnable = true;
+	//info.depthWriteEnable = true;
+	//info.stencilTestEnable = false;
+	info.flags = d_doubleSided | d_depthTestEnable | d_depthWriteEnable;
 	gctx_set_state(gctx, &info);
 	gctx_add_geometry3d(gctx, nullptr, (float*)vertices3.data(), sizeof(glm::vec3), &color[1], 0, (float*)uv, sizeof(glm::vec2), vertices3.size(), indices3.data(), indices3.size(), sizeof(uint32_t), 1);
 	gctx_add_geometry3d(gctx, nullptr, (float*)vertices.data(), sizeof(glm::vec3), &color[1], 0, (float*)uv, sizeof(glm::vec2), vertices.size(), indices4.data(), indices4.size(), sizeof(uint32_t), 1);
 
 	uint32_t color2[2] = { 0xFF9678B4,0xFFf55555 };
 	gctx_add_geometry3d(gctx, nullptr, (float*)shphere.vertices.data(), sizeof(glm::vec3), color2, 0, (float*)uv, sizeof(glm::vec2), shphere.vertices.size(), shphere.indices.data(), shphere.indices.size(), sizeof(uint32_t), 1);
-	info.polygon = 1;// 线框模式
-	info.doubleSided = false;
+	info.polygon = 1;// 线框模式 
+	info.flags = d_depthTestEnable | d_depthWriteEnable;
 	gctx_set_state(gctx, &info);
 	uint32_t color1[2] = { 0xFF000000,0xFFf55555 };
 	gctx_add_geometry3d(gctx, nullptr, (float*)vertices3.data(), sizeof(glm::vec3), color1, 0, (float*)uv, sizeof(glm::vec2), vertices3.size(), indices3.data(), indices3.size(), sizeof(uint32_t), 1);

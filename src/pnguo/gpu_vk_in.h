@@ -1,5 +1,25 @@
 #pragma once
 
+struct devinfo_x {
+	VkDevice				dev = nullptr;
+	VkPhysicalDeviceMemoryProperties phyMemProps = {};
+	VkPhysicalDevice		phy = nullptr;
+	VkInstance				instance = nullptr;
+#ifdef USE_VMA
+	VmaAllocator			allocator;
+#endif 
+	VkSurfaceKHR _surface = {};
+	VkPhysicalDeviceProperties _deviceProperties = {};
+	VkPhysicalDeviceProperties2 _deviceProperties2 = {};
+	VkPhysicalDeviceSubgroupProperties _subgroupProperties = {};
+	uint32_t maxPushDescriptors = 0;
+	std::string name;
+	uint32_t graphics_queueFlags = 0;
+	uint32_t _queue_family_index = 0;
+	std::vector<VkQueue> _graphics_queues;
+	std::vector<VkSurfaceFormatKHR> _surfaceFormats;
+	bool is_newdevice = false;
+};
 
 // 新渲染器声明  
 namespace vkg {
@@ -32,26 +52,6 @@ namespace vkg {
 	{
 		char name[256];
 		void* phd;
-	};
-	struct devinfo_x {
-		VkInstance _instance = 0;
-		VkDevice _device = 0;
-		VkPhysicalDevice _physicaldevice = {};
-		VkSurfaceKHR _surface = {};
-		VkPhysicalDeviceMemoryProperties _memoryProperties = {};
-		VkPhysicalDeviceProperties _deviceProperties = {};
-		VkPhysicalDeviceProperties2 _deviceProperties2 = {};
-		VkPhysicalDeviceSubgroupProperties _subgroupProperties = {};
-		uint32_t maxPushDescriptors = 0;
-		std::string name;
-		uint32_t graphics_queueFlags = 0;
-		uint32_t _queue_family_index = 0;
-		std::vector<VkQueue> _graphics_queues;
-		std::vector<VkSurfaceFormatKHR> _surfaceFormats;
-#ifdef USE_VMA
-		VmaAllocator _hAllocator = NULL;
-#endif
-		bool is_newdevice = false;
 	};
 	void free_devinfo(devinfo_x* d);
 

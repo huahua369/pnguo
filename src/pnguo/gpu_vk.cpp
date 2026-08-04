@@ -881,18 +881,18 @@ namespace vkg {
 	{
 		if (!d)return;
 		if (d->_surface)
-			vkDestroySurfaceKHR(d->_instance, d->_surface, 0);
+			vkDestroySurfaceKHR(d->instance, d->_surface, 0);
 		d->_surface = 0;
 #ifdef USE_VMA
-		if (d->_hAllocator)
+		if (d->allocator)
 		{
-			vmaDestroyAllocator(d->_hAllocator);
-			d->_hAllocator = NULL;
+			vmaDestroyAllocator(d->allocator);
+			d->allocator = NULL;
 		}
 #endif
 
-		if (d->is_newdevice && d->_device)
-			vkDestroyDevice(d->_device, 0);
+		if (d->is_newdevice && d->dev)
+			vkDestroyDevice(d->dev, 0);
 		delete d;
 	}
 
@@ -957,10 +957,10 @@ namespace vkg {
 		get_qfp(physicalDevice, queue_props);
 		uint32_t queue_family_count = queue_props.size();
 		assert(queue_family_count >= 1);
-		px->_physicaldevice = physicalDevice;
-		px->_device = dev;
-		px->_instance = vulkanInstance;
-		vkGetPhysicalDeviceMemoryProperties(physicalDevice, &px->_memoryProperties);
+		px->phy = physicalDevice;
+		px->dev = dev;
+		px->instance = vulkanInstance;
+		vkGetPhysicalDeviceMemoryProperties(physicalDevice, &px->phyMemProps);
 		vkGetPhysicalDeviceProperties(physicalDevice, &px->_deviceProperties);
 
 		VkPhysicalDevicePushDescriptorProperties pushDescriptorProps = {};
@@ -983,7 +983,7 @@ namespace vkg {
 			createInfo.pNext = NULL;
 			createInfo.hinstance = NULL;
 			createInfo.hwnd = (HWND)pw;
-			res = vkCreateWin32SurfaceKHR(px->_instance, &createInfo, NULL, &px->_surface);
+			res = vkCreateWin32SurfaceKHR(px->instance, &createInfo, NULL, &px->_surface);
 #elif __ANDROID__
 			ANativeWindow* window = (ANativeWindow*)pw;// platformWindow_;
 			VkAndroidSurfaceCreateInfoKHR surfaceCreateInfo = {};
@@ -1180,7 +1180,7 @@ namespace vkg {
 		}
 		if (dev)
 		{
-			px->_device = dev;
+			px->dev = dev;
 		}
 		else
 		{
@@ -1192,17 +1192,17 @@ namespace vkg {
 			device_info.enabledExtensionCount = (uint32_t)extension_names.size();
 			device_info.ppEnabledExtensionNames = device_info.enabledExtensionCount ? extension_names.data() : NULL;
 			device_info.pEnabledFeatures = NULL;
-			res = vkCreateDevice(physicalDevice, &device_info, NULL, &px->_device);
+			res = vkCreateDevice(physicalDevice, &device_info, NULL, &px->dev);
 			assert(res == VK_SUCCESS);
-			if (px->_device)
+			if (px->dev)
 				px->is_newdevice = true;
 		}
-		if (!px->_device)return;
+		if (!px->dev)return;
 		PFN_vkCmdPushDescriptorSet pdset = nullptr;
 		PFN_vkCmdPushDescriptorSetKHR pdsetKhr = nullptr;
 		if (pushset) {
-			pdset = (PFN_vkCmdPushDescriptorSet)vkGetDeviceProcAddr(px->_device, "vkCmdPushDescriptorSet");
-			pdsetKhr = (PFN_vkCmdPushDescriptorSetKHR)vkGetDeviceProcAddr(px->_device, "vkCmdPushDescriptorSetKHR");
+			pdset = (PFN_vkCmdPushDescriptorSet)vkGetDeviceProcAddr(px->dev, "vkCmdPushDescriptorSet");
+			pdsetKhr = (PFN_vkCmdPushDescriptorSetKHR)vkGetDeviceProcAddr(px->dev, "vkCmdPushDescriptorSetKHR");
 		}
 		PFN_vkCmdBeginRenderingKHR _vkCmdBeginRenderingKHR = VK_NULL_HANDLE;
 		PFN_vkCmdEndRenderingKHR _vkCmdEndRenderingKHR = VK_NULL_HANDLE;
@@ -1210,23 +1210,23 @@ namespace vkg {
 		PFN_vkCmdDrawMeshTasksEXT _vkCmdDrawMeshTasksEXT;
 		if (dr)
 		{
-			_vkCmdBeginRenderingKHR = (PFN_vkCmdBeginRenderingKHR)vkGetDeviceProcAddr(px->_device, "vkCmdBeginRenderingKHR");
-			_vkCmdEndRenderingKHR = (PFN_vkCmdEndRenderingKHR)vkGetDeviceProcAddr(px->_device, "vkCmdEndRenderingKHR");
-			_vkCmdSetFrontFace = (PFN_vkCmdSetFrontFace)vkGetDeviceProcAddr(px->_device, "vkCmdSetFrontFace");
+			_vkCmdBeginRenderingKHR = (PFN_vkCmdBeginRenderingKHR)vkGetDeviceProcAddr(px->dev, "vkCmdBeginRenderingKHR");
+			_vkCmdEndRenderingKHR = (PFN_vkCmdEndRenderingKHR)vkGetDeviceProcAddr(px->dev, "vkCmdEndRenderingKHR");
+			_vkCmdSetFrontFace = (PFN_vkCmdSetFrontFace)vkGetDeviceProcAddr(px->dev, "vkCmdSetFrontFace");
 			if (!_vkCmdSetFrontFace)
-				_vkCmdSetFrontFace = (PFN_vkCmdSetFrontFaceEXT)vkGetDeviceProcAddr(px->_device, "vkCmdSetFrontFaceEXT");
+				_vkCmdSetFrontFace = (PFN_vkCmdSetFrontFaceEXT)vkGetDeviceProcAddr(px->dev, "vkCmdSetFrontFaceEXT");
 		}
 		if (enabledMS)
 		{
-			_vkCmdDrawMeshTasksEXT = reinterpret_cast<PFN_vkCmdDrawMeshTasksEXT>(vkGetDeviceProcAddr(px->_device, "vkCmdDrawMeshTasksEXT"));
+			_vkCmdDrawMeshTasksEXT = reinterpret_cast<PFN_vkCmdDrawMeshTasksEXT>(vkGetDeviceProcAddr(px->dev, "vkCmdDrawMeshTasksEXT"));
 		}
 
 #ifdef USE_VMA
 		VmaAllocatorCreateInfo allocatorInfo = {};
 		allocatorInfo.physicalDevice = physicalDevice;
-		allocatorInfo.device = px->_device;
-		allocatorInfo.instance = px->_instance;
-		vmaCreateAllocator(&allocatorInfo, &px->_hAllocator);
+		allocatorInfo.device = px->dev;
+		allocatorInfo.instance = px->instance;
+		vmaCreateAllocator(&allocatorInfo, &px->allocator);
 #endif
 		// create queues
 		uint32_t graphics_fidx = 0;
@@ -1255,14 +1255,14 @@ namespace vkg {
 		}
 		for (int i = 0; i < px->_graphics_queues.size(); i++) {
 			VkQueue gq = 0;
-			vkGetDeviceQueue(px->_device, graphics_fidx, i, &gq);
+			vkGetDeviceQueue(px->dev, graphics_fidx, i, &gq);
 			px->_graphics_queues[i] = gq;
 		}
 
 		// 初始化扩展函数地址
-		ExtDebugUtilsGetProcAddresses(px->_device);
+		ExtDebugUtilsGetProcAddresses(px->dev);
 #ifdef ExtGetHDRFSEFreesyncHDRProcAddresses
-		ExtGetHDRFSEFreesyncHDRProcAddresses(px->_instance, m_device);
+		ExtGetHDRFSEFreesyncHDRProcAddresses(px->_instance, mdev);
 #endif
 	}
 	void Device_init(devinfo_x* px, dev_info_cx* d, void* pw)
@@ -1281,7 +1281,7 @@ namespace vkg {
 
 		Device_CreateEx((VkInstance)d->inst, (VkPhysicalDevice)d->phy, (VkDevice)d->vkdev, pw, &dp, px);
 		if (!d->vkdev)
-			d->vkdev = px->_device;
+			d->vkdev = px->dev;
 	}
 
 
@@ -10064,9 +10064,9 @@ namespace vkg {
 		{
 			auto dev = devicelist[idx];
 			if (dev) {
-				r.inst = dev->_instance;
-				r.phy = dev->_physicaldevice;
-				r.vkdev = dev->_device;
+				r.inst = dev->instance;
+				r.phy = dev->phy;
+				r.vkdev = dev->dev;
 			}
 		}
 		return r;
@@ -10284,12 +10284,12 @@ namespace vkg {
 
 	VmaAllocator cxDevice::GetAllocator()
 	{
-		return d ? d->_hAllocator : nullptr;
+		return d ? d->allocator : nullptr;
 	}
 
 	VkPhysicalDeviceMemoryProperties cxDevice::GetPhysicalDeviceMemoryProperties()
 	{
-		return d->_memoryProperties;
+		return d->phyMemProps;
 	}
 	VkPhysicalDeviceLimits* cxDevice::get_limits()
 	{
@@ -10662,9 +10662,9 @@ namespace vkg {
 	void cxDevice::get_dev_info(dev_info_cx* r)
 	{
 		if (r && d) {
-			r->inst = d->_instance;
-			r->phy = d->_physicaldevice;
-			r->vkdev = d->_device;
+			r->inst = d->instance;
+			r->phy = d->phy;
+			r->vkdev = d->dev;
 			r->qFamIdx = d->_queue_family_index;
 			r->qCount = get_queue_count();
 		}
@@ -10856,10 +10856,10 @@ namespace vkg {
 		if (c)
 		{
 			auto d = (devinfo_x*)ctx->new_device(phy, dev, devname, hwnd);
-			if (d && d->_device)
+			if (d && d->dev)
 			{
 				c->d = d;
-				c->set_device(d->_device, d->_queue_family_index);
+				c->set_device(d->dev, d->_queue_family_index);
 				c->get_queue(0);
 			}
 			else {
