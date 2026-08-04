@@ -13269,8 +13269,8 @@ void geoms_ctx::init(VkvgDevice ctx, uint32_t _sizeVBO, uint32_t _sizeIBO)
 
 	//maxPushDescriptors = ctx->maxPushDescriptors;
 	sizeVBO = _sizeVBO; sizeIBO = _sizeIBO;
-	vkh_buffer_init((VkhDevice)&dev->vkhDev, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeVBO, &vertices, true);
-	vkh_buffer_init((VkhDevice)&dev->vkhDev, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeIBO, &indices, true);
+	vkh_buffer_init((VkhDevice)&dev->vkDev, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeVBO, &vertices, true);
+	vkh_buffer_init((VkhDevice)&dev->vkDev, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeIBO, &indices, true);
 }
 
 
