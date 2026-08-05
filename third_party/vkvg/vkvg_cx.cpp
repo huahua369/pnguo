@@ -11714,7 +11714,7 @@ void _rvg_path_extents(paths_t* ctx, bool transformed, float* x1, float* y1, flo
 #define PRI_CTX auto cr=(vgdev_ctx*)ctx
 
 void rvg_set_dev(rvgctx_t* ctx, void* vgdev) {
-	if (!ctx)return ;
+	if (!ctx)return;
 	PRI_CTX;
 	cr->dev = (VkvgDevice)vgdev;
 }
@@ -12103,7 +12103,7 @@ rvg_surface_t* rvg_new_surface(rvgctx_t* ctx, int width, int height, uint32_t* d
 	auto p = (vgdev_ctx*)ctx;
 	VkvgSurface surf = nullptr;
 	do {
-		if (!p && !p->dev)break;
+		if (!p || !p->dev)break;
 		if (!data) { surf = vkvg_surface_create(p->dev, width, height); break; }
 		uint32_t* ndata = 0;
 		size_t nds = width * height * sizeof(int);
@@ -12144,7 +12144,7 @@ rvg_surface_t* rvg_new_surface_vk(rvgctx_t* ctx, int width, int height, void* vk
 	auto p = (vgdev_ctx*)ctx;
 	VkvgSurface surf = nullptr;
 	do {
-		if (!p && !p->dev)break;
+		if (!p || !p->dev)break;
 		if (!vkimage) { surf = vkvg_surface_create(p->dev, width, height); break; }
 
 		if (format == 0)
