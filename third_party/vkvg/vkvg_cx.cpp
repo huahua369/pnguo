@@ -112,7 +112,7 @@ struct pipelinestate_p
 	VkDescriptorSetLayout descriptorSetLayout;
 	gem_info_s info = {};
 };
-
+// 支持渲染2d动画、普通3d颜色/纹理渲染。
 struct geoms_ctx {
 	struct Vertex1 {
 		vec3 pos;
@@ -137,6 +137,10 @@ struct geoms_ctx {
 public:
 	VkvgDevice dev = {};
 	USP_CX ac;				// 内存分配器
+	t_vector<cmd_t> cmdlist;// 命令列表
+	t_vector<Vertex1> vd1;	// 单面顶点
+	t_vector<Vertex2> vd2;	// 双面顶点
+	t_vector<uint32_t> ids;	// 索引
 	//glm::ivec2 bufsize = {};
 	vkh_buffer_t vertices = {};
 	vkh_buffer_t indices = {};
@@ -153,10 +157,6 @@ public:
 	glm::mat4 mat = glm::mat4(1.0f);
 	uint64_t curState = 0;	// 当前状态	
 	uint32_t v2offset = 0;	// 双面顶点偏移	
-	t_vector<cmd_t> cmdlist;// 命令列表
-	t_vector<Vertex1> vd1;	// 单面顶点
-	t_vector<Vertex2> vd2;	// 双面顶点
-	t_vector<uint32_t> ids;	// 索引
 	VkShaderModule shaderModule[4] = {};	// 基础shader
 public:
 	geoms_ctx();
@@ -198,16 +198,13 @@ private:
 	void upload_ibo(void* data, uint32_t offset, uint32_t size, bool flush);
 };
 
-
+// 矢量图渲染器
 class vgdev_ctx
 {
 public:
-	USP_CX ac;						// 
+	USP_CX ac;						// 普通内存池
 	hz::mbpool_t mac;				// 帧内存池
 	VkvgDevice dev = 0;
-	// 输出
-	vg_vector<Vertex> _vertex;
-	vg_vector<uint32_t> _indices;
 	struct scmd {
 		uint32_t vertexCount;
 		uint32_t firstVertex;
@@ -223,6 +220,9 @@ public:
 		int8_t type = 0;			// 类型：填充0、描边1、裁剪2、全屏3、清屏4
 	};
 	t_vector<cmd_t> cmdlist;		// 命令
+	// 输出
+	vg_vector<Vertex> _vertex;
+	vg_vector<uint32_t> _indices;
 	// 临时缓冲用
 	vg_vector<ear_clip_point> ecpsd;
 	vg_vector<vec2> _normals;
