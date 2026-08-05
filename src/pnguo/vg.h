@@ -578,6 +578,7 @@ typedef void rvg_pattern_t;
 struct rvg_cb {
 	rvgctx_t* ctx = 0;
 	// ctx操作
+	void (*set_dev)(rvgctx_t* ctx, void* vgdev);		// 绑定设备才能创建表面
 	void (*set_fence)(rvgctx_t* ctx, bool enable);
 	void (*set_glutess)(rvgctx_t* ctx, bool enable);
 	void (*begin_frame)(rvgctx_t* ctx);
@@ -650,7 +651,7 @@ struct rvg_cb {
 
 	// 图案：渐变/图片
 	rvg_surface_t* (*new_surface)(rvgctx_t* ctx, int width, int height, uint32_t* data, int stride, int type);	// stride宽度，type: 0 rgba, 1 bgra
-	rvg_surface_t* (*new_surface_vk)(rvgctx_t* ctx, int width, int height, void* vkimage);						// 输入vkimage做源
+	rvg_surface_t* (*new_surface_vk)(rvgctx_t* ctx, int width, int height, void* vkimage, int format);						// 输入vkimage做源
 	rvg_pattern_t* (*new_pattern_linear)(rvgctx_t* ctx, float x0, float y0, float x1, float y1);
 	rvg_pattern_t* (*new_pattern_radial)(rvgctx_t* ctx, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
 	rvg_pattern_t* (*new_pattern_sweep)(rvgctx_t* ctx, float cx, float cy, float start_angle, float end_angle);

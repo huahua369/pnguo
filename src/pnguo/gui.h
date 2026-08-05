@@ -311,13 +311,11 @@ struct color_style {
 	int _old_bst = 0;			// 鼠标状态
 	uTheme effect = uTheme::dark;
 	uint8_t disabled_alpha = 0x30;
-
 	bool circle = false;			// 圆形按钮
 	bool mPushed = false;
 	bool _disabled = false;
 	bool hover = false;
 };
-std::string save_color_style(const color_style* data, int indent);
 // 纯色按钮
 struct color_btn :public widget_t
 {
@@ -327,19 +325,13 @@ public:
 	color_btn();
 	~color_btn();
 	btn_cols_t* set_btn_color_bgr(size_t idx);
-
 	bool update(float delta);
 	void draw(rvg_cx* rv);
 };
-
 // 渐变按钮
-
 struct gradient_btn :public widget_t
 {
 	std::string str;
-	//const char* icon = nullptr;
-	//icon_rt icon = {};
-	//size_t len = 0; 
 	uint32_t back_color = 0;
 	uint32_t text_color_shadow = 0x88111111;
 	double opacity = 1.0;
@@ -350,7 +342,6 @@ struct gradient_btn :public widget_t
 	uint32_t _gradBot = 0;
 	uint32_t borderLight = 0;
 	uint32_t borderDark = 0;
-
 	uTheme effect = uTheme::light;	// dark
 	bool mPushed = false;
 	bool mChecked = false;
@@ -366,6 +357,7 @@ public:
 	bool update(float delta);
 	void draw(rvg_cx* rv);
 };
+std::string save_color_style(const color_style* data, int indent);
 class menu_btn :public widget_t
 {
 public:

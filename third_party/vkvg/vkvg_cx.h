@@ -23,6 +23,8 @@ struct image_r;
 struct dblock_d;
 struct geometry_d;
 class vgdev_ctx;
+
+
 class rvg_x
 {
 public:

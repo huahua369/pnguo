@@ -180,6 +180,11 @@ public:
 	bool add_geometry3d(void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride
 		, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
 private:
+	// 创建纹理
+	VkhImage new_texture(VkFormat format, int width, int height);
+	// 更新纹理数据，color为清屏色可选，data为纹理数据可选，data优先级高于color，二选一。
+	void update_texture(VkhImage img, const glm::vec4& color, uint32_t* data);
+	void texture_destroy(VkhImage img);
 
 	pipelinestate_p new_spv_base(gem_info_s* info);
 	// 绑定顶点缓冲和索引缓冲
@@ -199,6 +204,7 @@ class vgdev_ctx
 public:
 	USP_CX ac;						// 
 	hz::mbpool_t mac;				// 帧内存池
+	VkvgDevice dev = 0;
 	// 输出
 	vg_vector<Vertex> _vertex;
 	vg_vector<uint32_t> _indices;
@@ -11706,6 +11712,12 @@ void _rvg_path_extents(paths_t* ctx, bool transformed, float* x1, float* y1, flo
 }
 
 #define PRI_CTX auto cr=(vgdev_ctx*)ctx
+
+void rvg_set_dev(rvgctx_t* ctx, void* vgdev) {
+	if (!ctx)return ;
+	PRI_CTX;
+	cr->dev = (VkvgDevice)vgdev;
+}
 // 视图
 //size_t rvg_new_view(rvgctx_t* ctx, int x, int y, int width, int height) {
 //	PRI_CTX;
@@ -12085,17 +12097,69 @@ void rvg_identity_matrix(rvgctx_t* ctx)
 	PRI_CTX;
 	dc_identity_matrix(cr);
 }
-
 // 图案：渐变/图片
 rvg_surface_t* rvg_new_surface(rvgctx_t* ctx, int width, int height, uint32_t* data, int stride, int type)
 {
 	auto p = (vgdev_ctx*)ctx;
-	return 0;
+	VkvgSurface surf = nullptr;
+	do {
+		if (!p && !p->dev)break;
+		if (!data) { surf = vkvg_surface_create(p->dev, width, height); break; }
+		uint32_t* ndata = 0;
+		size_t nds = width * height * sizeof(int);
+		if (stride != width * sizeof(int) || type == 1) {
+			ndata = (uint32_t*)p->ac.new_mem(nds);
+			if (ndata) {
+				auto dt = (char*)data;
+				auto dst = ndata;
+				auto stride0 = width * sizeof(int);
+				if (stride < width)
+					stride = stride0;
+				for (size_t i = 0; i < height; i++)
+				{
+					memcpy(dst, dt, stride0);
+					if (type)
+					{
+						auto dst8 = (glm::u8vec4*)dst;
+						for (size_t j = 0; j < width; j++)
+						{
+							std::swap(dst8->x, dst8->z);
+							dst8++;
+						}
+					}
+					dt += stride;
+					dst += width;
+				}
+				data = ndata;
+			}
+		}
+		surf = vkvg_surface_create_from_bitmap(p->dev, (unsigned char*)data, width, height);
+		if (ndata)
+			p->ac.free_mem0(ndata, nds);
+	} while (0);
+	return (rvg_surface_t*)surf;
 }
-rvg_surface_t* rvg_new_surface_vk(rvgctx_t* ctx, int width, int height, void* vkimage)
+rvg_surface_t* rvg_new_surface_vk(rvgctx_t* ctx, int width, int height, void* vkimage, int format)
 {
 	auto p = (vgdev_ctx*)ctx;
-	return 0;
+	VkvgSurface surf = nullptr;
+	do {
+		if (!p && !p->dev)break;
+		if (!vkimage) { surf = vkvg_surface_create(p->dev, width, height); break; }
+
+		if (format == 0)
+		{
+			format = VK_FORMAT_R8G8B8A8_UNORM; // VK_RGBA
+		}
+		if (format == 1)
+		{
+			format = VK_FORMAT_B8G8R8A8_UNORM; // VK_BGRA
+		}
+		VkhImage himg = vkh_image_import((VkhDevice)&p->dev->vkDev, (VkImage)vkimage, (VkFormat)format, width, height);
+		if (himg)
+			surf = vkvg_surface_create_for_VkhImage(p->dev, himg);
+	} while (0);
+	return (rvg_surface_t*)surf;
 }
 rvg_pattern_t* rvg_new_pattern_linear(rvgctx_t* ctx, float x0, float y0, float x1, float y1)
 {
@@ -12160,6 +12224,7 @@ void init_rvg(vgdev_ctx* ptr, rvg_cb* r) {
 	if (!ptr || !r)return;
 	*r = {};
 	r->ctx = (rvgctx_t*)ptr;
+	r->set_dev = rvg_set_dev;
 	r->set_fence = (rboolcb)dc_set_fence;
 	r->set_glutess = (rboolcb)dc_set_glutess;
 	r->begin_frame = (rvoidcb)dc_begin_frame;
@@ -13726,6 +13791,123 @@ bool geoms_ctx::add_geometry3d(void* texture, const float* xyz, int xyz_stride, 
 	}
 	cmdlist.push_back(c);
 	return true;
+}
+
+VkhImage dae_empty_texture(VkvgDevice dev, VkFormat format, int width, int height, const glm::vec4& color)
+{
+	VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
+	// create empty image to bind to context source descriptor when not in use
+	VkhImage emptyImg = vkh_image_create((VkhDevice)&dev->vkDev, format, width > 0 ? width : 16, height > 0 ? height : 16, tiling, VKH_MEMORY_USAGE_GPU_ONLY,
+		VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+	vkh_image_create_descriptor(emptyImg, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT, VK_FILTER_NEAREST,
+		VK_FILTER_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST,
+		VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+
+	_device_wait_and_reset_device_fence(dev);
+	auto cmd = dev->cmd;
+	vkh_cmd_begin(dev->cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+	VkClearColorValue       cclr = { {color.x, color.y, color.z, color.w} };
+	VkImageSubresourceRange range = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	VkhImage img = emptyImg;
+	//vkh_image_set_layout(dev->cmd, img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+	//	VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+	//	VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+
+	vkh_cmd_end(dev->cmd);
+	_device_submit_cmd(dev, &dev->cmd, dev->fence);
+	return emptyImg;
+}
+VkhImage geoms_ctx::new_texture(VkFormat format, int width, int height)
+{
+	VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
+	// create empty image to bind to context source descriptor when not in use
+	VkhImage img = vkh_image_create((VkhDevice)&dev->vkDev, format, width > 0 ? width : 16, height > 0 ? height : 16, tiling, VKH_MEMORY_USAGE_GPU_ONLY,
+		VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+	vkh_image_create_descriptor(img, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT, VK_FILTER_NEAREST,
+		VK_FILTER_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST,
+		VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+	return img;
+}
+
+void geoms_ctx::update_texture(VkhImage img, const glm::vec4& color, uint32_t* data)
+{
+
+	uint32_t                 imgSize = img->infos.extent.width * img->infos.extent.height * 4;
+	glm::uvec2 size = { img->infos.extent.width, img->infos.extent.height };
+	VkImageSubresourceLayers imgSubResLayers = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+	auto vdev = img->pDev;
+	// original format image
+	VkhImage stagImg = vkh_image_create(vdev, VK_FORMAT_R8G8B8A8_UNORM, size.x,
+		size.y, VK_IMAGE_TILING_LINEAR, VKH_MEMORY_USAGE_GPU_ONLY,
+		VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+	// bgra bliting target
+	VkhImage tmpImg = img;
+	// staging buffer
+	vkh_buffer_t buff = { 0 };
+	vkh_buffer_init(vdev, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, imgSize,
+		&buff, true);
+
+	memcpy(vkh_buffer_get_mapped_pointer(&buff), data, imgSize);
+
+	VkCommandBuffer cmd = dev->cmd;
+
+	_device_wait_and_reset_device_fence(dev);
+
+	vkh_cmd_begin(cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	if (data)
+	{
+		vkh_image_set_layout(cmd, stagImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+		VkBufferImageCopy bufferCopyRegion = { .imageSubresource = imgSubResLayers,
+											  .imageExtent = {size.x, size.y, 1} };
+
+		vkCmdCopyBufferToImage(cmd, buff.buffer, vkh_image_get_vkimage(stagImg), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+			&bufferCopyRegion);
+
+		vkh_image_set_layout(cmd, stagImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT);
+		vkh_image_set_layout(cmd, tmpImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+		VkImageBlit blit = {
+			.srcSubresource = imgSubResLayers,
+			.dstSubresource = imgSubResLayers,
+		};
+		blit.srcOffsets[1] = { (int32_t)size.x, (int32_t)size.y, 1 };
+		blit.dstOffsets[1] = { (int32_t)size.x, (int32_t)size.y, 1 };
+
+		vkCmdBlitImage(cmd, vkh_image_get_vkimage(stagImg), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			vkh_image_get_vkimage(tmpImg), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+
+		vkh_image_set_layout(cmd, tmpImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+	}
+	else {
+		VkClearColorValue       cclr = { {color.x, color.y, color.z, color.w} };
+		VkImageSubresourceRange range = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+		vkh_image_set_layout(cmd, img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+		vkCmdClearColorImage(cmd, vkh_image_get_vkimage(img), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &cclr, 1, &range);
+		vkh_image_set_layout(dev->cmd, img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+	}
+	vkh_cmd_end(cmd);
+	_device_submit_cmd(dev, &dev->cmd, dev->fence);
+
+	vkh_buffer_reset(&buff);
+	vkh_image_destroy(stagImg);
+}
+
+void geoms_ctx::texture_destroy(VkhImage img)
+{
+	if (img)
+		vkh_image_destroy(img);
 }
 
 geoms_ctx* new_geoms(VkvgDevice ctx, uint32_t _sizeVBO, uint32_t _sizeIBO)
