@@ -702,9 +702,9 @@ typedef struct _vkvg_device_t {
 	VkPipeline pipe_OVER; /**< default operator */
 	VkPipeline pipe_SUB;
 	VkPipeline pipe_CLEAR; /**< clear operator */
-
 	VkPipeline pipelinePolyFill; /**< even-odd polygon filling first step */
 	VkPipeline pipelineClipping; /**< draw on stencil to update clipping regions */
+	VkPipeline dy_pipe[5];
 
 	VkPipelineCache       pipelineCache;  /**< speed up startup by caching configured pipelines on disk */
 	VkPipelineLayout      pipelineLayout; /**< layout common to all pipelines */

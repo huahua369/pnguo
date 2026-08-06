@@ -103,6 +103,7 @@ extern "C" {
 
 VkhImage dc_device_create_empty_texture(VkvgDevice dev, VkFormat format, int width, int height, const glm::vec4& color);
 
+void dy_device_setupPipelines(VkvgDevice dev);
 void _device_submit_cmd_sem(VkvgDevice dev, VkCommandBuffer* cmd, VkSemaphore waitSemaphore, VkSemaphore signalSemaphore, VkFence fence);
 
 struct pipelinestate_p
@@ -112,6 +113,55 @@ struct pipelinestate_p
 	VkDescriptorSetLayout descriptorSetLayout;
 	gem_info_s info = {};
 };
+// 普通三角形命令
+struct geom_cmd_t {
+	pipelinestate_p* pipeline = nullptr;	// 当前管线
+	VkhImage texture = nullptr;
+	glm::mat4 mat = glm::mat4(1.0f);
+	uint32_t count = 0;
+	uint32_t firstIndex = 0;
+	int32_t  vertexOffset = 0;
+	size_t offset = 0, ioffset = 0;
+};
+struct scmd {
+	uint32_t vertexCount;
+	uint32_t firstVertex;
+};
+// 矢量命令
+struct vgcmd_t {
+	scmd* v = 0;
+	int vc = 0;
+	int full_screen_quad = 0;
+	ivec2 vertex = {};			// 顶点开始、数量
+	ivec2 index = {};			// 索引开始、数量
+	state_save_t* state = {};	// 渲染参数
+	vec4 bounds = {};			// 全屏填充,odd/clip专用
+	int8_t type = 0;			// 类型：填充0、描边1、裁剪2、全屏3、清屏4
+};
+class glist_cx
+{
+public:
+	struct cmd_t {
+		int stype;
+		union {
+			geom_cmd_t g; vgcmd_t v;
+		}c;
+	};
+	USP_CX ac;				// 内存分配器
+	t_vector<cmd_t> cmdlist;// 命令列表
+public:
+	glist_cx();
+	~glist_cx();
+	void clear();
+	void insert(size_t pos, geom_cmd_t* c);
+	void insert(size_t pos, vgcmd_t* c);
+	void push(geom_cmd_t* c);
+	void push(vgcmd_t* c);
+private:
+
+};
+
+
 // 支持渲染2d动画、普通3d颜色/纹理渲染。
 struct geoms_ctx {
 	struct Vertex1 {
@@ -125,19 +175,9 @@ struct geoms_ctx {
 		uint32_t color;
 		uint32_t color1;
 	};
-	struct cmd_t {
-		pipelinestate_p* pipeline = nullptr;	// 当前管线
-		VkhImage texture = nullptr;
-		glm::mat4 mat = glm::mat4(1.0f);
-		uint32_t count = 0;
-		uint32_t firstIndex = 0;
-		int32_t  vertexOffset = 0;
-		size_t offset = 0, ioffset = 0;
-	};
 public:
 	VkvgDevice dev = {};
 	USP_CX ac;				// 内存分配器
-	t_vector<cmd_t> cmdlist;// 命令列表
 	t_vector<Vertex1> vd1;	// 单面顶点
 	t_vector<Vertex2> vd2;	// 双面顶点
 	t_vector<uint32_t> ids;	// 索引
@@ -149,15 +189,13 @@ public:
 	std::map<uint64_t, pipelinestate_p> pipelines;
 	pipelinestate_p* pipeline = nullptr;	// 当前管线
 
-	PFN_vkCmdBeginRenderingKHR _vkCmdBeginRenderingKHR = VK_NULL_HANDLE;
-	PFN_vkCmdEndRenderingKHR _vkCmdEndRenderingKHR = VK_NULL_HANDLE;
-
 	PFN_vkCmdPushDescriptorSet _vkCmdPushDescriptorSet = {};
-	uint32_t maxPushDescriptors = 0;
+
 	glm::mat4 mat = glm::mat4(1.0f);
 	uint64_t curState = 0;	// 当前状态	
 	uint32_t v2offset = 0;	// 双面顶点偏移	
 	VkShaderModule shaderModule[4] = {};	// 基础shader
+	glist_cx* gt = 0;	// 命令列表
 public:
 	geoms_ctx();
 	~geoms_ctx();
@@ -168,8 +206,9 @@ public:
 	// 清空命令列表
 	void clear();
 	// 批量录制渲染
-	void draw(VkCommandBuffer cmd);
-	void draw_dynamic(VkCommandBuffer cmd, VkhImage image, VkhImage depthStencil);
+
+	void draw_geom(VkCommandBuffer cmd, geom_cmd_t* c);
+
 public:
 	void set_state(gem_info_s* info);
 	void set_matrix(const glm::mat4* matrix);
@@ -179,6 +218,8 @@ public:
 	// 添加3D几何数据到缓冲区，xyz顶点坐标，color顶点颜色（双面则要双倍），uv顶点纹理坐标，indices索引数据
 	bool add_geometry3d(void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride
 		, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
+	// 上传顶点数据
+	void update_va();
 private:
 	// 创建纹理
 	VkhImage new_texture(VkFormat format, int width, int height);
@@ -190,8 +231,6 @@ private:
 	// 绑定顶点缓冲和索引缓冲
 	void bind(VkCommandBuffer cmd, size_t offset, size_t ioffset);
 	void push_update_descriptor_set(VkCommandBuffer cmd, pipelinestate_p* cp, VkhImage img);
-	// 上传顶点数据
-	void update_va();
 	void resize_vbo(uint32_t new_size);
 	void resize_ibo(uint32_t new_size);
 	void upload_vbo(void* data, uint32_t offset, uint32_t size, bool flush);
@@ -205,21 +244,12 @@ public:
 	USP_CX ac;						// 普通内存池
 	hz::mbpool_t mac;				// 帧内存池
 	VkvgDevice dev = 0;
-	struct scmd {
-		uint32_t vertexCount;
-		uint32_t firstVertex;
+	struct Vertex_c {
+		vec2     pos;
+		uint32_t color;
+		vec3     uv;
 	};
-	struct cmd_t {
-		scmd* v = 0;
-		int vc = 0;
-		int full_screen_quad = 0;
-		ivec2 vertex = {};			// 顶点开始、数量
-		ivec2 index = {};			// 索引开始、数量
-		state_save_t* state = {};	// 渲染参数
-		vec4 bounds = {};			// 全屏填充,odd/clip专用
-		int8_t type = 0;			// 类型：填充0、描边1、裁剪2、全屏3、清屏4
-	};
-	t_vector<cmd_t> cmdlist;		// 命令
+	//t_vector<vgcmd_t> cmdlist;		// 命令
 	// 输出
 	vg_vector<Vertex> _vertex;
 	vg_vector<uint32_t> _indices;
@@ -239,6 +269,16 @@ public:
 	paths_t* cur_path = 0;		// 当前路径
 	std::stack<state_save_t*> _cst;	// 保存栈 
 	geoms_ctx* gct = 0;
+	glist_cx* gt = 0;
+
+
+	PFN_vkCmdBeginRenderingKHR _vkCmdBeginRenderingKHR = VK_NULL_HANDLE;
+	PFN_vkCmdEndRenderingKHR _vkCmdEndRenderingKHR = VK_NULL_HANDLE;
+
+	PFN_vkCmdPushDescriptorSet _vkCmdPushDescriptorSet = {};
+	uint32_t maxPushDescriptors = 0;
+
+
 	int  cmdidx = 0;
 	bool is_glutess = false;
 	bool is_fence = true;
@@ -246,6 +286,11 @@ public:
 public:
 	vgdev_ctx();
 	~vgdev_ctx();
+public:
+	void set_dev(VkvgDevice d);
+	void initdyr();
+	void draw_dynamic(VkvgContext ctx, VkCommandBuffer cmd, VkhImage image, VkhImage depthStencil, bool clear_all);
+
 	void clear();
 	void save();
 	void restore();
@@ -270,7 +315,7 @@ public:
 
 	void set_dash(const float* dashes, uint32_t num_dashes, float offset);
 private:
-	void poly_fill(paths_t* ctx, vec4* bounds, cmd_t& c);
+	void poly_fill(paths_t* ctx, vec4* bounds, vgcmd_t& c);
 	void _fill_non_zero(paths_t*);
 	void fill_non_zero(paths_t* p);
 	bool _build_vb_step(paths_t* ctx, stroke_context_t* str, bool isCurve);
@@ -281,7 +326,7 @@ private:
 	void a_add_triangle_indices(paths_t* ctx, uint32_t i0, uint32_t i1, uint32_t i2);
 	void a_add_tri_indices_for_rect(uint32_t i);
 	void _add_vertexf(paths_t* ctx, float x, float y);
-	void cp_cmdt(cmd_t* c, state_save_t* t);
+	void cp_cmdt(vgcmd_t* c, state_save_t* t);
 };
 
 
@@ -4877,6 +4922,7 @@ void _device_init(VkvgDevice dev, const vkvg_device_create_info_t* info) {
 	}
 	_device_createDescriptorSetLayout(dev);
 	_device_setupPipelines(dev);
+	dy_device_setupPipelines(dev);
 
 	_device_create_empty_texture(dev, format, dev->supportedTiling);
 	dev->emptyImg1 = dc_device_create_empty_texture(dev, format, 16, 16, glm::vec4(1.0));
@@ -5190,7 +5236,8 @@ void vkvg_device_destroy(VkvgDevice dev) {
 	vkDestroyPipeline(dev->vkDev, dev->pipe_OVER, NULL);
 	vkDestroyPipeline(dev->vkDev, dev->pipe_SUB, NULL);
 	vkDestroyPipeline(dev->vkDev, dev->pipe_CLEAR, NULL);
-
+	for (int i = 0; i < 3; i++)
+		vkDestroyPipeline(dev->vkDev, dev->dy_pipe[i], NULL);
 #ifdef VKVG_WIRED_DEBUG
 	vkDestroyPipeline(dev->vkDev, dev->pipelineWired, NULL);
 	vkDestroyPipeline(dev->vkDev, dev->pipelineLineList, NULL);
@@ -5595,6 +5642,242 @@ void _device_setupPipelines(VkvgDevice dev) {
 	colorBlendState.logicOp = VK_LOGIC_OP_CLEAR;
 	VK_CHECK_RESULT(
 		vkCreateGraphicsPipelines(dev->vkDev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL, &dev->pipe_CLEAR));
+
+#ifdef VKVG_WIRED_DEBUG
+	colorBlendState.logicOpEnable = VK_FALSE;
+	blendAttachmentState.blendEnable = VK_TRUE;
+	colorBlendState.logicOp = VK_LOGIC_OP_CLEAR;
+
+	createInfo.pCode = (uint32_t*)wired_frag_spv;
+
+	createInfo.codeSize = wired_frag_spv_len;
+	VK_CHECK_RESULT(vkCreateShaderModule(dev->vkDev, &createInfo, NULL, &modFragWired));
+
+	shaderStages[1].module = modFragWired;
+
+	rasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(dev->vkDev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL,
+		&dev->pipelineLineList));
+
+	inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+	rasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
+	VK_CHECK_RESULT(
+		vkCreateGraphicsPipelines(dev->vkDev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL, &dev->pipelineWired));
+
+	vkDestroyShaderModule(dev->vkDev, modFragWired, NULL);
+#endif
+
+	vkDestroyShaderModule(dev->vkDev, modVert, NULL);
+	vkDestroyShaderModule(dev->vkDev, modFrag, NULL);
+}
+
+void dy_device_setupPipelines(VkvgDevice dev) {
+	VkGraphicsPipelineCreateInfo pipelineCreateInfo = { .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
+	VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = {
+	.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+	.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN };
+	VkPipelineRasterizationStateCreateInfo rasterizationState = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+		.depthClampEnable = VK_FALSE,
+		.rasterizerDiscardEnable = VK_FALSE,
+		.polygonMode = VK_POLYGON_MODE_FILL,
+		.cullMode = VK_CULL_MODE_NONE,
+		.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+		.depthBiasEnable = VK_FALSE,
+		.lineWidth = 1.0f };
+
+	VkPipelineColorBlendAttachmentState blendAttachmentState = {
+		.blendEnable = VK_TRUE,
+#ifdef VKVG_PREMULT_ALPHA
+		.srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
+		.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+		.colorBlendOp = VK_BLEND_OP_ADD,
+		.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+		.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+		.alphaBlendOp = VK_BLEND_OP_ADD,
+#else
+		.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+		.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+		.colorBlendOp = VK_BLEND_OP_ADD,
+		.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+		.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+		.alphaBlendOp = VK_BLEND_OP_ADD,
+#endif
+		.colorWriteMask = 0x0,
+	};
+
+	VkPipelineColorBlendStateCreateInfo colorBlendState = { .sType =
+															   VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+														   .attachmentCount = 1,
+														   .pAttachments = &blendAttachmentState };
+
+	/*failOp,passOp,depthFailOp,compareOp, compareMask, writeMask, reference;*/
+	VkStencilOpState polyFillOpState = { VK_STENCIL_OP_KEEP,
+										VK_STENCIL_OP_INVERT,
+										VK_STENCIL_OP_KEEP,
+										VK_COMPARE_OP_EQUAL,
+										STENCIL_CLIP_BIT,
+										STENCIL_FILL_BIT,
+										0 };
+	VkStencilOpState clipingOpState = { VK_STENCIL_OP_ZERO,
+										VK_STENCIL_OP_REPLACE,
+										VK_STENCIL_OP_KEEP,
+										VK_COMPARE_OP_EQUAL,
+										STENCIL_FILL_BIT,
+										STENCIL_ALL_BIT,
+										0x2 };
+	VkStencilOpState stencilOpState = { VK_STENCIL_OP_KEEP,
+										VK_STENCIL_OP_ZERO,
+										VK_STENCIL_OP_KEEP,
+										VK_COMPARE_OP_EQUAL,
+										STENCIL_FILL_BIT,
+										STENCIL_FILL_BIT,
+										0x1 };
+
+	VkPipelineDepthStencilStateCreateInfo dsStateCreateInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+		.depthTestEnable = VK_FALSE,
+		.depthWriteEnable = VK_FALSE,
+		.depthCompareOp = VK_COMPARE_OP_ALWAYS,
+		.stencilTestEnable = VK_TRUE,
+		.front = polyFillOpState,
+		.back = polyFillOpState };
+
+	VkDynamicState dynamicStateEnables[] = {
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR,
+		VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK,
+		VK_DYNAMIC_STATE_STENCIL_REFERENCE,
+		VK_DYNAMIC_STATE_STENCIL_WRITE_MASK,
+	};
+	VkPipelineDynamicStateCreateInfo dynamicState = { .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+													 .dynamicStateCount = 2,
+													 .pDynamicStates = dynamicStateEnables };
+
+	VkPipelineViewportStateCreateInfo viewportState = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, .viewportCount = 1, .scissorCount = 1 };
+
+	VkPipelineMultisampleStateCreateInfo multisampleState = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO, .rasterizationSamples = (VkSampleCountFlagBits)dev->samples };
+	/*if (dev->samples != VK_SAMPLE_COUNT_1_BIT){
+		multisampleState.sampleShadingEnable = VK_TRUE;
+		multisampleState.minSampleShading = 0.5f;
+	}*/
+	VkVertexInputBindingDescription vertexInputBinding = {
+		.binding = 0, .stride = sizeof(Vertex), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX };
+
+	VkVertexInputAttributeDescription vertexInputAttributs[3] = { {0, 0, VK_FORMAT_R32G32_SFLOAT, 0},
+																 {1, 0, VK_FORMAT_R8G8B8A8_UNORM, 8},
+																 {2, 0, VK_FORMAT_R32G32B32_SFLOAT, 12} };
+
+	VkPipelineVertexInputStateCreateInfo vertexInputState = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+		.vertexBindingDescriptionCount = 1,
+		.pVertexBindingDescriptions = &vertexInputBinding,
+		.vertexAttributeDescriptionCount = 3,
+		.pVertexAttributeDescriptions = vertexInputAttributs };
+#ifdef VKVG_WIRED_DEBUG
+	VkShaderModule modVert, modFrag, modFragWired;
+#else
+	VkShaderModule modVert, modFrag;
+#endif
+	VkShaderModuleCreateInfo createInfo = { .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+										   .codeSize = vkvg_main_vert_spv_len,
+										   .pCode = (uint32_t*)vkvg_main_vert_spv };
+	VK_CHECK_RESULT(vkCreateShaderModule(dev->vkDev, &createInfo, NULL, &modVert));
+#if defined(VKVG_LCD_FONT_FILTER) && defined(FT_CONFIG_OPTION_SUBPIXEL_RENDERING)
+	createInfo.pCode = (uint32_t*)vkvg_main_lcd_frag_spv;
+	createInfo.codeSize = vkvg_main_lcd_frag_spv_len;
+#else
+	createInfo.pCode = (uint32_t*)vkvg_main_frag_spv;
+	createInfo.codeSize = vkvg_main_frag_spv_len;
+	createInfo.pCode = (uint32_t*)vkvg_main_frag1_spv;
+	createInfo.codeSize = sizeof(vkvg_main_frag1_spv);
+#endif
+	VK_CHECK_RESULT(vkCreateShaderModule(dev->vkDev, &createInfo, NULL, &modFrag));
+
+	VkPipelineShaderStageCreateInfo vertStage = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+		.stage = VK_SHADER_STAGE_VERTEX_BIT,
+		.module = modVert,
+		.pName = "main",
+	};
+	VkPipelineShaderStageCreateInfo fragStage = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+		.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+		.module = modFrag,
+		.pName = "main",
+	};
+
+	// Use specialization constants to pass number of samples to the shader (used for MSAA resolve)
+	/*VkSpecializationMapEntry specializationEntry = {
+		.constantID = 0,
+		.offset = 0,
+		.size = sizeof(uint32_t)};
+	uint32_t specializationData = VKVG_SAMPLES;
+	VkSpecializationInfo specializationInfo = {
+		.mapEntryCount = 1,
+		.pMapEntries = &specializationEntry,
+		.dataSize = sizeof(specializationData),
+		.pData = &specializationData};*/
+
+	VkPipelineShaderStageCreateInfo shaderStages[] = { vertStage, fragStage };
+
+	pipelineCreateInfo.stageCount = 1;
+	pipelineCreateInfo.pStages = shaderStages;
+	pipelineCreateInfo.pVertexInputState = &vertexInputState;
+	pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
+	pipelineCreateInfo.pViewportState = &viewportState;
+	pipelineCreateInfo.pRasterizationState = &rasterizationState;
+	pipelineCreateInfo.pMultisampleState = &multisampleState;
+	pipelineCreateInfo.pColorBlendState = &colorBlendState;
+	pipelineCreateInfo.pDepthStencilState = &dsStateCreateInfo;
+	pipelineCreateInfo.pDynamicState = &dynamicState;
+	pipelineCreateInfo.layout = dev->pipelineLayout;
+
+	VkFormat colorFormat = FB_COLOR_FORMAT;
+	VkFormat depthFormat = dev->stencilFormat;
+	pipelineCreateInfo.renderPass = nullptr;
+	VkPipelineRenderingCreateInfoKHR pipelineRenderingCreateInfo{
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
+		.colorAttachmentCount = 1,
+		.pColorAttachmentFormats = &colorFormat,
+		.depthAttachmentFormat = depthFormat,
+		.stencilAttachmentFormat = depthFormat
+	};
+	//if (info->dynamicrenderingEnable)
+	pipelineCreateInfo.pNext = &pipelineRenderingCreateInfo;
+
+#ifndef __APPLE__
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(dev->vkDev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL,
+		&dev->dy_pipe[0]));//pipelinePolyFill
+#endif
+
+	inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	dsStateCreateInfo.back = dsStateCreateInfo.front = clipingOpState;
+	dynamicState.dynamicStateCount = 5;
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(dev->vkDev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL,
+		&dev->dy_pipe[1]));//pipelineClipping));
+
+	dsStateCreateInfo.back = dsStateCreateInfo.front = stencilOpState;
+	blendAttachmentState.colorWriteMask = 0xf;
+	dynamicState.dynamicStateCount = 3;
+	pipelineCreateInfo.stageCount = 2;
+	// todo pipe
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(dev->vkDev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL
+		, &dev->dy_pipe[2]));//pipe_OVER));
+
+	blendAttachmentState.alphaBlendOp = blendAttachmentState.colorBlendOp = VK_BLEND_OP_SUBTRACT;
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(dev->vkDev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL
+		, &dev->dy_pipe[3]));//pipe_SUB));
+
+	colorBlendState.logicOpEnable = VK_TRUE;
+	blendAttachmentState.blendEnable = VK_FALSE;
+	colorBlendState.logicOp = VK_LOGIC_OP_CLEAR;
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(dev->vkDev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL
+		, &dev->dy_pipe[4]));//pipe_CLEAR));
+
+
 
 
 #ifdef VKVG_WIRED_DEBUG
@@ -8646,7 +8929,7 @@ vgdev_ctx::vgdev_ctx()
 	_indices.reserve(1024);
 	_normals.reserve(128);
 	ecpsd.reserve(128);
-	cmdlist.reserve(128);
+	//cmdlist.reserve(128);
 	_dpath = dc_new_paths(this);
 	t = new_state();
 }
@@ -8660,9 +8943,9 @@ vgdev_ctx::~vgdev_ctx()
 
 void vgdev_ctx::clear()
 {
-	cmd_t c = {};
+	vgcmd_t c = {};
 	c.type = 4;
-	cmdlist.push_back(c);
+	gt->push(&c); //cmdlist.push_back(c);
 }
 
 //size_t vgdev_ctx::new_view(int x, int y, int width, int height)
@@ -8709,7 +8992,7 @@ void vgdev_ctx::clip_preserve(paths_t* ctx)
 		return;
 	ctx->t = t;
 
-	cmd_t c = {};
+	vgcmd_t c = {};
 	c.type = 2;
 	if (t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
 		poly_fill(ctx, NULL, c);
@@ -8722,9 +9005,10 @@ void vgdev_ctx::clip_preserve(paths_t* ctx)
 		fill_non_zero(ctx);
 		c.vertex.y = _vertex.size() - c.vertex.x;
 		c.index.y = _indices.size() - c.index.x;
-		cmdlist.push_back(c);
+
 	}
-	cmdlist.back().full_screen_quad = _vertex.size();
+	c.full_screen_quad = _vertex.size();
+	gt->push(&c);
 	Vertex v = {};
 	v.pos = { -1,-1 };
 	v.color = t->curColor;
@@ -8737,20 +9021,21 @@ void vgdev_ctx::clip_preserve(paths_t* ctx)
 }
 void vgdev_ctx::clip0()
 {
-	cmd_t c = {};
+	vgcmd_t c = {};
 	c.type = 2;
-	cmdlist.push_back(c);
+	gt->push(&c);
 }
 
 void vgdev_ctx::clip(const glm::ivec4* rc)
 {
 	if (rc)
 	{
-		cmd_t c = {};
+		vgcmd_t c = {};
 		c.type = 2;
 		c.bounds = vec4{ (float)rc->x, (float)rc->y, (float)rc->z, (float)rc->w };
-		t->clip_idx = cmdlist.size();
-		cmdlist.push_back(c);
+		//t->clip_idx = cmdlist.size();
+		//cmdlist.push_back(c);
+		gt->push(&c);
 	}
 }
 
@@ -9089,7 +9374,7 @@ void vgdev_ctx::fill_non_zero(paths_t* p)
 	}
 }
 // Even-Odd inside test with stencil buffer implementation.
-void vgdev_ctx::poly_fill(paths_t* ctx, vec4* bounds, cmd_t& c) {
+void vgdev_ctx::poly_fill(paths_t* ctx, vec4* bounds, vgcmd_t& c) {
 	Vertex   v = { {0}, ctx->t->curColor, {0, 0, -1} };
 	uint32_t ptrPath = 0;
 	uint32_t firstPtIdx = 0;
@@ -9158,9 +9443,8 @@ void vgdev_ctx::poly_fill(paths_t* ctx, vec4* bounds, cmd_t& c) {
 	}
 	if (bounds)
 		c.bounds = *bounds;
-	cmdlist.push_back(c);
 }
-void vgdev_ctx::cp_cmdt(cmd_t* c, state_save_t* t)
+void vgdev_ctx::cp_cmdt(vgcmd_t* c, state_save_t* t)
 {
 	c->state = (state_save_t*)mac.allocate(sizeof(state_save_t) * 1);
 	if (!c->state)return;
@@ -9256,13 +9540,13 @@ void vgdev_ctx::fill_preserve(paths_t* ctx)
 	ctx->t = t;
 	if (t->pattern)
 		gCount++;
+	vgcmd_t c = {};
 	if (ctx->t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
 
 		vec4 bounds = { FLT_MAX, FLT_MAX, FLT_MIN, FLT_MIN };
-		cmd_t c = {};
 		c.type = 0;
 		poly_fill(ctx, &bounds, c);
-		cmdlist.back().full_screen_quad = _vertex.size();
+		c.full_screen_quad = _vertex.size();
 		Vertex v = {};
 		v.pos = { -1,-1 };
 		v.color = t->curColor;
@@ -9275,7 +9559,6 @@ void vgdev_ctx::fill_preserve(paths_t* ctx)
 	}
 	else
 	{
-		cmd_t c = {};
 		c.vertex.x = _vertex.size();
 		c.index.x = _indices.size();
 		c.type = 0;
@@ -9284,8 +9567,9 @@ void vgdev_ctx::fill_preserve(paths_t* ctx)
 		fill_non_zero(ctx);
 		c.vertex.y = _vertex.size() - c.vertex.x;
 		c.index.y = _indices.size() - c.index.x;
-		cmdlist.push_back(c);
+
 	}
+	gt->push(&c);
 }
 
 
@@ -9669,7 +9953,7 @@ void vgdev_ctx::stroke_preserve(paths_t* ctx) {
 	if (t->pattern)
 		gCount++;
 
-	cmd_t c = {};
+	vgcmd_t c = {};
 	c.vertex.x = _vertex.size();
 	c.index.x = _indices.size();
 	c.type = 1;
@@ -9798,7 +10082,7 @@ void vgdev_ctx::stroke_preserve(paths_t* ctx) {
 	}
 	c.vertex.y = _vertex.size() - c.vertex.x;
 	c.index.y = _indices.size() - c.index.x;
-	cmdlist.push_back(c);
+	gt->push(&c); //cmdlist.push_back(c);
 }
 
 void vgdev_ctx::clip(paths_t* p)
@@ -9835,7 +10119,7 @@ void vgdev_ctx::paint()
 		fill(ph);
 		return;
 	}
-	cmd_t c = {};
+	vgcmd_t c = {};
 	c.type = 3;
 	c.full_screen_quad = _vertex.size();
 	Vertex v = {};
@@ -9847,28 +10131,28 @@ void vgdev_ctx::paint()
 	_vertex.push_back(v);
 	v.pos = { -1,3 };
 	_vertex.push_back(v);
-	cmdlist.push_back(c);
+	gt->push(&c); //cmdlist.push_back(c);
 }
 
-void bind_draw_pipeline(VkvgContext ctx, state_save_t* t) {
+void dy_bind_draw_pipeline(VkvgContext ctx, state_save_t* t) {
 	switch (t->curOperator) {
 	case VKVG_OPERATOR_OVER:
-		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipe_OVER);
+		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->dy_pipe[2]);// pipe_OVER);
 		break;
 	case VKVG_OPERATOR_CLEAR:
-		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipe_CLEAR);
+		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->dy_pipe[4]);//pipe_CLEAR);
 		break;
 	case VKVG_OPERATOR_DIFFERENCE:
-		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipe_SUB);
+		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->dy_pipe[3]);//pipe_SUB);
 		break;
 	default:
-		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipe_OVER);
+		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->dy_pipe[2]);//pipe_OVER);
 		break;
 	}
 	CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
 }
 
-void cmd_draw_full_screen_quad(VkvgContext ctx, vgdev_ctx::cmd_t* c, vec4* scissor, VkRect2D* clip)
+void cmd_draw_full_screen_quad(VkvgContext ctx, vgcmd_t* c, vec4* scissor, VkRect2D* clip)
 {
 #if defined(DEBUG) && defined(VKVG_DBG_UTILS)
 	vkh_cmd_label_start(ctx->cmd, "_draw_full_screen_quad", DBG_LAB_COLOR_FSQ);
@@ -10151,6 +10435,46 @@ VkRect2D dc_scissor(VkvgContext ctx, vec4* scissor) {
 	}
 	return r;
 }
+
+void dy_start_cmd_for_render_pass(VkvgContext ctx) {
+	//if (ctx->pSurf->img->layout != VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL || ctx->dev->threadAware) {
+	//	VkhImage imgMs = ctx->pSurf->imgMS;
+	//	if (imgMs != NULL)
+	//		vkh_image_set_layout(ctx->cmd, imgMs, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+	//			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	//			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+	//			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+
+	//	vkh_image_set_layout(ctx->cmd, ctx->pSurf->img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+	//		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+	//		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+	//	vkh_image_set_layout(ctx->cmd, ctx->pSurf->stencil, ctx->dev->stencilAspectFlag,
+	//		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+	//		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT);
+	//}
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+	vkh_cmd_label_start(ctx->cmd, "dc render pass", DBG_LAB_COLOR_RP);
+#endif
+
+	VkViewport viewport = { 0, 0, (float)ctx->pSurf->width, (float)ctx->pSurf->height, 0, 1.f };
+	CmdSetViewport(ctx->cmd, 0, 1, &viewport);
+
+	CmdSetScissor(ctx->cmd, 0, 1, &ctx->bounds);
+
+	VkDescriptorSet dss[] = { ctx->dsFont, ctx->dsSrc, ctx->dsGrad };
+	//CmdBindDescriptorSets(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineLayout, 0, 3, dss, 0, NULL);
+
+	VkDeviceSize offsets[1] = { 0 };
+	CmdBindVertexBuffers(ctx->cmd, 0, 1, &ctx->vertices.buffer, offsets);
+	CmdBindIndexBuffer(ctx->cmd, ctx->indices.buffer, 0, VKVG_VK_INDEX_TYPE);
+
+	_update_push_constants(ctx);
+	//dy_bind_draw_pipeline(ctx,0);
+	CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+	push_update_descriptor_set_a(ctx, ctx->d_img, ctx->d_offset);
+	ctx->cmdStarted = true;
+}
 void dc_clear(VkvgContext ctx) {
 	if (vkvg_status(ctx))
 		return;
@@ -10161,11 +10485,11 @@ void dc_clear(VkvgContext ctx) {
 		ctx->curClipState = vkvg_clip_state_none;
 	else
 		ctx->curClipState = vkvg_clip_state_clear;
-	if (!ctx->cmdStarted) {
-		ctx->renderPassBeginInfo.renderPass = ctx->dev->renderPass_ClearAll;
-		dc_start_cmd_for_render_pass(ctx);
-		return;
-	}
+	//if (!ctx->cmdStarted) {
+	//	ctx->renderPassBeginInfo.renderPass = ctx->dev->renderPass_ClearAll;
+	//	dc_start_cmd_for_render_pass(ctx);
+	//	return;
+	//}
 	VkClearAttachment ca[2] = { clearColorAttach, clearStencil };
 	ca[1].clearValue.depthStencil.depth = 1;
 	vkCmdClearAttachments(ctx->cmd, 2, ca, 1, &ctx->clearRect);
@@ -10224,10 +10548,195 @@ bool dc_wait_fence(VkvgContext ctx, VkFence fence) {
 	}
 	return ret;
 }
+
+void geoms_ctx::draw_geom(VkCommandBuffer cmd, geom_cmd_t* c) {
+	if (!c)return;
+	if (c->pipeline)
+	{
+		auto cp = c->pipeline;
+		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cp->pipeline);
+		vkCmdPushConstants(cmd, cp->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &c->mat);
+		push_update_descriptor_set(cmd, cp, c->texture ? c->texture : dev->emptyImg1);
+	}
+	bind(cmd, c->offset * v2offset, c->ioffset);
+	if (c->firstIndex == -1)
+		vkCmdDraw(cmd, c->count, 1, c->vertexOffset, 0);
+	else
+		vkCmdDrawIndexed(cmd, c->count, 1, c->firstIndex, c->vertexOffset, 0);
+}
+void draw_vg(VkvgContext ctx, vgcmd_t* c, VkRect2D& cuclip)
+{
+	auto t = c->state;
+	if (t)
+	{
+		dy_bind_draw_pipeline(ctx, t);
+		update_pattern(ctx, t->pattern, t);
+		dc_update_push_constants(ctx, t);
+		if (!ctx->cmdStarted)
+			ctx->cmdStarted = true;
+		push_update_descriptor_set_a(ctx, ctx->d_img, ctx->d_offset);
+	}
+	switch (c->type)
+	{
+	case 0:
+	{// 填充
+		if (t && t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
+			CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->dy_pipe[0]);// pipelinePolyFill);
+			for (size_t i = 0; i < c->vc; i++)
+			{
+				vkCmdDraw(ctx->cmd, c->v[i].vertexCount, 1, c->v[i].firstVertex, 0);
+			}
+			dy_bind_draw_pipeline(ctx, t);
+			CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
+			cmd_draw_full_screen_quad(ctx, c, &c->bounds, &cuclip);
+			CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+		}
+		else {
+			vkCmdDrawIndexed(ctx->cmd, c->index.y, 1, c->index.x, (int32_t)c->vertex.x, 0);
+		}
+	}
+	break;
+	case 1:
+	{// 描边 
+		vkCmdDrawIndexed(ctx->cmd, c->index.y, 1, c->index.x, (int32_t)c->vertex.x, 0);
+	}
+	break;
+	case 2:
+	{// 裁剪
+		int bw = c->bounds.width; int bh = c->bounds.height;
+		if (bw != 0 && bh != 0) {
+			cuclip = dc_scissor(ctx, bw < 0 || bh < 0 ? nullptr : &c->bounds);
+			break;
+		}
+		if (c->vc > 0 || c->index.y > 0) {
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+			vkh_cmd_label_start(ctx->cmd, "clip", DBG_LAB_COLOR_CLIP);
+#endif
+			if (t && t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
+				CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->dy_pipe[0]);//pipelinePolyFill);
+				for (size_t i = 0; i < c->vc; i++)
+				{
+					vkCmdDraw(ctx->cmd, c->v[i].vertexCount, 1, c->v[i].firstVertex, 0);
+				}
+				CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->dy_pipe[1]);//pipelineClipping);
+			}
+			else {
+				CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->dy_pipe[1]);//pipelineClipping);
+				CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
+				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+				CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
+				vkCmdDrawIndexed(ctx->cmd, c->index.y, 1, c->index.x, (int32_t)c->vertex.x, 0);
+			}
+			CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+			CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
+			CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_ALL_BIT);
+			cmd_draw_full_screen_quad(ctx, c, NULL, 0);
+			ctx->curClipState = vkvg_clip_state_clip;
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+			vkh_cmd_label_end(ctx->cmd);
+#endif
+		}
+		else {
+			auto cs = clearStencil;
+			cs.clearValue.depthStencil.depth = 1;
+			cs.clearValue.depthStencil.stencil = 0;
+			vkCmdClearAttachments(ctx->cmd, 1, &cs, 1, &ctx->clearRect);
+		}
+	}
+	break;
+	case 3:
+	{
+		cmd_draw_full_screen_quad(ctx, c, NULL, 0);
+	}
+	break;
+	case 4:
+	{
+		dc_clear(ctx);
+	}
+	break;
+	}
+}
+void vgdev_ctx::set_dev(VkvgDevice d)
+{
+	if (!gt)
+		gt = new glist_cx();
+	dev = d;
+}
+void vgdev_ctx::initdyr() {
+	if (!dev || !dev->vkDev)return;
+	_vkCmdPushDescriptorSet = (PFN_vkCmdPushDescriptorSet)vkGetDeviceProcAddr(dev->vkDev, "vkCmdPushDescriptorSet");
+	if (!_vkCmdPushDescriptorSet) _vkCmdPushDescriptorSet = (PFN_vkCmdPushDescriptorSet)vkGetInstanceProcAddr(dev->instance, "vkCmdPushDescriptorSet");
+	_vkCmdBeginRenderingKHR = reinterpret_cast<PFN_vkCmdBeginRenderingKHR>(vkGetDeviceProcAddr(dev->vkDev, "vkCmdBeginRenderingKHR"));
+	_vkCmdEndRenderingKHR = reinterpret_cast<PFN_vkCmdEndRenderingKHR>(vkGetDeviceProcAddr(dev->vkDev, "vkCmdEndRenderingKHR"));
+
+}
+
+void vgdev_ctx::draw_dynamic(VkvgContext ctx, VkCommandBuffer cmd, VkhImage image, VkhImage depthStencil, bool clear_all)
+{
+	if (!_vkCmdBeginRenderingKHR)initdyr();
+	if (!cmd || !_vkCmdBeginRenderingKHR)return;
+	VkImageSubresourceRange crange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }; VkImageSubresourceRange dsrange = { VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1 };
+	vkh_image_set_layout_subres(cmd, image, crange, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+	vkh_image_set_layout_subres(cmd, depthStencil, dsrange, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT);
+	VkRenderingAttachmentInfoKHR colorAttachment{
+	.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
+	.imageView = image->view,
+	.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	.loadOp = clear_all ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD,
+	.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+	.clearValue = {.color = {0.0f,0.0f,0.0f,0.0f} },
+	};
+	VkRenderingAttachmentInfoKHR depthStencilAttachment{
+		.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
+		.imageView = depthStencil->view,
+		.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		.loadOp = clear_all ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD,
+		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+		.clearValue = {.depthStencil = {1.0f,  0} }
+	};
+	VkRenderingInfoKHR renderingInfo{
+		.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR,
+		.renderArea = { 0, 0, image->infos.extent.width, image->infos.extent.height },
+		.layerCount = 1,
+		.colorAttachmentCount = 1,
+		.pColorAttachments = &colorAttachment,
+		.pDepthAttachment = &depthStencilAttachment,
+		.pStencilAttachment = &depthStencilAttachment
+	};
+	_vkCmdBeginRenderingKHR(cmd, &renderingInfo); 
+	dy_start_cmd_for_render_pass(ctx);
+	VkViewport viewport = { 0.0f,0.0f,(float)image->infos.extent.width, (float)image->infos.extent.height, 0.0f, 1.0f };
+	vkCmdSetViewport(cmd, 0, 1, &viewport);
+	VkRect2D scissor = { 0, 0, image->infos.extent.width, image->infos.extent.height };
+	vkCmdSetScissor(cmd, 0, 1, &scissor);
+	pipelinestate_p* cp = 0;
+	VkRect2D cuclip = {};
+	for (auto& it : gt->cmdlist) {
+		switch (it.stype) {
+		case 0:
+			gct->draw_geom(cmd, &it.c.g);
+			break;
+		case 1:
+			draw_vg(ctx, &it.c.v, cuclip);
+			break;
+		}
+	}
+	_vkCmdEndRenderingKHR(cmd);
+	//vkh_image_set_layout_subres(cmd, image, crange,
+	//	VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	//	VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+	//	VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+	//	VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT
+	//);
+
+}
+
 // todo draw command list
 void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 {
-	if (!ctx || cmdlist.empty() || _vertex.empty())return 0;// 填充0、描边1、裁剪2
+	if (!ctx || _vertex.empty())return 0;// 填充0、描边1、裁剪2
 	check_vao_size(ctx, _vertex.size(), _indices.size());
 	_resize_ubo(ctx, gCount);
 	ctx->gxCount = 0;
@@ -10243,109 +10752,24 @@ void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 	}
 	auto cwait_last = ctx->cmdFence[cmdidx];
 	ctx->cmdStarted = false;
-	gct = test_geoms(gct, ctx);
-#if 1
+
+	gct = test_geoms(gct, ctx, gt);
+#if 0
 	dc_clear(ctx);
 	VkRect2D cuclip = {};
-	for (auto& it : cmdlist)
+	for (auto& it : gt->cmdlist)
 	{
-		auto t = it.state;
-		if (t)
-		{
-			bind_draw_pipeline(ctx, it.state);
-			update_pattern(ctx, t->pattern, t);
-			dc_update_push_constants(ctx, t);
-		}
-		switch (it.type)
-		{
-		case 0:
-		{// 填充
-			if (t && t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
-				CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelinePolyFill);
-				for (size_t i = 0; i < it.vc; i++)
-				{
-					vkCmdDraw(ctx->cmd, it.v[i].vertexCount, 1, it.v[i].firstVertex, 0);
-				}
-				bind_draw_pipeline(ctx, it.state);
-				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
-				cmd_draw_full_screen_quad(ctx, &it, &it.bounds, &cuclip);
-				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
-			}
-			else {
-				vkCmdDrawIndexed(ctx->cmd, it.index.y, 1, it.index.x, (int32_t)it.vertex.x, 0);
-			}
-			if (!ctx->cmdStarted)
-				ctx->cmdStarted = true;
-			push_update_descriptor_set_a(ctx, ctx->d_img, ctx->d_offset);
-		}
-		break;
-		case 1:
-		{// 描边 
-			vkCmdDrawIndexed(ctx->cmd, it.index.y, 1, it.index.x, (int32_t)it.vertex.x, 0);
-		}
-		break;
-		case 2:
-		{// 裁剪
-			int bw = it.bounds.width; int bh = it.bounds.height;
-			if (bw != 0 && bh != 0) {
-				cuclip = dc_scissor(ctx, bw < 0 || bh < 0 ? nullptr : &it.bounds);
-				break;
-			}
-			if (it.vc > 0 || it.index.y > 0) {
-#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
-				vkh_cmd_label_start(ctx->cmd, "clip", DBG_LAB_COLOR_CLIP);
-#endif
-				if (t && t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
-					CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelinePolyFill);
-					for (size_t i = 0; i < it.vc; i++)
-					{
-						vkCmdDraw(ctx->cmd, it.v[i].vertexCount, 1, it.v[i].firstVertex, 0);
-					}
-					CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineClipping);
-				}
-				else {
-					CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineClipping);
-					CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
-					CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
-					CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
-					vkCmdDrawIndexed(ctx->cmd, it.index.y, 1, it.index.x, (int32_t)it.vertex.x, 0);
-				}
-				CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
-				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
-				CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_ALL_BIT);
-				cmd_draw_full_screen_quad(ctx, &it, NULL, 0);
-				ctx->curClipState = vkvg_clip_state_clip;
-#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
-				vkh_cmd_label_end(ctx->cmd);
-#endif
-			}
-			else {
-				auto cs = clearStencil;
-				cs.clearValue.depthStencil.depth = 1;
-				cs.clearValue.depthStencil.stencil = 0;
-				vkCmdClearAttachments(ctx->cmd, 1, &cs, 1, &ctx->clearRect);
-			}
-		}
-		break;
-		case 3:
-		{
-			cmd_draw_full_screen_quad(ctx, &it, NULL, 0);
-		}
-		break;
-		case 4:
-		{
-			dc_clear(ctx);
-		}
-		break;
-		}
 	}
-
 	//gct->draw(ctx->cmd);
 	_end_render_pass(ctx);
+#else 
+	vkh_cmd_begin(ctx->cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	gct->update_va();
+	draw_dynamic(ctx, ctx->cmd, ctx->pSurf->imgMS ? ctx->pSurf->imgMS : ctx->pSurf->img, ctx->pSurf->stencil, true);
 #endif
 	ctx->cmdStarted = true;
 	//vkh_cmd_begin(ctx->cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-	gct->draw_dynamic(ctx->cmd, ctx->pSurf->imgMS ? ctx->pSurf->imgMS : ctx->pSurf->img, ctx->pSurf->stencil);
+	//gct->draw_dynamic(ctx->cmd, ctx->pSurf->imgMS ? ctx->pSurf->imgMS : ctx->pSurf->img, ctx->pSurf->stencil);
 
 	// 更新渐变ubo
 	vkh_buffer_flush(&ctx->uboGrad);
@@ -10396,7 +10820,8 @@ void vgdev_ctx::begin_frame()
 	mac.release();
 	_vertex.clear();
 	_indices.clear();
-	cmdlist.clear();
+	//cmdlist.clear();
+	gt->clear();
 	dc_clear_path(_dpath);
 
 	while (_cst.size())
@@ -10413,7 +10838,7 @@ void vgdev_ctx::end_frame()
 {
 	_vertex.clear();
 	_indices.clear();
-	cmdlist.clear();
+	//cmdlist.clear();
 }
 
 void vgdev_ctx::set_glutess(bool b) { is_glutess = b; }
@@ -10444,6 +10869,10 @@ void vkvg_clear_rect(VkvgContext ctx, int x, int y, int width, int height) {
 	VkClearAttachment ca[2] = { clearColorAttach, clearStencil };
 	ca[1].clearValue.depthStencil.depth = 1;
 	vkCmdClearAttachments(ctx->cmd, 2, ca, 1, &cr);
+}
+void* get_surface_dev(VkvgSurface surf)
+{
+	return surf ? surf->dev : nullptr;
 }
 vgdev_ctx* new_vgctx() {
 	auto p = new vgdev_ctx();
@@ -11716,7 +12145,7 @@ void _rvg_path_extents(paths_t* ctx, bool transformed, float* x1, float* y1, flo
 void rvg_set_dev(rvgctx_t* ctx, void* vgdev) {
 	if (!ctx)return;
 	PRI_CTX;
-	cr->dev = (VkvgDevice)vgdev;
+	cr->set_dev((VkvgDevice)vgdev);
 }
 // 视图
 //size_t rvg_new_view(rvgctx_t* ctx, int x, int y, int width, int height) {
@@ -13327,11 +13756,6 @@ void geoms_ctx::init(VkvgDevice ctx, uint32_t _sizeVBO, uint32_t _sizeIBO)
 
 	_vkCmdPushDescriptorSet = (PFN_vkCmdPushDescriptorSet)vkGetDeviceProcAddr(dev->vkDev, "vkCmdPushDescriptorSet");
 	if (!_vkCmdPushDescriptorSet) _vkCmdPushDescriptorSet = (PFN_vkCmdPushDescriptorSet)vkGetInstanceProcAddr(dev->instance, "vkCmdPushDescriptorSet");
-
-
-	_vkCmdBeginRenderingKHR = reinterpret_cast<PFN_vkCmdBeginRenderingKHR>(vkGetDeviceProcAddr(dev->vkDev, "vkCmdBeginRenderingKHR"));
-	_vkCmdEndRenderingKHR = reinterpret_cast<PFN_vkCmdEndRenderingKHR>(vkGetDeviceProcAddr(dev->vkDev, "vkCmdEndRenderingKHR"));
-
 	//maxPushDescriptors = ctx->maxPushDescriptors;
 	sizeVBO = _sizeVBO; sizeIBO = _sizeIBO;
 	vkh_buffer_init((VkhDevice)&dev->vkDev, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, _sizeVBO, &vertices, true);
@@ -13386,7 +13810,7 @@ void geoms_ctx::reset()
 
 void geoms_ctx::clear()
 {
-	cmdlist.clear();// 命令列表
+	//cmdlist.clear();// 命令列表
 	vd1.clear();	// 单面顶点
 	vd2.clear();	// 双面顶点
 	ids.clear();
@@ -13406,97 +13830,6 @@ void geoms_ctx::update_va()
 		upload_ibo(ids.data(), 0, ids.size() * sizeof(int), true);
 }
 
-void geoms_ctx::draw_dynamic(VkCommandBuffer cmd, VkhImage image, VkhImage depthStencil)
-{
-	if (!cmd || !_vkCmdBeginRenderingKHR)return;
-	update_va();
-	VkImageSubresourceRange crange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }; VkImageSubresourceRange dsrange = { VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1 };
-	vkh_image_set_layout_subres(cmd, image, crange, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-	vkh_image_set_layout_subres(cmd, depthStencil, dsrange, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT);
-	VkRenderingAttachmentInfoKHR colorAttachment{
-	.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
-	.imageView = image->view,
-	.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-	.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,// VK_ATTACHMENT_LOAD_OP_CLEAR,
-	.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-	.clearValue = {.color = {0.0f,0.0f,0.0f,0.0f} },
-	};
-	VkRenderingAttachmentInfoKHR depthStencilAttachment{
-		.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
-		.imageView = depthStencil->view,
-		.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-		.clearValue = {.depthStencil = {1.0f,  0} }
-	};
-	VkRenderingInfoKHR renderingInfo{
-		.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR,
-		.renderArea = { 0, 0, image->infos.extent.width, image->infos.extent.height },
-		.layerCount = 1,
-		.colorAttachmentCount = 1,
-		.pColorAttachments = &colorAttachment,
-		.pDepthAttachment = &depthStencilAttachment,
-		.pStencilAttachment = &depthStencilAttachment
-	};
-	_vkCmdBeginRenderingKHR(cmd, &renderingInfo);
-	VkViewport viewport = { 0.0f,0.0f,(float)image->infos.extent.width, (float)image->infos.extent.height, 0.0f, 1.0f };
-	vkCmdSetViewport(cmd, 0, 1, &viewport);
-	VkRect2D scissor = { 0, 0, image->infos.extent.width, image->infos.extent.height };
-	vkCmdSetScissor(cmd, 0, 1, &scissor);
-	pipelinestate_p* cp = 0;
-	for (auto& it : cmdlist) {
-		if (cp != it.pipeline)
-		{
-			cp = it.pipeline;
-			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cp->pipeline);
-		}
-		if (cp)
-		{
-			vkCmdPushConstants(cmd, cp->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &it.mat);
-			push_update_descriptor_set(cmd, cp, it.texture ? it.texture : dev->emptyImg1);
-		}
-		bind(cmd, it.offset * v2offset, it.ioffset);
-		if (it.firstIndex == -1)
-			vkCmdDraw(cmd, it.count, 1, it.vertexOffset, 0);
-		else
-			vkCmdDrawIndexed(cmd, it.count, 1, it.firstIndex, it.vertexOffset, 0);
-	}
-	_vkCmdEndRenderingKHR(cmd);
-	//vkh_image_set_layout_subres(cmd, image, crange,
-	//	VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-	//	VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-	//	VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-	//	VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT
-	//);
-
-}
-void geoms_ctx::draw(VkCommandBuffer cmd)
-{
-	if (!cmd)return;
-	pipelinestate_p* cp = 0;
-	update_va();
-
-	for (auto& it : cmdlist) {
-		if (cp != it.pipeline)
-		{
-			cp = it.pipeline;
-			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cp->pipeline);
-		}
-		if (cp)
-		{
-			vkCmdPushConstants(cmd, cp->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &it.mat);
-			push_update_descriptor_set(cmd, cp, it.texture ? it.texture : dev->emptyImg1);
-		}
-		bind(cmd, it.offset * v2offset, it.ioffset);
-		if (it.firstIndex == -1)
-			vkCmdDraw(cmd, it.count, 1, it.vertexOffset, 0);
-		else
-			vkCmdDrawIndexed(cmd, it.count, 1, it.firstIndex, it.vertexOffset, 0);
-	}
-
-}
 
 
 void geoms_ctx::bind(VkCommandBuffer cmd, size_t offset, size_t ioffset)
@@ -13555,7 +13888,7 @@ bool geoms_ctx::add_geometry(void* texture, const float* xy, int xy_stride, cons
 	, const void* indices, int num_indices, int size_indices, int color_type)
 {
 	if (!xy || num_vertices < 1)return false;
-	cmd_t c = {};
+	geom_cmd_t c = {};
 	c.pipeline = pipeline;
 	c.texture = (VkhImage)texture;
 	c.mat = mat;
@@ -13668,7 +14001,8 @@ bool geoms_ctx::add_geometry(void* texture, const float* xy, int xy_stride, cons
 			verts += 1;
 		}
 	}
-	cmdlist.push_back(c);
+	//cmdlist.push_back(c);
+	gt->push(&c);
 	return true;
 }
 
@@ -13676,7 +14010,7 @@ bool geoms_ctx::add_geometry3d(void* texture, const float* xyz, int xyz_stride, 
 	, const void* indices, int num_indices, int size_indices, int color_type)
 {
 	if (!xyz || num_vertices < 1)return false;
-	cmd_t c = {};
+	geom_cmd_t c = {};
 	c.pipeline = pipeline;
 	c.texture = (VkhImage)texture;
 	c.mat = mat;
@@ -13789,7 +14123,8 @@ bool geoms_ctx::add_geometry3d(void* texture, const float* xyz, int xyz_stride, 
 			verts += 1;
 		}
 	}
-	cmdlist.push_back(c);
+	//cmdlist.push_back(c);
+	gt->push(&c);
 	return true;
 }
 
@@ -13910,6 +14245,54 @@ void geoms_ctx::texture_destroy(VkhImage img)
 		vkh_image_destroy(img);
 }
 
+
+glist_cx::glist_cx()
+{}
+
+glist_cx::~glist_cx()
+{}
+void glist_cx::clear()
+{
+	cmdlist.clear();
+}
+void glist_cx::insert(size_t pos, geom_cmd_t* c)
+{
+	if (c) {
+		cmd_t c1 = {}; c1.stype = 0; c1.c.g = *c;
+		if (pos < cmdlist.size())
+			cmdlist.insert(cmdlist.begin() + pos, c1);
+		else
+			cmdlist.push_back(c1);
+	}
+}
+void glist_cx::insert(size_t pos, vgcmd_t* c)
+{
+	if (c) {
+		cmd_t c1 = {}; c1.stype = 1; c1.c.v = *c;
+		if (pos < cmdlist.size())
+			cmdlist.insert(cmdlist.begin() + pos, c1);
+		else
+			cmdlist.push_back(c1);
+	}
+}
+void glist_cx::push(geom_cmd_t* c)
+{
+	cmd_t c1 = {}; c1.stype = 0; c1.c.g = *c;
+	cmdlist.push_back(c1);
+}
+void glist_cx::push(vgcmd_t* c)
+{
+	cmd_t c1 = {}; c1.stype = 1; c1.c.v = *c;
+	cmdlist.push_back(c1);
+}
+
+
+
+
+
+
+
+
 geoms_ctx* new_geoms(VkvgDevice ctx, uint32_t _sizeVBO, uint32_t _sizeIBO)
 {
 	auto p = new geoms_ctx();
@@ -13928,9 +14311,9 @@ void gctx_clear(geoms_ctx* ctx) {
 	if (ctx)ctx->clear();
 }
 // 批量录制渲染
-void gctx_draw(geoms_ctx* ctx, VkCommandBuffer cmd) {
-	if (ctx && cmd)ctx->draw(cmd);
-}
+//void gctx_draw(geoms_ctx* ctx, VkCommandBuffer cmd) {
+//	if (ctx && cmd)ctx->draw(cmd);
+//}
 void gctx_set_state(geoms_ctx* ctx, gem_info_s* info) {
 	if (ctx)ctx->set_state(info);
 }
@@ -14190,10 +14573,13 @@ void createIcosphere(mesh3d_vi* shphere, size_t subdivisions, float radius, cons
 	}
 	for (auto& it : shphere->vertices)it = pos + it * sc;
 }
-geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx)
+geoms_ctx* test_geoms(geoms_ctx* gctx, VkvgContext ctx, glist_cx* gt)
 {
 	if (!gctx)
+	{
 		gctx = new_geoms(ctx->dev, 1024 * 1024, 1024 * 1024);
+		gctx->gt = gt;
+	}
 	gctx->clear();
 	gem_info_s info = {};
 	info.blendMode = (uint8_t)blendmode_e::normal;

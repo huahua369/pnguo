@@ -445,6 +445,7 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	auto cr = vkvg_create(surf);
 
 #if 1
+	dcb->set_dev(dctx, get_surface_dev(surf));
 	dcb->set_fence(dctx, wait);
 	dcb->begin_frame(dctx);
 	dcb->clear(dctx);
