@@ -527,12 +527,12 @@ struct text_style
 	font_family_t* family = 0;
 	float fontsize = 0;
 	float lineheight = 0;
-	glm::vec2 align = { 0.50,0.50 };// 文本对齐
+	glm::vec2 align = { 0.50,0.50 };	// 文本对齐
 	glm::vec2 shadow_pos = { 1.0,1.0 };
 	int stroke = 0;						// 描边宽度
 	uint32_t color = 0xffc2c2c2;		// 文本颜色
 	uint32_t color_stroke = 0xff000000;	// 描边颜色
-	uint32_t color_shadow = 0;			//0xcc121212;	// 阴影颜色
+	uint32_t color_shadow = 0;			// 阴影颜色	0xcc121212;
 	bool mcolor_effect = true;			// 是否启用彩色字体参与阴影描边效果
 };
 // 文本区域
@@ -553,7 +553,6 @@ struct text_block
 	const char* str = 0; size_t first = 0; size_t size = 0;
 	int baseline = 0;       // 基线偏移，0则使用字体默认基线
 };
-
 struct image_block
 {
 	int ctype = 1;

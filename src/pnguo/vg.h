@@ -674,8 +674,8 @@ struct canvas_cb {
 	// 清空数据
 	void (*clear)(void* ctx);
 	bool (*clip)(void* ctx, const glm::ivec4* rect);
-	// 添加预渲染矢量图索引
-	void (*add_vg)(void* ctx, void* vgctx, size_t idx);
+	// 添加矢量纹理，dst为渲染目标坐标/宽高，rect取纹理区域坐标/宽高
+	void (*add_vg)(void* ctx, void* vgsurface, const glm::ivec4* dst, const glm::ivec4* rect);
 	// 添加文本，风格
 	void (*add_text)(void* ctx, text_st* p, text_style* ts);
 	// 普通图片，支持九宫格、混合颜色
