@@ -589,40 +589,398 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	if (rsem)*rsem = sem;
 	return dctx;
 }
-class A
+void canvas_gui(viewdev_cx* view, font_family_t* family)
 {
-public:
-	int x = 0;
-	A()
-	{}
+	auto dvv = new div_cx();
+	dvv->set_size({ 500,400 });
+	dvv->set_pos({ 100,60 });
+	dvv->style.family = family;
+	dvv->style.fontsize = 16;
+	view->push_m(dvv);
+	dvv->border = { 0xffacacac,1,5,0x9f666666 };	// 颜色，线粗，圆角，背景色
+	dvv->flex.wrap = flex_wrap::WRAP;
+	dvv->flex.direction = flex_direction::ROW;
+	dvv->flex.justify_content = flex_align::ALIGN_START;	// x轴，主轴对齐
+	dvv->flex.align_items = flex_align::ALIGN_CENTER;		// y轴，交叉轴对齐
+	dvv->flex.align_content = flex_align::ALIGN_START;		// y轴，多行交叉轴对齐
+	dvv->flex_child.margin_left = 2;		// 子元素外边距
+	dvv->flex_child.margin_right = 2;
+	dvv->flex_child.margin_top = 2;
+	dvv->flex_child.margin_bottom = 2;
+	dvv->draggable = true;
+	for (int i = 0; i < 7; i++) {
+		auto btn = new color_btn();
+		btn->rounding = 4;
+		btn->cs.effect = (uTheme)fmod(i, 3);
+		btn->set_btn_color_bgr(fmod(i, 5));
+		dvv->add_widget(btn);
+		btn->set_size({ 128,36 });
+		btn->style.fontsize = 16;
+		btn->style.color = -1;
+		btn->cs.circle = true;
+		//btn->style.stroke = 1;
+		btn->style.color_stroke = 0x80000000;
+		//btn->style.shadow_pos = { 3, 3 };
+		btn->style.color_shadow = 0xcc121212;
+		//btn->style.mcolor_effect = false;
+		auto str = save_color_style(&btn->cs, 2);
 
-	~A()
-	{
-		printf("%d\n", x);
+		//btn->str = (char*)u8"🍕按钮 " + std::to_string(5 + i);
+	}
+}
+
+void examples1(viewdev_cx* view, font_family_t* family)
+{
+
+#if 1
+	auto dvv = new div_cx();
+	dvv->set_size({ 500,400 });
+	dvv->set_pos({ 100,60 });
+	dvv->style.family = family;
+	dvv->style.fontsize = 16;
+
+	dvv->border = { 0xffacacac,1,5,0x9f666666 };	// 颜色，线粗，圆角，背景色
+	dvv->flex.wrap = flex_wrap::WRAP;
+	dvv->flex.direction = flex_direction::ROW;
+	dvv->flex.justify_content = flex_align::ALIGN_START;	// x轴，主轴对齐
+	dvv->flex.align_items = flex_align::ALIGN_CENTER;		// y轴，交叉轴对齐
+	dvv->flex.align_content = flex_align::ALIGN_START;		// y轴，多行交叉轴对齐
+	dvv->flex_child.margin_left = 2;		// 子元素外边距
+	dvv->flex_child.margin_right = 2;
+	dvv->flex_child.margin_top = 2;
+	dvv->flex_child.margin_bottom = 2;
+	dvv->draggable = true;
+	//dvv->flex.direction = flex_direction::COLUMN;
+	uint32_t colors[5] = { 0x905050fc,0x9050fc50,0x90fc5050,0x90ffffff,0x90282828 };
+	//x=默认，y=鼠标进入，z=按下
+	glm::uvec3 gradTop = { 0xff4a4a4a,0x80404040,0xff292929 }, gradBot = { 0xff3a3a3a,0x80303030,0xff1d1d1d };
+	glm::uvec3 gradTop1 = { 0xff8a8a8a,0x80bebebe,0xff303030 }, gradBot1 = { 0xff5a5a5a,0x80303030,0xff1d1d1d };
+	glm::uvec2 blackb = { 0x805c5c5c , 0x801d1d1d };
+
+	for (int i = 0; i < 5; i++) {
+		auto btn = new gradient_btn();
+		//auto btn = new color_btn();
+		btn->rounding = 4;
+		dvv->add_widget(btn);
+		btn->set_size({ 200,36 });
+		btn->back_color = colors[i];
+		btn->borderLight = blackb.x;
+		btn->borderDark = blackb.y;
+		btn->gradTop = gradTop;
+		btn->gradBot = gradBot;
+		btn->style.fontsize = 16;
+		btn->style.color = -1;
+		btn->style.color_shadow = 0xcc000000;
+		btn->str = (char*)u8"🔥按钮gbutton " + std::to_string(i);
+		if (i == 4) {
+			btn->gradTop = gradTop1;
+			btn->gradBot = gradBot1;
+		}
+	}
+	auto gr = new group_radio_t();
+	const char* cstr[] = { (char*)u8"橙子aag",(char*)u8"葡萄bb",(char*)u8"桃子aag",(char*)u8"西瓜bb",(char*)u8"荔枝bb" };
+	for (int i = 0; i < 5; i++) {
+		auto r = new radio_tl();
+		r->set_group(gr);
+		r->set_size({ 136,36 });
+		r->_style.line_col = 0xffff8020;
+		r->_style.thickness = 1;
+		r->_style.radius = 7;
+		r->v.text = cstr[i];
+		dvv->add_widget(r);
+	}
+	for (int i = 0; i < 7; i++) {
+		auto btn = new color_btn();
+		btn->rounding = 4;
+		btn->cs.effect = (uTheme)fmod(i, 3);
+		btn->set_btn_color_bgr(fmod(i, 5));
+		dvv->add_widget(btn);
+		btn->set_size({ 128,36 });
+		btn->style.fontsize = 16;
+		btn->style.color = -1;
+		//btn->style.stroke = 1;
+		btn->style.color_stroke = 0x80000000;
+		//btn->style.shadow_pos = { 3, 3 };
+		btn->style.color_shadow = 0xcc121212;
+		//btn->style.mcolor_effect = false;
+		auto str = save_color_style(&btn->cs, 2);
+
+		btn->str = (char*)u8"🍕按钮 " + std::to_string(5 + i);
 	}
 
-private:
-
-};
-class B
-{
-public:
-	A a;
-	A b;
-public:
-	B()
+	for (int i = 0; i < 4; i++) {
+		auto r = new checkbox_tl();
+		r->set_size({ 136,36 });
+		r->_style.line_col = 0xffff8020;
+		r->_style.thickness = 1;
+		r->v.text = cstr[i];
+		dvv->add_widget(r);
+	}
 	{
-		a.x = 1;
-		b.x = 2;
+		auto r = new checkbox_tl();
+		r->set_size({ 136,36 });
+		r->_style.line_col = 0xffff8020;
+		r->_style.thickness = 1;
+		r->v.text = cstr[4];
+		r->v.mixed = true;
+		dvv->add_widget(r);
 	}
 
-	~B()
-	{}
+	//auto edit1 = new edit_cx();
+	//{
+	//	auto r = edit1;
+	//	r->set_size({ 236,32 });
+	//	//r->set_single(false);
+	//	r->placeholder = (char*)u8"输入文本";
+	//	//dvv->add_widget(r);
+	//	r->dindex = 0;
 
-private:
+	//}
+	auto pro = new progress_tl();
+	dvv->add_widget(pro);
+	pro->set_size({ 120,26 });
+	pro->right_inside = true;
+	pro->rounding = 10;
+	pro->height = 20;
+	pro->width = 110;
+	pro->color = { 0xffff9e40, 0x5f6c6c6c };
+	pro->set_value(0.5);
+	//auto colorpick = new colorpick_tl();
+	//{
+	//	auto c = colorpick;
+	//	c->init(0xff282828, 300, 20, true);
+	//	c->style.fontsize = 15;
+	//	//dvv->add_widget(c);
+	//}
+	static bool loadf = false;
 
-};
+	auto dvv2 = new div_cx();
+	{
+		auto dvv1 = new div_cx();
+		dvv1->set_size({ 180,150 });
+		dvv1->set_pos({ 100,60 });
+		dvv1->style.family = family;
+		dvv1->style.fontsize = 16;
+		dvv1->border = { 0xffacacac,1,5,0xaf66f666 };	// 颜色，线粗，圆角，背景色
+		dvv1->flex_child.margin_left = 2;		// 子元素外边距
+		dvv1->flex_child.margin_right = 2;
+		dvv1->flex_child.margin_top = 2;
+		dvv1->flex_child.margin_bottom = 2;
+		dvv1->flex.wrap = flex_wrap::WRAP;
+		dvv1->draggable = true;
+		dvv1->_absolute = true;
+		{
+			auto btn = new color_btn();
+			btn->rounding = 4;
+			btn->set_btn_color_bgr(fmod(4, 5));
+			dvv1->add_widget(btn);
+			btn->set_size({ 128,36 });
+			btn->style.fontsize = 16;
+			btn->style.color = -1;
+			btn->str = (char*)u8"🍕按钮 ";
+			btn->click_cb = [=](void* p, int clicks, const glm::vec2& mpos) {
 
+				};
+			{
+				auto r = new checkbox_tl();
+				r->set_size({ 36,36 });
+				r->_style.line_col = 0xffff8020;
+				r->_style.thickness = 1;
+				r->v.mixed = true;
+				dvv1->add_widget(r);
+			}
+			{
+				auto r = new switch_tl();
+				r->set_size({ 60,36 });
+				r->set_value(true);
+				r->v.mixed = true;
+				dvv1->add_widget(r);
+			}
+		}
+		dvv->add_widget(dvv1);
+	}
+	auto fpslab = new color_btn();
+	dvv2->set_size({ 500,400 });
+	dvv2->set_pos({ 10,10 });
+	dvv2->style.family = family;
+	dvv2->style.fontsize = 16;
+	dvv2->border = { 0xffffffff,1,5,0x50f66666 };	// 颜色，线粗，圆角，背景色
+	dvv2->flex_child.margin_left = 4;		// 子元素外边距
+	dvv2->flex_child.margin_right = 4;
+	dvv2->flex_child.margin_top = 4;
+	dvv2->flex_child.margin_bottom = 4;
+	dvv2->draggable = true;
+	dvv2->docking = true;
+	dvv2->_absolute = true;
+	{
+		//auto r = new switch_tl();
+		//r->set_size({ 60,36 });
+		//r->set_value(true);
+		//r->v.mixed = true;
+		//dvv2->add_widget(r);
+	}
+	view->push_m(dvv2);
+	{
+		auto btn = fpslab;
+		btn->rounding = 4;
+		btn->cs.light = 0;
+		btn->style.align = {};
+		btn->set_btn_color_bgr(fmod(2, 5));
+		btn->cs.effect = uTheme::light;
+		btn->_disabled_events = true;
+		dvv2->add_widget(btn);
+		btn->set_size({ 492,392 });
+		btn->style.fontsize = 20;
+		btn->style.color = 0xffffffff;
+		//btn->style.stroke = 1;
+		btn->style.color_stroke = 0x8f0012ff;
+		btn->style.shadow_pos = { 1,1 };
+		btn->style.color_shadow = 0x80ff2301;
+	}
+#if 0
+	{
+		dvv2->mevent_cb = [=](void* p, int type, const glm::vec2& mps)
+			{
+				return;
+				auto dv = (div_cx*)p;
+				if (!dv || !dv->form)return;
+
+				//printf("ad %p\t%d %.2f %.2f\n", dvv2->form, type, mps.x, mps.y);
+				if (!dv->form->viewports_enable) {
+					glm::vec2 pos = dvv2->get_pos();
+					glm::vec2 size = dvv2->get_size();
+					glm::vec2 main_pos = appx->app->main->get_pos();
+					glm::vec2 main_size = appx->app->main->get_size();
+
+
+					if (type == (int)event_type2::on_drag) {
+
+						if (pos.x < 0 || pos.y < 0 || pos.x + size.x >  main_size.x || pos.y + size.y >  main_size.y)
+						{
+						}
+					}
+					if (type == (int)event_type2::on_dragend) {
+						if (pos.x < 0 || pos.y < 0 || pos.x + size.x >  main_size.x || pos.y + size.y >  main_size.y)
+						{
+							view->set_div(dvv2);
+							view->remove_q();
+						}
+						else {
+						}
+					}
+					return;
+				}
+				if (type == (int)event_type2::on_down) {
+					if (appx->app->main != dvv2->form)
+					{
+						dvv2->fpos = dvv2->form->get_pos();
+						dvv2->curpos = (glm::ivec2)mps - dvv2->fpos;
+					}
+				}
+				if (type == (int)event_type2::on_drag) {
+					glm::vec2 main_pos = appx->app->main->get_pos();
+					glm::ivec2 ps = {};
+					ps += dvv2->mmpos - dvv2->curpos;
+					if (appx->app->main != dvv2->form)
+					{
+						printf("d %p\t%d %d\n", dvv2->form, ps.x, ps.y);
+						dvv2->form->set_pos(ps);
+						if (dvv2->form->get_visible())
+							dvv2->fpos = ps;
+					}
+					else {
+						dv->set_pos(ps);
+					}
+				}
+				//view->get_div(dv->form);
+			};
+	}
+#endif
+	view->push_m(dvv);
+	auto colorpicker = new div_cx();
+	glm::ivec2 surfsize = { 260 * 3,256 };
+	VkvgSurface surf = view->_vgdev->new_surface(surfsize.x, surfsize.y);
+	auto img = view->_vgdev->new_surface(R"(E:\za\noto-emoji-2.042\third_party\region-flags\png\GB-WLS.png)");
+	void* vgctx = 0;
+	// 调色板 
+	{
+		auto dvv = colorpicker;
+		view->push_m(dvv);
+		dvv->set_size({ 1028,728 });
+		dvv->set_pos({ 200,160 });
+		dvv->style.family = family;
+		dvv->style.fontsize = 16;
+		dvv->border = { 0xffacacac,1,5,0xf9666666 };	// 颜色，线粗，圆角，背景色
+		dvv->flex.wrap = flex_wrap::NO_WRAP;
+		dvv->flex.direction = flex_direction::ROW;
+		dvv->flex.justify_content = flex_align::ALIGN_START;	// x轴，主轴对齐
+		dvv->flex.align_items = flex_align::ALIGN_CENTER;		// y轴，交叉轴对齐
+		dvv->flex.align_content = flex_align::ALIGN_START;		// y轴，多行交叉轴对齐
+		dvv->flex_child.margin_left = 2;		// 子元素外边距
+		dvv->flex_child.margin_right = 2;
+		dvv->flex_child.margin_top = 2;
+		dvv->flex_child.margin_bottom = 2;
+		dvv->draggable = 1;
+
+		//auto r = new edit_cx();
+		//r->set_size({ 360,360 });
+		////r->set_single(false);
+		//r->placeholder = (char*)u8"输入文本";
+		//r->dindex = 0;
+		//r->set_single(false);
+
+		flex_data data;
+		data.width = 100.0f;
+		data.height = 200.0f;
+		data.grow = 1.0f;
+		data.justify_content = flex_align::ALIGN_CENTER;
+
+		std::string json_str = save_flex_data(data);
+		//r->set_text(json_str.c_str(), json_str.length());
+		//flex_data loaded = load_flex_data(json_str);
+
+		//dvv->add_widget(r);
+		if (surf) {
+			vgctx = draw_vgtest(surf, img, surfsize, 1, nullptr);
+		}
+
+		auto ibtn = new image_btn();
+		if (ibtn) {
+			ibtn->set_surface(surf, surfsize.x, surfsize.y);
+			ibtn->set_size({ surfsize.x, surfsize.y });
+			//ibtn->set_vkimage(vki.vkimage, vki.size.x, vki.size.y, 0);
+			//ibtn->str = "abcc";
+			//ibtn->set_size({ 1024,720 });
+			dvv->add_widget(ibtn);
+		}
+	}
+	glm::vec4 dcc[] = { glm::vec4(1, 0, 0, 0.5),
+		glm::vec4(0, 1, 0, 0.5),
+		glm::vec4(0, 0, 1, 0.5) };
+	for (int i = 0; i < 3; i++)
+	{
+		auto dvv = new div_cx();
+		dvv->set_size({ 100,100 });
+		dvv->set_pos({ 100,60 });
+		dvv->style.family = family;
+		dvv->style.fontsize = 16;
+		dvv->border = { 0xffacacac,1,5, color2u(dcc[i]) };	// 颜色，线粗，圆角，背景色
+		dvv->flex.wrap = flex_wrap::WRAP;
+		dvv->flex.direction = flex_direction::ROW;
+		dvv->flex.justify_content = flex_align::ALIGN_START;	// x轴，主轴对齐
+		dvv->flex.align_items = flex_align::ALIGN_CENTER;		// y轴，交叉轴对齐
+		dvv->flex.align_content = flex_align::ALIGN_START;		// y轴，多行交叉轴对齐
+		dvv->flex_child.margin_left = 2;		// 子元素外边距
+		dvv->flex_child.margin_right = 2;
+		dvv->flex_child.margin_top = 2;
+		dvv->flex_child.margin_bottom = 2;
+		dvv->draggable = true;
+		dvv->order = 3 - i;
+		dvv->text = std::to_string(i);
+		view->push_m(dvv);
+	}
+#endif
+}
 void testgui() {
 
 	//test_vkvg("temp/vgtest0618.png", 0);
@@ -715,361 +1073,16 @@ void testgui() {
 	}
 
 	//dom_cx* dom0 = view->get_dom(form0);
-
-	auto dvv = new div_cx();
-	dvv->set_size({ 500,400 });
-	dvv->set_pos({ 100,60 });
-	dvv->style.family = appx->family;
-	dvv->style.fontsize = 16;
-
-	dvv->border = { 0xffacacac,1,5,0x9f666666 };	// 颜色，线粗，圆角，背景色
-	dvv->flex.wrap = flex_wrap::WRAP;
-	dvv->flex.direction = flex_direction::ROW;
-	dvv->flex.justify_content = flex_align::ALIGN_START;	// x轴，主轴对齐
-	dvv->flex.align_items = flex_align::ALIGN_CENTER;		// y轴，交叉轴对齐
-	dvv->flex.align_content = flex_align::ALIGN_START;		// y轴，多行交叉轴对齐
-	dvv->flex_child.margin_left = 2;		// 子元素外边距
-	dvv->flex_child.margin_right = 2;
-	dvv->flex_child.margin_top = 2;
-	dvv->flex_child.margin_bottom = 2;
-	dvv->draggable = true;
-	//dvv->flex.direction = flex_direction::COLUMN;
-	uint32_t colors[5] = { 0x905050fc,0x9050fc50,0x90fc5050,0x90ffffff,0x90282828 };
-	//x=默认，y=鼠标进入，z=按下
-	glm::uvec3 gradTop = { 0xff4a4a4a,0x80404040,0xff292929 }, gradBot = { 0xff3a3a3a,0x80303030,0xff1d1d1d };
-	glm::uvec3 gradTop1 = { 0xff8a8a8a,0x80bebebe,0xff303030 }, gradBot1 = { 0xff5a5a5a,0x80303030,0xff1d1d1d };
-	glm::uvec2 blackb = { 0x805c5c5c , 0x801d1d1d };
-#if 1
-	for (int i = 0; i < 5; i++) {
-		auto btn = new gradient_btn();
-		//auto btn = new color_btn();
-		btn->rounding = 4;
-		dvv->add_widget(btn);
-		btn->set_size({ 200,36 });
-		btn->back_color = colors[i];
-		btn->borderLight = blackb.x;
-		btn->borderDark = blackb.y;
-		btn->gradTop = gradTop;
-		btn->gradBot = gradBot;
-		btn->style.fontsize = 16;
-		btn->style.color = -1;
-		btn->style.color_shadow = 0xcc000000;
-		btn->str = (char*)u8"🔥按钮gbutton " + std::to_string(i);
-		if (i == 4) {
-			btn->gradTop = gradTop1;
-			btn->gradBot = gradBot1;
-		}
-	}
-	auto gr = new group_radio_t();
-	const char* cstr[] = { (char*)u8"橙子aag",(char*)u8"葡萄bb",(char*)u8"桃子aag",(char*)u8"西瓜bb",(char*)u8"荔枝bb" };
-	for (int i = 0; i < 5; i++) {
-		auto r = new radio_tl();
-		r->set_group(gr);
-		r->set_size({ 136,36 });
-		r->_style.line_col = 0xffff8020;
-		r->_style.thickness = 1;
-		r->_style.radius = 7;
-		r->v.text = cstr[i];
-		dvv->add_widget(r);
-	}
-	for (int i = 0; i < 7; i++) {
-		auto btn = new color_btn();
-		btn->rounding = 4;
-		btn->cs.effect = (uTheme)fmod(i, 3);
-		btn->set_btn_color_bgr(fmod(i, 5));
-		dvv->add_widget(btn);
-		btn->set_size({ 128,36 });
-		btn->style.fontsize = 16;
-		btn->style.color = -1;
-		//btn->style.stroke = 1;
-		btn->style.color_stroke = 0x80000000;
-		//btn->style.shadow_pos = { 3, 3 };
-		btn->style.color_shadow = 0xcc121212;
-		//btn->style.mcolor_effect = false;
-		auto str = save_color_style(&btn->cs, 2);
-
-		btn->str = (char*)u8"🍕按钮 " + std::to_string(5 + i);
-	}
-
-	for (int i = 0; i < 4; i++) {
-		auto r = new checkbox_tl();
-		r->set_size({ 136,36 });
-		r->_style.line_col = 0xffff8020;
-		r->_style.thickness = 1;
-		r->v.text = cstr[i];
-		dvv->add_widget(r);
-	}
-	{
-		auto r = new checkbox_tl();
-		r->set_size({ 136,36 });
-		r->_style.line_col = 0xffff8020;
-		r->_style.thickness = 1;
-		r->v.text = cstr[4];
-		r->v.mixed = true;
-		dvv->add_widget(r);
-	}
-#endif
-
-	//auto edit1 = new edit_cx();
-	//{
-	//	auto r = edit1;
-	//	r->set_size({ 236,32 });
-	//	//r->set_single(false);
-	//	r->placeholder = (char*)u8"输入文本";
-	//	//dvv->add_widget(r);
-	//	r->dindex = 0;
-
-	//}
-	auto pro = new progress_tl();
-	dvv->add_widget(pro);
-	pro->set_size({ 120,26 });
-	pro->right_inside = true;
-	pro->rounding = 10;
-	pro->height = 20;
-	pro->width = 110;
-	pro->color = { 0xffff9e40, 0x5f6c6c6c };
-	pro->set_value(0.5);
-	//auto colorpick = new colorpick_tl();
-	//{
-	//	auto c = colorpick;
-	//	c->init(0xff282828, 300, 20, true);
-	//	c->style.fontsize = 15;
-	//	//dvv->add_widget(c);
-	//}
-	static bool loadf = false;
-
-	auto dvv2 = new div_cx();
-	{
-		auto dvv1 = new div_cx();
-		dvv1->set_size({ 180,150 });
-		dvv1->set_pos({ 100,60 });
-		dvv1->style.family = appx->family;
-		dvv1->style.fontsize = 16;
-		dvv1->border = { 0xffacacac,1,5,0xaf66f666 };	// 颜色，线粗，圆角，背景色
-		dvv1->flex_child.margin_left = 2;		// 子元素外边距
-		dvv1->flex_child.margin_right = 2;
-		dvv1->flex_child.margin_top = 2;
-		dvv1->flex_child.margin_bottom = 2;
-		dvv1->flex.wrap = flex_wrap::WRAP;
-		dvv1->draggable = true;
-		dvv1->_absolute = true;
-		{
-			auto btn = new color_btn();
-			btn->rounding = 4;
-			btn->set_btn_color_bgr(fmod(4, 5));
-			dvv1->add_widget(btn);
-			btn->set_size({ 128,36 });
-			btn->style.fontsize = 16;
-			btn->style.color = -1;
-			btn->str = (char*)u8"🍕按钮 ";
-			btn->click_cb = [=](void* p, int clicks, const glm::vec2& mpos) {
-
-				};
-			{
-				auto r = new checkbox_tl();
-				r->set_size({ 36,36 });
-				r->_style.line_col = 0xffff8020;
-				r->_style.thickness = 1;
-				r->v.mixed = true;
-				dvv1->add_widget(r);
-			}
-			{
-				auto r = new switch_tl();
-				r->set_size({ 60,36 });
-				r->set_value(true);
-				r->v.mixed = true;
-				dvv1->add_widget(r);
-			}
-		}
-		dvv->add_widget(dvv1);
-	}
-	auto fpslab = new color_btn();
-	{
-		dvv2->set_size({ 500,400 });
-		dvv2->set_pos({ 10,10 });
-		dvv2->style.family = appx->family;
-		dvv2->style.fontsize = 16;
-		dvv2->border = { 0xffffffff,1,5,0x50f66666 };	// 颜色，线粗，圆角，背景色
-		dvv2->flex_child.margin_left = 4;		// 子元素外边距
-		dvv2->flex_child.margin_right = 4;
-		dvv2->flex_child.margin_top = 4;
-		dvv2->flex_child.margin_bottom = 4;
-		dvv2->draggable = true;
-		dvv2->docking = true;
-		dvv2->_absolute = true;
-		{
-			//auto r = new switch_tl();
-			//r->set_size({ 60,36 });
-			//r->set_value(true);
-			//r->v.mixed = true;
-			//dvv2->add_widget(r);
-		}
-		view->push_m(dvv2);
-		{
-			auto btn = fpslab;
-			btn->rounding = 4;
-			btn->cs.light = 0;
-			btn->style.align = {};
-			btn->set_btn_color_bgr(fmod(2, 5));
-			btn->cs.effect = uTheme::light;
-			btn->_disabled_events = true;
-			dvv2->add_widget(btn);
-			btn->set_size({ 492,392 });
-			btn->style.fontsize = 20;
-			btn->style.color = 0xffffffff;
-			//btn->style.stroke = 1;
-			btn->style.color_stroke = 0x8f0012ff;
-			btn->style.shadow_pos = { 1,1 };
-			btn->style.color_shadow = 0x80ff2301;
-		}
-		dvv2->mevent_cb = [=](void* p, int type, const glm::vec2& mps)
-			{
-				return;
-				auto dv = (div_cx*)p;
-				if (!dv || !dv->form)return;
-
-				//printf("ad %p\t%d %.2f %.2f\n", dvv2->form, type, mps.x, mps.y);
-				if (!dv->form->viewports_enable) {
-					glm::vec2 pos = dvv2->get_pos();
-					glm::vec2 size = dvv2->get_size();
-					glm::vec2 main_pos = appx->app->main->get_pos();
-					glm::vec2 main_size = appx->app->main->get_size();
-
-
-					if (type == (int)event_type2::on_drag) {
-
-						if (pos.x < 0 || pos.y < 0 || pos.x + size.x >  main_size.x || pos.y + size.y >  main_size.y)
-						{
-						}
-					}
-					if (type == (int)event_type2::on_dragend) {
-						if (pos.x < 0 || pos.y < 0 || pos.x + size.x >  main_size.x || pos.y + size.y >  main_size.y)
-						{
-							view->set_div(dvv2);
-							view->remove_q();
-						}
-						else {
-						}
-					}
-					return;
-				}
-				if (type == (int)event_type2::on_down) {
-					if (appx->app->main != dvv2->form)
-					{
-						dvv2->fpos = dvv2->form->get_pos();
-						dvv2->curpos = (glm::ivec2)mps - dvv2->fpos;
-					}
-				}
-				if (type == (int)event_type2::on_drag) {
-					glm::vec2 main_pos = appx->app->main->get_pos();
-					glm::ivec2 ps = {};
-					ps += dvv2->mmpos - dvv2->curpos;
-					if (appx->app->main != dvv2->form)
-					{
-						printf("d %p\t%d %d\n", dvv2->form, ps.x, ps.y);
-						dvv2->form->set_pos(ps);
-						if (dvv2->form->get_visible())
-							dvv2->fpos = ps;
-					}
-					else {
-						dv->set_pos(ps);
-					}
-				}
-				//view->get_div(dv->form);
-			};
-	}
-	view->push_m(dvv);
-	auto colorpicker = new div_cx();
-	glm::ivec2 surfsize = { 260 * 3,256 };
-	VkvgSurface surf = view->_vgdev->new_surface(surfsize.x, surfsize.y);
-	auto img = view->_vgdev->new_surface(R"(E:\za\noto-emoji-2.042\third_party\region-flags\png\GB-WLS.png)");
-	void* vgctx = 0;
-	// 调色板 
-	{
-		auto dvv = colorpicker;
-		view->push_m(dvv);
-		dvv->set_size({ 1028,728 });
-		dvv->set_pos({ 200,160 });
-		dvv->style.family = appx->family;
-		dvv->style.fontsize = 16;
-		dvv->border = { 0xffacacac,1,5,0xf9666666 };	// 颜色，线粗，圆角，背景色
-		dvv->flex.wrap = flex_wrap::NO_WRAP;
-		dvv->flex.direction = flex_direction::ROW;
-		dvv->flex.justify_content = flex_align::ALIGN_START;	// x轴，主轴对齐
-		dvv->flex.align_items = flex_align::ALIGN_CENTER;		// y轴，交叉轴对齐
-		dvv->flex.align_content = flex_align::ALIGN_START;		// y轴，多行交叉轴对齐
-		dvv->flex_child.margin_left = 2;		// 子元素外边距
-		dvv->flex_child.margin_right = 2;
-		dvv->flex_child.margin_top = 2;
-		dvv->flex_child.margin_bottom = 2;
-		dvv->draggable = 1;
-
-		//auto r = new edit_cx();
-		//r->set_size({ 360,360 });
-		////r->set_single(false);
-		//r->placeholder = (char*)u8"输入文本";
-		//r->dindex = 0;
-		//r->set_single(false);
-
-		flex_data data;
-		data.width = 100.0f;
-		data.height = 200.0f;
-		data.grow = 1.0f;
-		data.justify_content = flex_align::ALIGN_CENTER;
-
-		std::string json_str = save_flex_data(data);
-		//r->set_text(json_str.c_str(), json_str.length());
-		//flex_data loaded = load_flex_data(json_str);
-
-		//dvv->add_widget(r);
-		if (surf) {
-			vgctx = draw_vgtest(surf, img, surfsize, 1, nullptr);
-		}
-
-		auto ibtn = new image_btn();
-		if (ibtn) {
-			ibtn->set_surface(surf, surfsize.x, surfsize.y);
-			ibtn->set_size({ surfsize.x, surfsize.y });
-			//ibtn->set_vkimage(vki.vkimage, vki.size.x, vki.size.y, 0);
-			//ibtn->str = "abcc";
-			//ibtn->set_size({ 1024,720 });
-			dvv->add_widget(ibtn);
-		}
-	}
-	glm::vec4 dcc[] = { glm::vec4(1, 0, 0, 0.5),
-		glm::vec4(0, 1, 0, 0.5),
-		glm::vec4(0, 0, 1, 0.5) };
-	for (int i = 0; i < 3; i++)
-	{
-		auto dvv = new div_cx();
-		dvv->set_size({ 100,100 });
-		dvv->set_pos({ 100,60 });
-		dvv->style.family = appx->family;
-		dvv->style.fontsize = 16;
-		dvv->border = { 0xffacacac,1,5, color2u(dcc[i]) };	// 颜色，线粗，圆角，背景色
-		dvv->flex.wrap = flex_wrap::WRAP;
-		dvv->flex.direction = flex_direction::ROW;
-		dvv->flex.justify_content = flex_align::ALIGN_START;	// x轴，主轴对齐
-		dvv->flex.align_items = flex_align::ALIGN_CENTER;		// y轴，交叉轴对齐
-		dvv->flex.align_content = flex_align::ALIGN_START;		// y轴，多行交叉轴对齐
-		dvv->flex_child.margin_left = 2;		// 子元素外边距
-		dvv->flex_child.margin_right = 2;
-		dvv->flex_child.margin_top = 2;
-		dvv->flex_child.margin_bottom = 2;
-		dvv->draggable = true;
-		dvv->order = 3 - i;
-		dvv->text = std::to_string(i);
-		view->push_m(dvv);
-	}
-
+	//examples1(view, appx->family);
+	canvas_gui(view, appx->family);
 	size_t frame_count = 0;
 	appx->app->set_fps(60);
-	appx->fpslab = fpslab;
+	//appx->fpslab = fpslab;
 	{
 		appx->draw2d = [=](app_x* ptr, float delta)
 			{
 				void* psem = 0;
-				draw_vgtest(surf, img, surfsize, 0, &psem);
+				//draw_vgtest(surf, img, surfsize, 0, &psem);
 				return psem;
 			};
 	}
@@ -1078,9 +1091,9 @@ void testgui() {
 		frame_count = appx->run();
 	} while (frame_count);
 
-	view->_vgdev->free_surface(surf);
-	view->_vgdev->free_surface(img);
-	free_vgctx((vgdev_ctx*)vgctx);
+	//view->_vgdev->free_surface(surf);
+	//view->_vgdev->free_surface(img);
+	//free_vgctx((vgdev_ctx*)vgctx);
 }
 int main() {
 	// 启用内存泄漏检测

@@ -138,6 +138,7 @@ struct vgcmd_t {
 	vec4 bounds = {};			// 全屏填充,odd/clip专用
 	int8_t type = 0;			// 类型：填充0、描边1、裁剪2、全屏3、清屏4
 };
+class geoms_ctx;
 class glist_cx
 {
 public:
@@ -149,6 +150,14 @@ public:
 	};
 	USP_CX ac;				// 内存分配器
 	t_vector<cmd_t> cmdlist;// 命令列表
+
+	VkvgDevice dev = {};
+	PFN_vkCmdBeginRenderingKHR _vkCmdBeginRenderingKHR = VK_NULL_HANDLE;
+	PFN_vkCmdEndRenderingKHR _vkCmdEndRenderingKHR = VK_NULL_HANDLE;
+	PFN_vkCmdPushDescriptorSet _vkCmdPushDescriptorSet = {};
+	uint32_t maxPushDescriptors = 0;
+	VkvgContext ctx = 0;
+	geoms_ctx* gctx = 0;
 public:
 	glist_cx();
 	~glist_cx();
@@ -157,13 +166,16 @@ public:
 	void insert(size_t pos, vgcmd_t* c);
 	void push(geom_cmd_t* c);
 	void push(vgcmd_t* c);
+
+	void initdyr();
 private:
 
 };
 
 
 // 支持渲染2d动画、普通3d颜色/纹理渲染。
-struct geoms_ctx {
+class geoms_ctx {
+public:
 	struct Vertex1 {
 		vec3 pos;
 		vec2 uv;
@@ -272,11 +284,6 @@ public:
 	glist_cx* gt = 0;
 
 
-	PFN_vkCmdBeginRenderingKHR _vkCmdBeginRenderingKHR = VK_NULL_HANDLE;
-	PFN_vkCmdEndRenderingKHR _vkCmdEndRenderingKHR = VK_NULL_HANDLE;
-
-	PFN_vkCmdPushDescriptorSet _vkCmdPushDescriptorSet = {};
-	uint32_t maxPushDescriptors = 0;
 
 
 	int  cmdidx = 0;
@@ -288,9 +295,6 @@ public:
 	~vgdev_ctx();
 public:
 	void set_dev(VkvgDevice d);
-	void initdyr();
-	void draw_dynamic(VkvgContext ctx, VkCommandBuffer cmd, VkhImage image, VkhImage depthStencil, bool clear_all);
-
 	void clear();
 	void save();
 	void restore();
@@ -10662,7 +10666,7 @@ void vgdev_ctx::set_dev(VkvgDevice d)
 		gt = new glist_cx();
 	dev = d;
 }
-void vgdev_ctx::initdyr() {
+void glist_cx::initdyr() {
 	if (!dev || !dev->vkDev)return;
 	_vkCmdPushDescriptorSet = (PFN_vkCmdPushDescriptorSet)vkGetDeviceProcAddr(dev->vkDev, "vkCmdPushDescriptorSet");
 	if (!_vkCmdPushDescriptorSet) _vkCmdPushDescriptorSet = (PFN_vkCmdPushDescriptorSet)vkGetInstanceProcAddr(dev->instance, "vkCmdPushDescriptorSet");
@@ -10671,10 +10675,10 @@ void vgdev_ctx::initdyr() {
 
 }
 
-void vgdev_ctx::draw_dynamic(VkvgContext ctx, VkCommandBuffer cmd, VkhImage image, VkhImage depthStencil, bool clear_all)
+void draw_dynamic(glist_cx* gt, VkCommandBuffer cmd, VkhImage image, VkhImage depthStencil, bool clear_all)
 {
-	if (!_vkCmdBeginRenderingKHR)initdyr();
-	if (!cmd || !_vkCmdBeginRenderingKHR)return;
+	if (!gt->_vkCmdBeginRenderingKHR)gt->initdyr();
+	if (!cmd || !gt->_vkCmdBeginRenderingKHR)return;
 	VkImageSubresourceRange crange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }; VkImageSubresourceRange dsrange = { VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1 };
 	vkh_image_set_layout_subres(cmd, image, crange, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
@@ -10705,8 +10709,8 @@ void vgdev_ctx::draw_dynamic(VkvgContext ctx, VkCommandBuffer cmd, VkhImage imag
 		.pDepthAttachment = &depthStencilAttachment,
 		.pStencilAttachment = &depthStencilAttachment
 	};
-	_vkCmdBeginRenderingKHR(cmd, &renderingInfo); 
-	dy_start_cmd_for_render_pass(ctx);
+	gt->_vkCmdBeginRenderingKHR(cmd, &renderingInfo);
+	dy_start_cmd_for_render_pass(gt->ctx);
 	VkViewport viewport = { 0.0f,0.0f,(float)image->infos.extent.width, (float)image->infos.extent.height, 0.0f, 1.0f };
 	vkCmdSetViewport(cmd, 0, 1, &viewport);
 	VkRect2D scissor = { 0, 0, image->infos.extent.width, image->infos.extent.height };
@@ -10716,14 +10720,14 @@ void vgdev_ctx::draw_dynamic(VkvgContext ctx, VkCommandBuffer cmd, VkhImage imag
 	for (auto& it : gt->cmdlist) {
 		switch (it.stype) {
 		case 0:
-			gct->draw_geom(cmd, &it.c.g);
+			gt->gctx->draw_geom(cmd, &it.c.g);
 			break;
 		case 1:
-			draw_vg(ctx, &it.c.v, cuclip);
+			draw_vg(gt->ctx, &it.c.v, cuclip);
 			break;
 		}
 	}
-	_vkCmdEndRenderingKHR(cmd);
+	gt->_vkCmdEndRenderingKHR(cmd);
 	//vkh_image_set_layout_subres(cmd, image, crange,
 	//	VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	//	VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
@@ -10765,7 +10769,10 @@ void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 #else 
 	vkh_cmd_begin(ctx->cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	gct->update_va();
-	draw_dynamic(ctx, ctx->cmd, ctx->pSurf->imgMS ? ctx->pSurf->imgMS : ctx->pSurf->img, ctx->pSurf->stencil, true);
+	gt->dev = dev;
+	gt->gctx = gct;
+	gt->ctx = ctx;
+	draw_dynamic(gt, ctx->cmd, ctx->pSurf->imgMS ? ctx->pSurf->imgMS : ctx->pSurf->img, ctx->pSurf->stencil, true);
 #endif
 	ctx->cmdStarted = true;
 	//vkh_cmd_begin(ctx->cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -10792,8 +10799,6 @@ void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 		void* ws = 0;
 		if (waitSemaphore)
 		{
-			//if (!(*waitSemaphore))
-			//	*waitSemaphore = ctx->pSurf->sem0;
 			ws = *waitSemaphore;
 		}
 		vkResetFences(ctx->dev->vkDev, 1, &cwait);
