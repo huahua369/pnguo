@@ -1,4 +1,4 @@
-
+#extension GL_EXT_scalar_block_layout : enable
 struct VSInput
 {
 	float2 inPos;

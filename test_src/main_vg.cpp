@@ -23,6 +23,8 @@ _stroke_preserve
 #include <SDL3/SDL.h>
 using namespace glm;
 #include <ovg.h>
+#include "vk_mem_alloc.h"
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -989,6 +991,19 @@ void examples1(viewdev_cx* view, font_family_t* family)
 	}
 #endif
 }
+void test_ovg(dev_info_cx* devinfo) {
+	ovg_device_t* ovgdev = new_vkdevctx((VkDevice)devinfo->vkdev, (VkPhysicalDevice)devinfo->phy, (VkInstance)devinfo->inst);
+	// free_vkdevctx(ovgdev);
+	VkFormat colorFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+	VkFormat depthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
+	VkSampleCountFlags samples = VK_SAMPLE_COUNT_8_BIT;
+	ovg_ctx_t* octx = new_ovgctx(ovgdev, colorFormat, depthFormat, samples);
+
+	auto cb = get_canvas_cb(octx);
+	auto p = cb->new_path(cb->ac);
+	cb->rectangle(p, 10, 10, 100, 100);
+
+}
 void testgui() {
 
 	//test_vkvg("temp/vgtest0618.png", 0);
@@ -1079,7 +1094,13 @@ void testgui() {
 			appx->rc3d = { 0,0,vki.size.x, vki.size.y };
 		}
 	}
+
+	dev_info_cx devinfo = {};
+	get_dev_info(appx->dctx, &devinfo);
+
 	auto gpu = new_gpu();
+	test_ovg(&devinfo);
+
 	//dom_cx* dom0 = view->get_dom(form0);
 	//examples1(view, appx->family);
 	canvas_gui(view, appx->family);

@@ -298,6 +298,14 @@ struct ovg_canvas_cb {
 	void (*geom_add_geometry3d)(drawlist_t* dc, void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
 
 };
-ovg_canvas_cb* new_canvas_cb(mem_resource_t* ac);
 
+// 测试
 void* new_gpu();
+
+struct ovg_device_t;
+struct ovg_ctx_t;
+ovg_device_t* new_vkdevctx(VkDevice vkdev, VkPhysicalDevice phy, VkInstance instance);
+void free_vkdevctx(ovg_device_t* dev);
+ovg_ctx_t* new_ovgctx(ovg_device_t* dev, VkFormat colorFormat, VkFormat depthFormat, VkSampleCountFlags samples);
+
+ovg_canvas_cb* get_canvas_cb(ovg_ctx_t* ctx);

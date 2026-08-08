@@ -23,10 +23,132 @@
 
 using namespace glm;
 
-#include "ovg.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gpu.h>
+
+#include <vulkan/vulkan.h>
+
+#include "ovg.h"
+
+
+#include <vk_mem_alloc.h>
+
+#include <array>
+#include <memory_resource>
+
+#ifndef MEMAC_PMR
+template<class _Ty>
+using pmalloc_t = std::pmr::polymorphic_allocator<_Ty>;		// 指定类型内存分配
+using uspool_t = std::pmr::unsynchronized_pool_resource;	// 线程不安全
+using mbpool_t = std::pmr::monotonic_buffer_resource;		// 线程不安全，多次分配，统一释放
+using spool_t = std::pmr::synchronized_pool_resource;		// 线程安全的
+
+class usp_ac_cx
+{
+public:
+	uspool_t _alloc = {};				// pmr内存分配
+	size_t _Align = 16;
+public:
+	usp_ac_cx() {}
+	~usp_ac_cx() {}
+public:
+	void* allocate(const size_t _Bytes, const size_t align = 0) {
+		return  _alloc.allocate(_Bytes, align > 0 ? align : _Align);
+	}
+	void* new_mem(size_t n)
+	{
+		n = std::max((size_t)1, n);
+		auto p = _alloc.allocate(n, _Align);
+		memset(p, 0, n);
+		return p;
+	}
+	void* new_mem0(size_t n)
+	{
+		n = std::max((size_t)1, n);
+		auto p = _alloc.allocate(n, _Align);
+		return p;
+	}
+	template<class T>
+	T* new_mem(size_t n)
+	{
+		n = std::max((size_t)1, n);
+		auto p = (T*)_alloc.allocate(sizeof(T) * n, _Align);
+		auto ptr = p;
+		for (int i = 0; i < n; i++)
+		{
+			p[i] = {};
+		}
+		return p;
+	}
+	template<class T >
+	T* new_mem(size_t n, T*& p)
+	{
+		n = std::max((size_t)1, n);
+		p = (T*)_alloc.allocate(sizeof(T) * n, _Align);
+		auto ptr = p;
+		for (int i = 0; i < n; i++)
+		{
+			p[i] = {};
+		}
+		return p;
+	}
+	template<class T >
+	T* new_mem_o(size_t n)
+	{
+		n = std::max((size_t)1, n);
+		auto p = (T*)_alloc.allocate(sizeof(T) * n, _Align);
+		return p;
+	}
+	template<class T>
+	T* new_mem(T*& p, size_t n)
+	{
+		return new_mem(n, p);
+	}
+	template<class T>
+	void free_mem(T* t, size_t n)
+	{
+		auto ptr = t;
+		if (t && n > 0)
+		{
+			_alloc.deallocate(t, sizeof(T) * n, _Align);
+		}
+	}
+	void free_mem0(void* t, size_t n)
+	{
+		auto ptr = t;
+		if (t && n > 0)
+		{
+			_alloc.deallocate(t, n, _Align);
+		}
+	}
+	template<class T, class... Ts>
+	T* new_obj(Ts &&... args)
+	{
+		auto p = (T*)new_mem(sizeof(T));
+		if (p)
+		{
+#ifdef _WIN32
+			std::uninitialized_construct_using_allocator(p, _alloc, std::forward<Ts>(args)...);
+#else
+			std::__uninitialized_construct_using_allocator(p, _alloc, std::forward<Ts>(args)...);
+#endif
+		}
+		return p;
+	}
+	template<class T>
+	void free_obj(T* t)
+	{
+		auto ptr = t;
+		if (t)
+		{
+			std::destroy_at(ptr);
+			_alloc.deallocate(t, sizeof(T), _Align);
+		}
+	}
+};
+
+#endif // !MEMAC_PMR
 
 unsigned char vg_vert_spv[4048] = {
 	0x03, 0x02, 0x23, 0x07, 0x00, 0x03, 0x01, 0x00, 0x00, 0x00, 0x28, 0x00, 0xDF, 0x00, 0x00, 0x00,
@@ -1161,18 +1283,278 @@ unsigned char vg_frag_spv[13996] = {
 	0xE9, 0x01, 0x00, 0x00, 0xFD, 0x00, 0x01, 0x00, 0x38, 0x00, 0x01, 0x00
 };
 
-ovg_canvas_cb* new_canvas_cb(mem_resource_t* ac)
+
+unsigned char* code[2] = { vg_vert_spv, vg_frag_spv };
+size_t code_len[2] = { 4048,13996 };
+
+struct ovgVertex2 {
+	vec2     pos;
+	uint32_t color;
+	vec3     uv;
+};
+#ifndef STENCIL_FILL_BIT
+#define STENCIL_FILL_BIT              0x1
+#define STENCIL_CLIP_BIT              0x2
+#define STENCIL_ALL_BIT               0x3
+#endif
+// 兼容VkhDevice
+struct ovg_device_t {
+	VkDevice dev;
+	VkPhysicalDeviceMemoryProperties phyMemProps;
+	VkPhysicalDevice phy;
+	VkInstance instance;
+	VmaAllocator allocator;
+	void* application;
+	usp_ac_cx* ac = 0;	// 内存分配器 
+	VkPipelineCache pipelineCache = 0;
+};
+struct ovg_ctx_t {
+	ovg_device_t* dev = 0;
+	VkFormat colorFormat; VkFormat depthFormat;
+	VkSampleCountFlags samples;
+
+	VkDescriptorSetLayout dslPushDset = 0;
+	VkPipelineLayout pipelineLayout = 0;
+	VkPipeline pipe_OVER = 0; /**< default operator */
+	VkPipeline pipe_SUB = 0;
+	VkPipeline pipe_CLEAR = 0; /**< clear operator */
+	VkPipeline pipelinePolyFill = 0; /**< even-odd polygon filling first step */
+	VkPipeline pipelineClipping = 0; /**< draw on stencil to update clipping regions */
+
+	ovg_canvas_cb ccb = {};
+};
+template <typename T>
+inline T ovgAlignUp(T val, T align)
 {
-	return nullptr;
+	return (val + align - 1) / align * align;
+}
+void free_vkdevctx(ovg_device_t* dev) {
+	if (dev && dev->ac) {
+		auto ac = dev->ac;
+		if (dev->pipelineCache) {
+			vkDestroyPipelineCache(dev->dev, dev->pipelineCache, 0);
+		}
+		ac->free_obj(dev);
+		delete ac;
+	}
+}
+ovg_device_t* new_vkdevctx(VkDevice vkdev, VkPhysicalDevice phy, VkInstance instance)
+{
+	auto ac = new usp_ac_cx();
+	if (!ac || !vkdev || !phy || !instance) { if (ac) { delete ac; }return 0; }
+	ovg_device_t* dev = ac->new_obj<ovg_device_t>();
+	dev->dev = vkdev;
+	dev->phy = phy;
+	dev->instance = instance;
+	dev->ac = ac;
+	vkGetPhysicalDeviceMemoryProperties(phy, &dev->phyMemProps);
+	VmaAllocatorCreateInfo allocatorInfo = {};
+	allocatorInfo.physicalDevice = phy; allocatorInfo.device = dev->dev;
+	vmaCreateAllocator(&allocatorInfo, (VmaAllocator*)&dev->allocator);
+	return dev;
+}
+ovg_ctx_t* new_ovgctx(ovg_device_t* dev, VkFormat colorFormat, VkFormat depthFormat, VkSampleCountFlags samples)
+{
+	if (!dev || !dev->ac)return 0;
+	ovg_ctx_t* ctx = dev->ac->new_obj<ovg_ctx_t>();
+	if (!ctx)return 0;
+	ctx->dev = dev;
+	ctx->colorFormat = colorFormat;
+	ctx->depthFormat = depthFormat;
+	ctx->samples = samples;
+	ctx->ccb.ac = (mem_resource_t*)dev->ac;
+
+	VkPipelineCacheCreateInfo pipelineCacheCreateInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO };
+	auto hr1 = vkCreatePipelineCache(dev->dev, &pipelineCacheCreateInfo, NULL, &dev->pipelineCache);
+
+	VkGraphicsPipelineCreateInfo pipelineCreateInfo = { .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
+	VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = {
+	.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+	.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN };
+	VkPipelineRasterizationStateCreateInfo rasterizationState = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+		.depthClampEnable = VK_FALSE,
+		.rasterizerDiscardEnable = VK_FALSE,
+		.polygonMode = VK_POLYGON_MODE_FILL,
+		.cullMode = VK_CULL_MODE_NONE,
+		.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+		.depthBiasEnable = VK_FALSE,
+		.lineWidth = 1.0f };
+
+	VkPipelineColorBlendAttachmentState blendAttachmentState = {
+		.blendEnable = VK_TRUE,
+		.srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
+		.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+		.colorBlendOp = VK_BLEND_OP_ADD,
+		.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+		.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+		.alphaBlendOp = VK_BLEND_OP_ADD,
+		.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+	};
+
+	VkPipelineColorBlendStateCreateInfo colorBlendState = { .sType =
+															   VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+														   .attachmentCount = 1,
+														   .pAttachments = &blendAttachmentState };
+
+	/*failOp,passOp,depthFailOp,compareOp, compareMask, writeMask, reference;*/
+	VkStencilOpState polyFillOpState = { VK_STENCIL_OP_KEEP,
+										VK_STENCIL_OP_INVERT,
+										VK_STENCIL_OP_KEEP,
+										VK_COMPARE_OP_EQUAL,
+										STENCIL_CLIP_BIT,
+										STENCIL_FILL_BIT,
+										0 };
+	VkStencilOpState clipingOpState = { VK_STENCIL_OP_ZERO,
+										VK_STENCIL_OP_REPLACE,
+										VK_STENCIL_OP_KEEP,
+										VK_COMPARE_OP_EQUAL,
+										STENCIL_FILL_BIT,
+										STENCIL_ALL_BIT,
+										0x2 };
+	VkStencilOpState stencilOpState = { VK_STENCIL_OP_KEEP,
+										VK_STENCIL_OP_ZERO,
+										VK_STENCIL_OP_KEEP,
+										VK_COMPARE_OP_EQUAL,
+										STENCIL_FILL_BIT,
+										STENCIL_FILL_BIT,
+										0x1 };
+
+	VkPipelineDepthStencilStateCreateInfo dsStateCreateInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+		.depthTestEnable = VK_FALSE,
+		.depthWriteEnable = VK_FALSE,
+		.depthCompareOp = VK_COMPARE_OP_ALWAYS,
+		.stencilTestEnable = VK_TRUE,
+		.front = polyFillOpState,
+		.back = polyFillOpState };
+
+	VkDynamicState dynamicStateEnables[] = {
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR,
+		VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK,
+		VK_DYNAMIC_STATE_STENCIL_REFERENCE,
+		VK_DYNAMIC_STATE_STENCIL_WRITE_MASK,
+	};
+	VkPipelineDynamicStateCreateInfo dynamicState = { .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+		.dynamicStateCount = 2, .pDynamicStates = dynamicStateEnables };
+	VkPipelineViewportStateCreateInfo viewportState = { .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+		.viewportCount = 1, .scissorCount = 1 };
+	VkPipelineMultisampleStateCreateInfo multisampleState = { .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+		.rasterizationSamples = (VkSampleCountFlagBits)ctx->samples };
+	/*if (ctx->samples != VK_SAMPLE_COUNT_1_BIT){
+		multisampleState.sampleShadingEnable = VK_TRUE;
+		multisampleState.minSampleShading = 0.5f;
+	}*/
+	VkVertexInputBindingDescription vertexInputBinding = { .binding = 0, .stride = sizeof(ovgVertex2), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX };
+	VkVertexInputAttributeDescription vertexInputAttributs[3] = { {0, 0, VK_FORMAT_R32G32_SFLOAT, 0},
+																 {1, 0, VK_FORMAT_R8G8B8A8_UNORM, 8},
+																 {2, 0, VK_FORMAT_R32G32B32_SFLOAT, 12} };
+	VkPipelineVertexInputStateCreateInfo vertexInputState = {
+	.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+	.vertexBindingDescriptionCount = 1,
+	.pVertexBindingDescriptions = &vertexInputBinding,
+	.vertexAttributeDescriptionCount = 3,
+	.pVertexAttributeDescriptions = vertexInputAttributs };
+
+	VkShaderModule modVert = {}, modFrag = {};
+	VkShaderModuleCreateInfo createInfo = { .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, .codeSize = code_len[0], .pCode = (uint32_t*)code[0] };
+	auto hr = vkCreateShaderModule(dev->dev, &createInfo, NULL, &modVert);
+	createInfo.pCode = (uint32_t*)code[1];
+	createInfo.codeSize = code_len[1];
+	hr = vkCreateShaderModule(dev->dev, &createInfo, NULL, &modFrag);
+
+	VkDescriptorSetLayoutBinding    dsLayoutBinding = { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL };
+	VkDescriptorSetLayoutCreateInfo dsLayoutCreateInfo = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, .bindingCount = 1, .pBindings = &dsLayoutBinding };
+	std::array<VkDescriptorSetLayoutBinding, 2> setLayoutBindings = { };
+	dsLayoutBinding.binding = 1;
+	setLayoutBindings[1] = dsLayoutBinding;
+	dsLayoutBinding.binding = 0;
+	dsLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	setLayoutBindings[0] = dsLayoutBinding;
+	dsLayoutCreateInfo.bindingCount = 2;
+	dsLayoutCreateInfo.pBindings = setLayoutBindings.data();
+	dsLayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT;
+	hr = vkCreateDescriptorSetLayout(dev->dev, &dsLayoutCreateInfo, NULL, &ctx->dslPushDset);
+	VkPushConstantRange pushConstantRange[] = {
+		{VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants_t)},
+		//{VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(push_constants_t)}
+	};
+	pushConstantRange->size = ovgAlignUp(pushConstantRange->size, (uint32_t)32);
+	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+		.setLayoutCount = 1,
+		.pSetLayouts = &ctx->dslPushDset,
+		.pushConstantRangeCount = 1,
+		.pPushConstantRanges = (VkPushConstantRange*)&pushConstantRange };
+	hr = vkCreatePipelineLayout(dev->dev, &pipelineLayoutCreateInfo, NULL, &ctx->pipelineLayout);
+	VkPipelineShaderStageCreateInfo vertStage = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+		.stage = VK_SHADER_STAGE_VERTEX_BIT,
+		.module = modVert,
+		.pName = "main",
+	};
+	VkPipelineShaderStageCreateInfo fragStage = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+		.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+		.module = modFrag,
+		.pName = "main",
+	};
+	VkPipelineShaderStageCreateInfo shaderStages[] = { vertStage, fragStage };
+	pipelineCreateInfo.stageCount = 1;
+	pipelineCreateInfo.pStages = shaderStages;
+	pipelineCreateInfo.pVertexInputState = &vertexInputState;
+	pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
+	pipelineCreateInfo.pViewportState = &viewportState;
+	pipelineCreateInfo.pRasterizationState = &rasterizationState;
+	pipelineCreateInfo.pMultisampleState = &multisampleState;
+	pipelineCreateInfo.pColorBlendState = &colorBlendState;
+	pipelineCreateInfo.pDepthStencilState = &dsStateCreateInfo;
+	pipelineCreateInfo.pDynamicState = &dynamicState;
+	pipelineCreateInfo.layout = ctx->pipelineLayout;
+	pipelineCreateInfo.renderPass = nullptr;
+	VkPipelineRenderingCreateInfoKHR pipelineRenderingCreateInfo{
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
+		.colorAttachmentCount = 1,
+		.pColorAttachmentFormats = &ctx->colorFormat,
+		.depthAttachmentFormat = ctx->depthFormat,
+		.stencilAttachmentFormat = ctx->depthFormat
+	};
+	pipelineCreateInfo.pNext = &pipelineRenderingCreateInfo;
+
+#ifndef __APPLE__
+	hr = vkCreateGraphicsPipelines(dev->dev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL, &ctx->pipelinePolyFill);
+#endif
+	inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	dsStateCreateInfo.back = dsStateCreateInfo.front = clipingOpState;
+	dynamicState.dynamicStateCount = 5;
+	hr = vkCreateGraphicsPipelines(dev->dev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL, &ctx->pipelineClipping);
+
+	dsStateCreateInfo.back = dsStateCreateInfo.front = stencilOpState;
+	blendAttachmentState.colorWriteMask = 0xf;
+	dynamicState.dynamicStateCount = 3;
+	pipelineCreateInfo.stageCount = 2;
+	hr = vkCreateGraphicsPipelines(dev->dev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL, &ctx->pipe_OVER);
+	blendAttachmentState.alphaBlendOp = blendAttachmentState.colorBlendOp = VK_BLEND_OP_SUBTRACT;
+	hr = vkCreateGraphicsPipelines(dev->dev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL, &ctx->pipe_SUB);
+	colorBlendState.logicOpEnable = VK_TRUE;
+	blendAttachmentState.blendEnable = VK_FALSE;
+	colorBlendState.logicOp = VK_LOGIC_OP_CLEAR;
+	hr = vkCreateGraphicsPipelines(dev->dev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL, &ctx->pipe_CLEAR);
+	vkDestroyShaderModule(dev->dev, modVert, NULL);
+	vkDestroyShaderModule(dev->dev, modFrag, NULL);
+	return ctx;
+}
+
+ovg_canvas_cb* get_canvas_cb(ovg_ctx_t* ctx)
+{
+	return &ctx->ccb;
 }
 
 static SDL_GPUShader* compileShader(SDL_GPUDevice* device, SDL_GPUShaderStage stage)
 {
 	SDL_GPUShaderFormat formats = SDL_GetGPUShaderFormats(device);
-	//SDL_GPU_SHADERSTAGE_VERTEX,
-	//	SDL_GPU_SHADERSTAGE_FRAGMENT
-	unsigned char* code[2] = { vg_vert_spv, vg_frag_spv };
-	size_t code_len[2] = { 4048,13996 };
+	// SDL_GPU_SHADERSTAGE_VERTEX,
+	// SDL_GPU_SHADERSTAGE_FRAGMENT
 	SDL_GPUShaderCreateInfo sci = { };
 	sci.code = code[stage];
 	sci.code_size = code_len[stage];
@@ -1245,7 +1627,7 @@ void* new_gpu()
 	vertex_buffer_desc.slot = 0;
 	vertex_buffer_desc.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
 	vertex_buffer_desc.instance_step_rate = 0;
-	vertex_buffer_desc.pitch = sizeof(float)*9;
+	vertex_buffer_desc.pitch = sizeof(float) * 9;
 	SDL_GPUVertexAttribute vertex_attributes[3] = {};
 	vertex_attributes[0].buffer_slot = 0;
 	vertex_attributes[0].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
