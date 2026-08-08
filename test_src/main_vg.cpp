@@ -1000,9 +1000,11 @@ void test_ovg(dev_info_cx* devinfo) {
 	ovg_ctx_t* octx = new_ovgctx(ovgdev, colorFormat, depthFormat, samples);
 
 	auto cb = get_canvas_cb(octx);
-	auto p = cb->new_path(cb->ac);
-	cb->rectangle(p, 10, 10, 100, 100);
-
+	if (cb->new_path)
+	{
+		auto p = cb->new_path(cb->ac);
+		cb->rectangle(p, 10, 10, 100, 100);
+	}
 }
 void testgui() {
 
