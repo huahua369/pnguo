@@ -9071,7 +9071,6 @@ void _add_indice_for_stripa(vgdev_ctx* ctx, VKVG_IBO_INDEX_TYPE i, bool odd) {
 	}
 	ctx->_indices.insert(-1, inds, 3);
 }
-
 void fan_vertex2a(uint32_t v, vgdev_ctx* ctx) {
 	uint32_t i = (uint32_t)v;
 	switch (ctx->tesselator_idx_counter) {

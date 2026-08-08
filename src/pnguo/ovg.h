@@ -217,6 +217,7 @@ struct ovg_canvas_cb {
 	void(*get_current_point)(ovg_path_t* path, float* x, float* y);
 	// 添加数据到当前路径，参考path_type_e
 	void(*add_path)(ovg_path_t* path, float* data, size_t count);
+	void(*add_path0)(ovg_path_t* path, ovg_path_t* src);
 	void(*move_to)(ovg_path_t* path, float x, float y);
 	void(*rel_move_to)(ovg_path_t* path, float x, float y);
 	void(*line_to)(ovg_path_t* path, float x, float y);

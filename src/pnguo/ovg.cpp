@@ -1654,3 +1654,55 @@ void* new_gpu()
 	auto pipeline = SDL_CreateGPUGraphicsPipeline(device, &pipelinedesc);
 	return device;
 }
+// vg
+#if 1
+struct ovg_path_t {
+	std::pmr::vector<glm::vec2> points;	// 点数组
+	std::pmr::vector<uint32_t> pathes;	// 每段大小
+	std::pmr::vector<uint32_t> colors;	// 颜色数组，和pathes大小一样
+	uint32_t color = 0xffffffff;		// 默认颜色
+	uint32_t segmentPtr;   // current segment count in current path having curves
+	uint32_t subpathCount; // store count of subpath, not straight forward to retrieve from segmented path array
+	   
+	uint32_t  pathPtr = 0;		// 路径数组中的指针pointer in the path array  
+	vg_state_save_t* t = 0;
+	uint32_t curVertOffset = 0;
+	bool     simpleConvex; // true if path is single rect or concave closed curve.
+};
+
+void clear_path(ovg_path_t* path) {
+	path->points.clear();
+}
+enum class path_type_eta :uint32_t
+{
+	e_vmove = 1,// 移动
+	e_vline,	// 直线
+	e_vcurve,	// 二次曲线
+	e_vcubic	// 三次曲线
+};
+
+void close_path(ovg_path_t* path);
+void new_sub_path(ovg_path_t* path);
+void path_extents(ovg_path_t* path, float* x1, float* y1, float* x2, float* y2);
+void get_current_point(ovg_path_t* path, float* x, float* y);
+// 添加数据到当前路径，参考path_type_e
+void add_path(ovg_path_t* path, float* data, size_t count);
+void add_path0(ovg_path_t* path, ovg_path_t* src);
+void move_to(ovg_path_t* path, float x, float y);
+void rel_move_to(ovg_path_t* path, float x, float y);
+void line_to(ovg_path_t* path, float x, float y);
+void rel_line_to(ovg_path_t* path, float dx, float dy);
+void arc(ovg_path_t* path, float xc, float yc, float radius, float a1, float a2);
+void arc_negative(ovg_path_t* path, float xc, float yc, float radius, float a1, float a2);
+void curve_to(ovg_path_t* path, float x1, float y1, float x2, float y2, float x3, float y3);
+void rel_curve_to(ovg_path_t* path, float x1, float y1, float x2, float y2, float x3, float y3);
+void quadratic_to(ovg_path_t* path, float x1, float y1, float x2, float y2);
+void rel_quadratic_to(ovg_path_t* path, float x1, float y1, float x2, float y2);
+void rectangle(ovg_path_t* path, float x, float y, float w, float h);
+void rounded_rectangle(ovg_path_t* path, float x, float y, float w, float h, float radius);
+void rounded_rectangle2(ovg_path_t* path, float x, float y, float w, float h, float rx, float ry);
+void ellipse(ovg_path_t* path, float radiusX, float radiusY, float x, float y, float rotationAngle);
+void elliptic_arc_to(ovg_path_t* path, float x, float y, bool large_arc_flag, bool sweep_flag, float rx, float ry, float phi);
+void rel_elliptic_arc_to(ovg_path_t* path, float x, float y, bool large_arc_flag, bool sweep_flag, float rx, float ry, float phi);
+
+#endif // 1
