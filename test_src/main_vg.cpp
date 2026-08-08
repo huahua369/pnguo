@@ -15,12 +15,14 @@ _stroke_preserve
 #include <render.h>
 #include <app.h>
 #include <event.h>
-#include <vkvg_cx.h>
+//#include <vkvg_cx.h>
 #include <win_core.h>
 #include <vkrenderer.h>
 #include <page.h>
 #include <mapView.h>
 #include <SDL3/SDL.h>
+using namespace glm;
+#include <ovg.h>
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -183,14 +185,14 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 			VkvgPattern pat;
 
 			pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
-			vkvg_pattern_add_color_stop_rgba(pat, 0, 1, 1, 1, 1);
-			vkvg_pattern_add_color_stop_rgba(pat, 1, 0, 0, 0, 1);
+			vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
+			vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
 			vkvg_rectangle(cr, 0, 0, 256, 256);
 			vkvg_set_source(cr, pat);
 			vkvg_fill(cr);
 			vkvg_pattern_destroy(pat);
 			//vkvg_translate(cr, 0, 260);
-			pat = vkvg_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0, true);
+			pat = vkvg_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0);
 			vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
 			vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
 			//vkvg_pattern_set_extend(pat, VKVG_EXTEND_REPEAT);
@@ -201,30 +203,30 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 			vkvg_fill(cr);
 			vkvg_pattern_destroy(pat);
 
-			vkvg_translate(cr, 0, 260);
-			VkvgPattern sg = vkvg_pattern_create_sweep(128, 128, 0, 2);
-			vkvg_pattern_add_color_stop(sg, 0.0, white, 1);
-			vkvg_pattern_add_color_stop(sg, 0.25, red, 1);
-			vkvg_pattern_add_color_stop(sg, 0.55, green, 1);
-			vkvg_pattern_add_color_stop(sg, 0.70, blue, 0.51);
-			vkvg_pattern_add_color_stop(sg, 1.00, white, 0.51);
+			//vkvg_translate(cr, 0, 260);
+			//VkvgPattern sg = vkvg_pattern_create_sweep(128, 128, 0, 2);
+			//vkvg_pattern_add_color_stop(sg, 0.0, white, 1);
+			//vkvg_pattern_add_color_stop(sg, 0.25, red, 1);
+			//vkvg_pattern_add_color_stop(sg, 0.55, green, 1);
+			//vkvg_pattern_add_color_stop(sg, 0.70, blue, 0.51);
+			//vkvg_pattern_add_color_stop(sg, 1.00, white, 0.51);
 
-			vkvg_set_source(cr, sg);
-			vkvg_rectangle(cr, 0, 0, 256, 256);
-			vkvg_fill(cr);
-			vkvg_pattern_destroy(sg);
-			vkvg_translate(cr, 0, 260);
-			sg = vkvg_pattern_create_sweep(128, 128, 0, 2);
-			vkvg_pattern_add_color_stop(sg, 0.0, white, 1);
-			vkvg_pattern_add_color_stop(sg, 0.25, red, 1);
-			vkvg_pattern_add_color_stop(sg, 0.55, green, 1);
-			vkvg_pattern_add_color_stop(sg, 0.70, blue, 0.51);
-			vkvg_pattern_add_color_stop(sg, 1.00, white, 0.51);
-			vkvg_set_source(cr, sg);
+			//vkvg_set_source(cr, sg);
 			//vkvg_rectangle(cr, 0, 0, 256, 256);
-			vkvg_arc(cr, 128.0, 128.0, 80, 0, 2 * glm::pi<float>());
-			vkvg_fill(cr);
-			vkvg_pattern_destroy(sg);
+			//vkvg_fill(cr);
+			//vkvg_pattern_destroy(sg);
+			//vkvg_translate(cr, 0, 260);
+			//sg = vkvg_pattern_create_sweep(128, 128, 0, 2);
+			//vkvg_pattern_add_color_stop(sg, 0.0, white, 1);
+			//vkvg_pattern_add_color_stop(sg, 0.25, red, 1);
+			//vkvg_pattern_add_color_stop(sg, 0.55, green, 1);
+			//vkvg_pattern_add_color_stop(sg, 0.70, blue, 0.51);
+			//vkvg_pattern_add_color_stop(sg, 1.00, white, 0.51);
+			//vkvg_set_source(cr, sg);
+			////vkvg_rectangle(cr, 0, 0, 256, 256);
+			//vkvg_arc(cr, 128.0, 128.0, 80, 0, 2 * glm::pi<float>());
+			//vkvg_fill(cr);
+			//vkvg_pattern_destroy(sg);
 		}
 		vkvg_flush(cr);
 		vkvg_surface_resolve(surf);//msaa采样转换输出
@@ -434,6 +436,11 @@ void r_grid_fill(rvg_cb* cr, glm::vec2 size, glm::ivec2 cols, int width)
 	cr->set_source_color(cr->ctx, c);
 	cr->fill(cr->ctx);
 }
+#if 1
+void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize, bool wait, void** rsem) {
+	return 0;
+}
+#else
 void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize, bool wait, void** rsem) {
 	const char* filename = "temp/vkvg_gradient.png";
 	static auto dctx = new_vgctx();
@@ -589,6 +596,7 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	if (rsem)*rsem = sem;
 	return dctx;
 }
+#endif
 void canvas_gui(viewdev_cx* view, font_family_t* family)
 {
 	auto dvv = new div_cx();
@@ -1071,7 +1079,7 @@ void testgui() {
 			appx->rc3d = { 0,0,vki.size.x, vki.size.y };
 		}
 	}
-
+	auto gpu = new_gpu();
 	//dom_cx* dom0 = view->get_dom(form0);
 	//examples1(view, appx->family);
 	canvas_gui(view, appx->family);

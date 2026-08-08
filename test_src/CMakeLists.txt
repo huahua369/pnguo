@@ -76,6 +76,7 @@ list(APPEND src_vkvg
     "../src/pnguo/audio.cpp"
     "../src/pnguo/mapView.cpp"
     "../src/pnguo/vg.cpp"
+    "../src/pnguo/ovg.cpp"
     "../src/pnguo/pnguo.cpp"
     "../src/pnguo/buffer.cpp"
     "../src/pnguo/page.cpp"
