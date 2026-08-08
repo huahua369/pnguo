@@ -93,7 +93,7 @@ enum vg_clip_state_t :uint8_t {
 #define d_stencilTestEnable 0x08
 #endif // !d_doubleSided
 
-struct gem_info_s {
+struct gem_info_t {
 	uint8_t blendMode = 0;
 	uint8_t topology = 0;
 	uint8_t polygon = 0;
@@ -292,7 +292,7 @@ struct ovg_canvas_cb {
 	// 普通图片，支持九宫格、混合颜色
 	void (*add_image)(drawlist_t* dc, ovg_image_r* r);
 	// 原始三角形，输入0则不修改
-	void (*geom_set_state)(drawlist_t* dc, gem_info_s* info, const mat4* matrix);
+	void (*geom_set_state)(drawlist_t* dc, gem_info_t* info, const mat4* matrix);
 	// 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据，color_type=0表示float4，1表示uint32_t
 	void (*geom_add_geometry)(drawlist_t* dc, void* texture, const float* xy, int xy_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
 	// 添加3D几何数据到缓冲区，xyz顶点坐标，color顶点颜色（双面则要双倍），uv顶点纹理坐标，indices索引数据
@@ -309,4 +309,5 @@ ovg_device_t* new_vkdevctx(VkDevice vkdev, VkPhysicalDevice phy, VkInstance inst
 void free_vkdevctx(ovg_device_t* dev);
 ovg_ctx_t* new_ovgctx(ovg_device_t* dev, VkFormat colorFormat, VkFormat depthFormat, VkSampleCountFlags samples);
 
-ovg_canvas_cb* get_canvas_cb(ovg_ctx_t* ctx);
+ovg_canvas_cb* get_canvas_cb(ovg_ctx_t* ctx); 
+

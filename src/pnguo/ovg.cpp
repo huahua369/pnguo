@@ -2683,6 +2683,11 @@ ovg_canvas_cb* get_canvas_cb(ovg_ctx_t* ctx)
 	return &ctx->ccb;
 }
 
+void** get_ctx_pipe(ovg_ctx_t* ctx)
+{
+	return (void**)&ctx->pipelineLayout;
+}
+
 static SDL_GPUShader* compileShader(SDL_GPUDevice* device, SDL_GPUShaderStage stage)
 {
 	SDL_GPUShaderFormat formats = SDL_GetGPUShaderFormats(device);
@@ -2692,8 +2697,8 @@ static SDL_GPUShader* compileShader(SDL_GPUDevice* device, SDL_GPUShaderStage st
 	sci.code = code[stage];
 	sci.code_size = code_len[stage];
 	sci.format = SDL_GPU_SHADERFORMAT_SPIRV;
-	// FIXME not sure if this is correct
-	sci.entrypoint = stage ? "fragMain" : "main";
+	// FIXME not sure if this is correctstage ? "fragMain" :
+	sci.entrypoint = "main";
 	sci.num_samplers = stage;
 	sci.num_uniform_buffers = stage;
 	sci.stage = stage;
@@ -2796,7 +2801,7 @@ struct ovg_path_t {
 	uint32_t color = 0xffffffff;		// 默认颜色
 	uint32_t segmentPtr;   // current segment count in current path having curves
 	uint32_t subpathCount; // store count of subpath, not straight forward to retrieve from segmented path array
-	   
+
 	uint32_t  pathPtr = 0;		// 路径数组中的指针pointer in the path array  
 	vg_state_save_t* t = 0;
 	uint32_t curVertOffset = 0;

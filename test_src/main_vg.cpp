@@ -15,7 +15,6 @@ _stroke_preserve
 #include <render.h>
 #include <app.h>
 #include <event.h>
-//#include <vkvg_cx.h>
 #include <win_core.h>
 #include <vkrenderer.h>
 #include <page.h>
@@ -24,6 +23,7 @@ _stroke_preserve
 using namespace glm;
 #include <ovg.h>
 #include "vk_mem_alloc.h"
+#include <vkvg_cx.h>
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -438,7 +438,7 @@ void r_grid_fill(rvg_cb* cr, glm::vec2 size, glm::ivec2 cols, int width)
 	cr->set_source_color(cr->ctx, c);
 	cr->fill(cr->ctx);
 }
-#if 1
+#if 0
 void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize, bool wait, void** rsem) {
 	return 0;
 }
@@ -991,7 +991,7 @@ void examples1(viewdev_cx* view, font_family_t* family)
 	}
 #endif
 }
-void test_ovg(dev_info_cx* devinfo) {
+ovg_ctx_t* test_ovg(dev_info_cx* devinfo) {
 	ovg_device_t* ovgdev = new_vkdevctx((VkDevice)devinfo->vkdev, (VkPhysicalDevice)devinfo->phy, (VkInstance)devinfo->inst);
 	// free_vkdevctx(ovgdev);
 	VkFormat colorFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -1005,6 +1005,7 @@ void test_ovg(dev_info_cx* devinfo) {
 		auto p = cb->new_path(cb->ac);
 		cb->rectangle(p, 10, 10, 100, 100);
 	}
+	return octx;
 }
 void testgui() {
 
@@ -1101,7 +1102,7 @@ void testgui() {
 	get_dev_info(appx->dctx, &devinfo);
 
 	auto gpu = new_gpu();
-	test_ovg(&devinfo);
+	auto octx = test_ovg(&devinfo); 
 
 	//dom_cx* dom0 = view->get_dom(form0);
 	//examples1(view, appx->family);
