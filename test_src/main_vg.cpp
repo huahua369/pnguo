@@ -19,8 +19,7 @@ _stroke_preserve
 #include <vkrenderer.h>
 #include <page.h>
 #include <mapView.h>
-#include <SDL3/SDL.h>
-using namespace glm;
+#include <SDL3/SDL.h> 
 #include <ovg.h>
 #include "vk_mem_alloc.h"
 #include <vkvg_cx.h>
@@ -999,6 +998,8 @@ ovg_ctx_t* test_ovg(dev_info_cx* devinfo) {
 	VkSampleCountFlags samples = VK_SAMPLE_COUNT_8_BIT;
 	ovg_ctx_t* octx = new_ovgctx(ovgdev, colorFormat, depthFormat, samples);
 
+	glm::mat3x3 m3 = glm::scale(glm::mat3x3(1.0), glm::vec2(1.2, 2.3));
+	glm::mat3x2 m = glm::scale(glm::mat3x3(1.0), glm::vec2(1.2, 2.3));
 	auto cb = get_canvas_cb(octx);
 	if (cb->new_path)
 	{
@@ -1102,7 +1103,7 @@ void testgui() {
 	get_dev_info(appx->dctx, &devinfo);
 
 	auto gpu = new_gpu();
-	auto octx = test_ovg(&devinfo); 
+	auto octx = test_ovg(&devinfo);
 
 	//dom_cx* dom0 = view->get_dom(form0);
 	//examples1(view, appx->family);

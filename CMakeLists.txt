@@ -214,7 +214,7 @@ message("--glib  ${GLIB_LIBRARIES}")
 #vkvg 
 #FILE(GLOB VKVG_SRC third_party/vkvg/src/*.c third_party/vkvg/src/deps/*.c third_party/vkvg/src/recording/*.c third_party/vkh/src/*.c third_party/vkh/src/vma/*.cpp )
 FILE(GLOB VKH_SRC 
-  third_party/vkh/src/*.c third_party/vkh/src/vma/*.cpp
+  third_party/vkh/src/*.c 
 )
 SET (VKVG_PUBLIC_HEADERS "third_party/vkvg/vkvg.h;third_party/vkvg/vkvg-svg.h")
 

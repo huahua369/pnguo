@@ -911,9 +911,10 @@ const float DBG_LAB_COLOR_CLIP[4] = { 0, 1, 1, 1 };
 #endif
 #ifdef CreateRgbaf
 #undef CreateRgbaf
+#endif
 #define CreateRgbaf(r, g, b, a)                                                                                        \
     (((int)(a * 255.0f) << 24) | ((int)(b * 255.0f) << 16) | ((int)(g * 255.0f) << 8) | (int)(r * 255.0f))
-#endif
+
 
 
 
@@ -9153,11 +9154,11 @@ void vgdev_ctx::_fill_non_zero(paths_t* ctx)
 
 		uint32_t i = 0;
 		while (i < 2) {
-			v.pos = ctx->points[i++];
+			v.pos = ((vec2*)ctx->points)[i++];
 			_vertex.push_back(v);
 		}
 		while (i < pathPointCount) {
-			v.pos = ctx->points[i];
+			v.pos = ((vec2*)ctx->points)[i];
 			_vertex.push_back(v);
 			uint32_t ind[3] = { firstVertIdx, firstVertIdx + i - 1, firstVertIdx + i };
 			_indices.insert(-1, ind, 3);
@@ -9182,7 +9183,7 @@ void vgdev_ctx::_fill_non_zero(paths_t* ctx)
 			uint32_t i = 0;
 
 			while (i < pathPointCount) {
-				v.pos = ctx->points[i + firstPtIdx];
+				v.pos = ((vec2*)ctx->points)[i + firstPtIdx];
 				double dp[] = { v.pos.x, v.pos.y, 0 };
 				_vertex.push_back(v);
 				gluTessVertex(tess, dp, (void*)((unsigned long)firstVertIdx + i));
@@ -9234,7 +9235,7 @@ void vgdev_ctx::fill_non_zero(paths_t* p)
 			if (!ecps)break;
 			uint32_t            ecps_count = pathPointCount;
 			uint32_t i = 0;
-			auto points = p->points + firstPtIdx;
+			auto points = ((vec2*)p->points) + firstPtIdx;
 			// init points link list
 			while (i < pathPointCount - 1) {
 				v.pos = points[i];
@@ -9412,7 +9413,7 @@ void vgdev_ctx::poly_fill(paths_t* ctx, vec4* bounds, vgcmd_t& c) {
 			uint32_t firstVertIdx = (uint32_t)_vertex.size();
 			c.vertex.x = _vertex.size();
 			for (uint32_t i = 0; i < pathPointCount; i++) {
-				v.pos = ctx->points[i + firstPtIdx];
+				v.pos = ((vec2*)ctx->points)[i + firstPtIdx];
 				_vertex.push_back(v);
 				if (!bounds)
 					continue;
@@ -9609,9 +9610,9 @@ float a_get_arc_step(paths_t* ctx, float radius) {
 }
 bool vgdev_ctx::_build_vb_step(paths_t* ctx, stroke_context_t* str, bool isCurve) {
 	Vertex v = { {0}, ctx->curColor, {0, 0, -1} };
-	vec2   p0 = ctx->points[str->cp];
-	vec2   v0 = vec2_sub(p0, ctx->points[str->iL]);
-	vec2   v1 = vec2_sub(ctx->points[str->iR], p0);
+	vec2   p0 = ((vec2*)ctx->points)[str->cp];
+	vec2   v0 = vec2_sub(p0, ((vec2*)ctx->points)[str->iL]);
+	vec2   v1 = vec2_sub(((vec2*)ctx->points)[str->iR], p0);
 	float  length_v0 = vec2_length(v0);
 	float  length_v1 = vec2_length(v1);
 	if (length_v0 < FLT_EPSILON || length_v1 < FLT_EPSILON) {
@@ -9915,8 +9916,8 @@ void vgdev_ctx::_draw_stoke_cap(paths_t* ctx, stroke_context_t* str, vec2 p0, ve
 }
 float vgdev_ctx::_draw_dashed_segment(paths_t* ctx, stroke_context_t* str, dash_context_t* dc, bool isCurve) {
 	// vec2 pL = ctx->points[str->iL];
-	vec2 p = ctx->points[str->cp];
-	vec2 pR = ctx->points[str->iR];
+	vec2 p = ((vec2*)ctx->points)[str->cp];
+	vec2 pR = ((vec2*)ctx->points)[str->iR];
 
 	if (!dc->dashOn) // we test in fact the next dash start, if dashOn = true => next segment is a void.
 		_build_vb_step(ctx, str, isCurve);
@@ -10006,8 +10007,8 @@ void vgdev_ctx::stroke_preserve(paths_t* ctx) {
 			str.iL = lastPathPointIdx;
 		}
 		else {
-			_draw_stoke_cap(ctx, &str, ctx->points[str.cp],
-				vec2_line_norm(ctx->points[str.cp], ctx->points[str.cp + 1]), true);
+			_draw_stoke_cap(ctx, &str, ((vec2*)ctx->points)[str.cp],
+				vec2_line_norm(((vec2*)ctx->points)[str.cp], ((vec2*)ctx->points)[str.cp + 1]), true);
 			str.iL = str.cp++;
 		}
 
@@ -10050,7 +10051,7 @@ void vgdev_ctx::stroke_preserve(paths_t* ctx) {
 				if (prevDash < 0)
 					dc.curDash = t->dashCount - 1;
 				float m = fminf(t->dashes[prevDash] - dc.curDashOffset, t->dashes[dc.curDash]);
-				vec2  p2 = vec2_sub(ctx->points[str.iR], vec2_mult_s(dc.normal, m));
+				vec2  p2 = vec2_sub(((vec2*)ctx->points)[str.iR], vec2_mult_s(dc.normal, m));
 				_draw_stoke_cap(ctx, &str, p2, dc.normal, false);
 			}
 		}
@@ -10072,8 +10073,8 @@ void vgdev_ctx::stroke_preserve(paths_t* ctx) {
 			str.cp++;
 		}
 		else
-			_draw_stoke_cap(ctx, &str, ctx->points[str.cp],
-				vec2_line_norm(ctx->points[str.cp - 1], ctx->points[str.cp]), false);
+			_draw_stoke_cap(ctx, &str, ((vec2*)ctx->points)[str.cp],
+				vec2_line_norm(((vec2*)ctx->points)[str.cp - 1], ((vec2*)ctx->points)[str.cp]), false);
 
 		str.cp = firstPathPointIdx + pathPointCount;
 
@@ -10965,7 +10966,7 @@ void dc_finish_path(paths_t* ctx) {
 	} while (0);
 
 	ctx->pathes = pri->pathes.data();
-	ctx->points = pri->points.data();
+	ctx->points = (float*)pri->points.data();
 }
 // clear path datas in context
 void dc_clear_path(paths_t* ctx) {
@@ -12114,7 +12115,7 @@ void _rvg_path_extents(paths_t* ctx, bool transformed, float* x1, float* y1, flo
 		uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
 
 		for (uint32_t i = firstPtIdx; i < firstPtIdx + pathPointCount; i++) {
-			vec2 p = ctx->points[i];
+			vec2 p = ((vec2*)ctx->points)[i];
 			//if (transformed)
 			//	vkvg_matrix_transform_point(&ctx->pushConsts.mat, &p.x, &p.y);
 			if (p.x < xMin)
@@ -12396,7 +12397,7 @@ void rvg_set_opacity(rvgctx_t* ctx, float opacity)
 {
 	auto p = (vgdev_ctx*)ctx;
 	if (p && p->t)
-		p->t->curOperator = (vkvg_operator_t)opacity;
+		p->t->pushConsts.opacity=opacity;
 }
 void rvg_set_source_color(rvgctx_t* ctx, uint32_t c)
 {

@@ -145,10 +145,9 @@ private:
 extern "C" {
 #endif
 
-	typedef struct state_save_t state_save_t;
-	struct vgvec2;
+	typedef struct state_save_t state_save_t; 
 	struct paths_t {
-		vgvec2* points = 0;			// 路径坐标点points array 
+		float* points = 0;			// 路径坐标点points array 
 		uint32_t pointCount = 0;	// 数量effective points count
 		uint32_t  pathPtr = 0;		// pointer in the path array
 		uint32_t* pathes = 0;		// 每条路径的数量

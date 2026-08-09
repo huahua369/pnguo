@@ -4,11 +4,11 @@
 
 struct quadratic_v_t
 {
-	vec2 p0, p1, p2;
+	glm::vec2 p0, p1, p2;
 };
 struct cubic_v_t
 {
-	vec2 p0, p1, p2, p3;	// p1 p2是控制点
+	glm::vec2 p0, p1, p2, p3;	// p1 p2是控制点
 };
 /*
 用 bezier curve（贝塞尔曲线） 来设置 color stop（颜色渐变规则），
@@ -20,7 +20,7 @@ struct rect_shadow_vt
 {
 	float radius = 4;	// 半径
 	int segment = 6;	// 细分段
-	vec4 cfrom = { 0,0,0,0.8 }, cto = { 0.5,0.5,0.5,0.5 };// 颜色从cf到ct
+	glm::vec4 cfrom = { 0,0,0,0.8 }, cto = { 0.5,0.5,0.5,0.5 };// 颜色从cf到ct
 	/*	cubic
 		X轴为 offset（偏移量，取值范围为 0~1，0 代表阴影绘制起点），
 		Y轴为 alpha（颜 色透明度，取值范围为0~1，0 代表完全透明），
@@ -106,20 +106,20 @@ struct gem_info_t {
 
 
 struct push_constants_t {
-	vec4          source;
-	vec2          size;
+	glm::vec4          source;
+	glm::vec2          size;
 	uint32_t      fsq_patternType;
 	float         opacity;
-	mat3x2 mat;
-	mat3x2 matInv;
+	glm::mat3x2 mat;
+	glm::mat3x2 matInv;
 };
 #define MAX_STOPS 32
 struct vg_gradient_t {
-	vec4 colors[MAX_STOPS];
+	glm::vec4 colors[MAX_STOPS];
 	float stops[MAX_STOPS];
-	vec4 cp[2];
-	ivec4 m;
-	vec2 scale;	// 缩放目标
+	glm::vec4 cp[2];
+	glm::ivec4 m;
+	glm::vec2 scale;	// 缩放目标
 	uint32_t count;
 	int extend;
 };
@@ -133,7 +133,7 @@ struct vg_pattern_t {
 	vg_filter_t       filter;
 	vg_pattern_type_t	type;
 	bool                hasMatrix;
-	mat3x2			matrix;
+	glm::mat3x2			matrix;
 	void* data;	// Surface指针或vg_gradient_t
 };
 
@@ -149,7 +149,7 @@ struct vg_state_save_t {
 	uint8_t		curFillRule;
 	push_constants_t	pushConsts;
 	uint32_t			color;
-	vg_pattern_t		pattern;
+	vg_pattern_t* pattern;
 	vg_clip_state_t		clippingState;
 	uint32_t			references = 1;
 	bool aa = true;
@@ -158,17 +158,17 @@ struct vg_state_save_t {
 struct ovg_image_r
 {
 	void* img;
-	ivec4 rc;		// 所在纹理区域
-	ivec4 sliced;	// 九宫格
-	ivec2 dsize;	// 渲染大小
-	ivec2 pos;		// 渲染坐标
+	glm::ivec4 rc;		// 所在纹理区域
+	glm::ivec4 sliced;	// 九宫格
+	glm::ivec2 dsize;	// 渲染大小
+	glm::ivec2 pos;		// 渲染坐标
 	uint32_t color;		// 混合颜色
 	int8_t type;		// img的类型
 };
 struct text_st_t {
-	vec2 pos;
-	vec2 size;
-	vec4 clip;		// 裁剪区域
+	glm::vec2 pos;
+	glm::vec2 size;
+	glm::vec4 clip;		// 裁剪区域
 	const char* text;
 	int text_len;
 };
@@ -179,8 +179,8 @@ struct text_style_t
 	font_family_t* family = 0;
 	float fontsize = 0;
 	float lineheight = 0;
-	vec2 align = { 0.50,0.50 };	// 文本对齐
-	vec2 shadow_pos = { 1.0,1.0 };
+	glm::vec2 align = { 0.50,0.50 };	// 文本对齐
+	glm::vec2 shadow_pos = { 1.0,1.0 };
 	int stroke = 0;						// 描边宽度
 	uint32_t color = 0xffc2c2c2;		// 文本颜色
 	uint32_t color_stroke = 0xff000000;	// 描边颜色
@@ -189,8 +189,8 @@ struct text_style_t
 };
 // 文本区域
 struct text_box_rt {
-	ivec4 rc = {};		// 设置文本渲染区域，偏移/大小
-	vec2 text_align = { 0.0,0.0 };// 文本对齐
+	glm::ivec4 rc = {};		// 设置文本渲染区域，偏移/大小
+	glm::vec2 text_align = { 0.0,0.0 };// 文本对齐
 	int8_t auto_break = 0;	// 是否自动换行
 	int8_t word_wrap = 0;	// 0字符换行，1单词换行，2换行点，3句子断开，4标题大小写断点
 	int8_t ellipsis = 0;	// 省略号
@@ -215,9 +215,10 @@ struct ovg_canvas_cb {
 	void(*new_sub_path)(ovg_path_t* path);
 	void(*path_extents)(ovg_path_t* path, float* x1, float* y1, float* x2, float* y2);
 	void(*get_current_point)(ovg_path_t* path, float* x, float* y);
+	size_t(*get_segment_count)(ovg_path_t* path);
+	void(*set_segment_color)(ovg_path_t* path, size_t idx, uint32_t color);
 	// 添加数据到当前路径，参考path_type_e
 	void(*add_path)(ovg_path_t* path, float* data, size_t count);
-	void(*add_path0)(ovg_path_t* path, ovg_path_t* src);
 	void(*move_to)(ovg_path_t* path, float x, float y);
 	void(*rel_move_to)(ovg_path_t* path, float x, float y);
 	void(*line_to)(ovg_path_t* path, float x, float y);
@@ -234,8 +235,10 @@ struct ovg_canvas_cb {
 	void(*ellipse)(ovg_path_t* path, float radiusX, float radiusY, float x, float y, float rotationAngle);
 	void(*elliptic_arc_to)(ovg_path_t* path, float x, float y, bool large_arc_flag, bool sweep_flag, float rx, float ry, float phi);
 	void(*rel_elliptic_arc_to)(ovg_path_t* path, float x, float y, bool large_arc_flag, bool sweep_flag, float rx, float ry, float phi);
+	void(*circle)(ovg_path_t* path, float x, float y, float radius);
 	// 配置
 	vg_state_save_t* (*new_state)(mem_resource_t* ac);
+	void (*state_destroy)(vg_state_save_t* p);
 	void(*set_opacity)(vg_state_save_t* ctx, float opacity);
 	void(*set_source_color)(vg_state_save_t* ctx, uint32_t c);
 	void(*set_source_rgba)(vg_state_save_t* ctx, float r, float g, float b, float a);
@@ -271,6 +274,7 @@ struct ovg_canvas_cb {
 
 	// 渲染操作，rvg_t可以多次执行fill或stroke/clip
 	rvg_t* (*new_rvg)(mem_resource_t* ac);
+	void (*destroy_rvg)(rvg_t* p);
 	void(*set_path)(rvg_t* v, ovg_path_t* path, vg_state_save_t* st);
 	void(*stroke)(rvg_t* v);
 	void(*stroke_preserve)(rvg_t* v);
@@ -281,22 +285,26 @@ struct ovg_canvas_cb {
 	void(*reset_clip)(rvg_t* v);	// 重置裁剪
 	void(*clip)(rvg_t* v);			// 路径裁剪，清空当前路径
 	void(*clip_preserve)(rvg_t* v);	// 路径裁剪
-	void(*scissor)(rvg_t* v, int x, int y, int width, int height);	// 矩形裁剪，不受状态影响
+	void(*clip_rect)(rvg_t* v, int x, int y, int width, int height);	// 矩形裁剪
 
 	// 渲染列表
-	drawlist_t* (*new_drawlist)(mem_resource_t* ac);
-	// 添加矢量对象，dst渲染的坐标/宽高，rect为对象的区域坐标/宽高
-	void (*add_vg)(drawlist_t* dc, rvg_t* v, const vec4* dst, const ivec4* rect);
+	drawlist_t* (*new_drawlist)(mem_resource_t* ac); 
+	void (*destroy_drawlist)(drawlist_t* p);
+	// 清空渲染列表
+	void(*clear_all)(drawlist_t* v);
+	void(*scissor)(drawlist_t* v, int x, int y, int width, int height);	// 矩形裁剪
+	// 添加矢量对象，dst渲染的vec4坐标/宽高，rect为对象的区域ivec4坐标/宽高
+	void (*add_vg)(drawlist_t* dc, rvg_t* v, const float* dst4, const int* rect4);
 	// 添加文本，风格，渲染区可选
 	void (*add_text)(drawlist_t* dc, text_st_t* p, text_style_t* ts, text_box_rt* box);
 	// 普通图片，支持九宫格、混合颜色
 	void (*add_image)(drawlist_t* dc, ovg_image_r* r);
 	// 原始三角形，输入0则不修改
-	void (*geom_set_state)(drawlist_t* dc, gem_info_t* info, const mat4* matrix);
+	void (*set_geom_state)(drawlist_t* dc, gem_info_t* info, const void* matrix4x4);
 	// 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据，color_type=0表示float4，1表示uint32_t
-	void (*geom_add_geometry)(drawlist_t* dc, void* texture, const float* xy, int xy_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
+	void (*add_geometry)(drawlist_t* dc, void* texture, const float* xy, int xy_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
 	// 添加3D几何数据到缓冲区，xyz顶点坐标，color顶点颜色（双面则要双倍），uv顶点纹理坐标，indices索引数据
-	void (*geom_add_geometry3d)(drawlist_t* dc, void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
+	void (*add_geometry3d)(drawlist_t* dc, void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
 
 };
 
@@ -309,5 +317,5 @@ ovg_device_t* new_vkdevctx(VkDevice vkdev, VkPhysicalDevice phy, VkInstance inst
 void free_vkdevctx(ovg_device_t* dev);
 ovg_ctx_t* new_ovgctx(ovg_device_t* dev, VkFormat colorFormat, VkFormat depthFormat, VkSampleCountFlags samples);
 
-ovg_canvas_cb* get_canvas_cb(ovg_ctx_t* ctx); 
+ovg_canvas_cb* get_canvas_cb(ovg_ctx_t* ctx);
 
