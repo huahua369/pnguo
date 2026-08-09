@@ -55,11 +55,22 @@ enum class blendMode_e :int8_t {
 	modulate,
 	screen
 };
+enum vg_line_cap_t :uint8_t {
+	VG_LINE_CAP_BUTT,
+	VG_LINE_CAP_ROUND,
+	VG_LINE_CAP_SQUARE
+};
+
+enum vg_line_join_t :uint8_t {
+	VG_LINE_JOIN_MITER,
+	VG_LINE_JOIN_ROUND,
+	VG_LINE_JOIN_BEVEL
+};
 enum vg_extend_t :uint8_t {
-	VG_EXTEND_NONE,    /*!< nothing will be outputed outside the pattern original bounds */
-	VG_EXTEND_REPEAT,  /*!< pattern will be repeated to fill all the target bounds */
-	VG_EXTEND_REFLECT, /*!< pattern will be repeated but mirrored on each repeat */
-	VG_EXTEND_PAD      /*!< the last pixels making the borders of the pattern will be extended to the whole target */
+	VG_EXTEND_NONE,
+	VG_EXTEND_REPEAT,
+	VG_EXTEND_REFLECT,
+	VG_EXTEND_PAD
 };
 
 enum vg_filter_t :uint8_t {
@@ -288,7 +299,7 @@ struct ovg_canvas_cb {
 	void(*clip_rect)(rvg_t* v, int x, int y, int width, int height);	// 矩形裁剪
 
 	// 渲染列表
-	drawlist_t* (*new_drawlist)(mem_resource_t* ac); 
+	drawlist_t* (*new_drawlist)(mem_resource_t* ac);
 	void (*destroy_drawlist)(drawlist_t* p);
 	// 清空渲染列表
 	void(*clear_all)(drawlist_t* v);

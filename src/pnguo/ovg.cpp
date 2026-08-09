@@ -1766,6 +1766,29 @@ void o_remove_last_point(ovg_path_t* ctx) {
 }
 // test equality of two single precision vectors
 inline bool vec2_equ(const glm::vec2& a, const glm::vec2& b) { return (EQUF(a.x, b.x) & EQUF(a.y, b.y)); }
+inline glm::vec2 vec2_line_norm(glm::vec2 a, glm::vec2 b) {
+	glm::vec2  d = { b.x - a.x, b.y - a.y };
+	float md = sqrtf(d.x * d.x + d.y * d.y);
+	d.x /= md;
+	d.y /= md;
+	return d;
+}
+// compute sum of two single precision vectors
+inline glm::vec2 vec2_add(glm::vec2 a, glm::vec2 b) { return glm::vec2{ a.x + b.x, a.y + b.y }; }
+// compute subbstraction of two single precision vectors
+inline glm::vec2 vec2_sub(glm::vec2 a, glm::vec2 b) { return glm::vec2{ a.x - b.x, a.y - b.y }; }
+// multiply 2d vector by scalar
+inline glm::vec2 vec2_mult_s(glm::vec2 a, float m) { return glm::vec2{ a.x * m, a.y * m }; }
+// devide 2d vector by scalar
+inline glm::vec2 vec2_div_s(glm::vec2 a, float m) { return glm::vec2{ a.x / m, a.y / m }; }
+// normalize float vector
+inline glm::vec2 vec2_norm(glm::vec2 a) {
+	float m = sqrtf(a.x * a.x + a.y * a.y);
+	return glm::vec2{ a.x / m, a.y / m };
+}
+inline glm::vec2 vec2_perp(glm::vec2 a) { return glm::vec2{ a.y, -a.x }; }
+
+
 
 bool o_path_has_curves(uint32_t* pathes, uint32_t ptrPath) { return   pathes[ptrPath] & PATH_HAS_CURVES_BIT; }
 
@@ -2904,14 +2927,650 @@ void ovg_state_destroy(vg_state_save_t* p) {
 }
 // 渲染对象
 #if 1
+
+
+struct pipelinestate_p
+{
+	VkPipeline pipeline;
+	VkPipelineLayout pipelineLayout;
+	VkDescriptorSetLayout descriptorSetLayout;
+	gem_info_t state = {};
+};
+// 普通三角形命令
+struct geom_cmd_t {
+	gem_info_t state = {};
+	void* texture = nullptr;
+	glm::mat4 mat = glm::mat4(1.0f);
+	uint32_t count = 0;
+	uint32_t firstIndex = 0;
+	int32_t  vertexOffset = 0;
+	size_t offset = 0, ioffset = 0;
+};
+struct scmd {
+	uint32_t vertexCount;
+	uint32_t firstVertex;
+};
+// 矢量命令
+struct vgcmd_t {
+	scmd* v = 0;
+	int vc = 0;
+	int full_screen_quad = 0;
+	glm::ivec2 vertex = {};			// 顶点开始、数量
+	glm::ivec2 index = {};			// 索引开始、数量
+	vg_state_save_t* state = {};	// 渲染参数
+	glm::vec4 bounds = {};			// 全屏填充,odd/clip专用
+	int8_t type = 0;			// 类型：填充0、描边1、裁剪2、全屏3、清屏4
+};
+
+
+struct dash_context_t {
+	bool     dashOn;
+	uint32_t curDash;       // current dash index
+	float    curDashOffset; // cur dash offset between defined path point and last dash segment(on/off) start
+	float    totDashLength; // total length of dashes
+	glm::vec2 normal;
+};
+
+struct stroke_context_t {
+	uint32_t iL;
+	uint32_t iR;
+	uint32_t cp; // current point
+
+	uint32_t firstIdx; // save first point idx for closed path
+	float               hw;       // stroke half width, computed once.
+	float               lhMax;    // miter limit * line width
+	float arcStep; // cached arcStep, prevent compute multiple times for same stroke, 0 if not yet computed
+};
+
 struct rvg_t {
+	struct Vertex {
+		glm::vec2     pos;
+		uint32_t color;
+		glm::vec3     uv;
+	};
+	struct ear_clip_point {
+		glm::vec2 pos;
+		uint32_t idx;
+		struct ear_clip_point* next;
+	};
 	usp_ac_cx* ac;
+	std::pmr::vector<vgcmd_t> cmdlist;// 命令列表	// 输出
+	std::pmr::vector<Vertex> _vertex;
+	std::pmr::vector<uint32_t> _indices;
+	// 临时缓冲用
+	std::pmr::vector<ear_clip_point> ecpsd;
+	std::pmr::vector<glm::vec2> _normals;
+#if VKVG_FILL_NZ_GLUTESS
+	void (*vertex_cb)(uint32_t, rvg_t*) = 0; // tesselator vertex callback
+	uint32_t tesselator_fan_start = 0;
+	uint32_t tesselator_idx_counter = 0;
+#endif
+	vg_state_save_t* cur_st = 0;
+	ovg_path_t* cur_path = 0;
+	size_t gCount = 0;	// ubo数量
+	size_t curVertOffset = 0;
+	uint32_t curColor = 0;
+public:
+	rvg_t();
+	~rvg_t();
+	void stroke_preserve();
+public:
+	bool _build_vb_step(ovg_path_t* ctx, stroke_context_t* str, bool isCurve);
+	void _draw_stoke_cap(ovg_path_t* ctx, stroke_context_t* str, glm::vec2 p0, glm::vec2 n, bool isStart);
+	float _draw_dashed_segment(ovg_path_t* ctx, stroke_context_t* str, dash_context_t* dc, bool isCurve);
+	void _draw_segment(ovg_path_t* ctx, stroke_context_t* str, dash_context_t* dc, bool isCurve);
+
+	void _free_rvgst(vg_state_save_t* t);
+	void _cp_cmd_st(vg_state_save_t** dst, vg_state_save_t* t);
+	void _add_triangle_indices(ovg_path_t* ctx, uint32_t i0, uint32_t i1, uint32_t i2);
+	void _add_tri_indices_for_rect(uint32_t i);
+	void _add_vertexf(ovg_path_t* ctx, float x, float y);
 };
 struct drawlist_t {
 	usp_ac_cx* ac;
 };
 
-// 渲染操作，rvg_t可以多次执行fill或stroke/clip
+rvg_t::rvg_t()
+{
+	if (cur_st)
+		_free_rvgst(cur_st);
+}
+
+rvg_t::~rvg_t()
+{}
+void rvg_t::stroke_preserve()
+{
+	o_finish_path(cur_path);
+	if (!cur_path || !cur_path->pathPtr || !cur_st)
+		return;
+	auto p = cur_path;
+	p->t = cur_st;
+	if (p->t->pattern)
+		gCount++;
+	auto ctx = p;
+	vgcmd_t c = {};
+	c.vertex.x = _vertex.size();
+	c.index.x = _indices.size();
+	c.type = 1;
+	_cp_cmd_st(&c.state, cur_st);
+	ctx->curVertOffset = c.vertex.x;
+	stroke_context_t str = { 0 };
+	str.hw = p->t->lineWidth * 0.5f;
+	str.lhMax = p->t->miterLimit * p->t->lineWidth;
+	uint32_t ptrPath = 0;
+	curColor = p->t->color;
+	while (ptrPath < ctx->pathPtr) {
+		uint32_t ptrSegment = 0, lastSegmentPointIdx = 0;
+		uint32_t firstPathPointIdx = str.cp;
+		uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
+		uint32_t lastPathPointIdx = str.cp + pathPointCount - 1;
+
+		dash_context_t dc = { 0 };
+
+		if (o_path_has_curves(ctx->pathes.data(), ptrPath)) {
+			ptrSegment = 1;
+			lastSegmentPointIdx = str.cp + (ctx->pathes[ptrPath + ptrSegment] & PATH_ELT_MASK) - 1;
+		}
+
+		str.firstIdx = (uint32_t)_vertex.size() - ctx->curVertOffset;
+
+		// LOG(VKVG_LOG_INFO_PATH, "\tPATH: points count=%10d end point idx=%10d", ctx->pathes[ptrPath]&PATH_ELT_MASK,
+		// lastPathPointIdx);
+
+		if (p->t->dashCount > 0) {
+			// init dash stroke
+			dc.dashOn = true;
+			dc.curDash = 0; // current dash index
+			dc.totDashLength = 0; // limit offset to total length of dashes
+			for (uint32_t i = 0; i < p->t->dashCount; i++)
+				dc.totDashLength += p->t->dashes[i];
+			if (dc.totDashLength == 0) {
+				//ctx->status = VKVG_STATUS_INVALID_DASH;
+				break;
+				//return;
+			}
+			dc.curDashOffset = fmodf(
+				p->t->dashOffset,
+				dc.totDashLength); // cur dash offset between defined path point and last dash segment(on/off) start
+			str.iL = lastPathPointIdx;
+		}
+		else if (_path_is_closed(ctx, ptrPath)) {
+			str.iL = lastPathPointIdx;
+		}
+		else {
+			_draw_stoke_cap(ctx, &str, ctx->points[str.cp],
+				vec2_line_norm(ctx->points[str.cp], ctx->points[str.cp + 1]), true);
+			str.iL = str.cp++;
+		}
+
+		if (o_path_has_curves(ctx->pathes.data(), ptrPath)) {
+			while (str.cp < lastPathPointIdx) {
+
+				bool curved = ctx->pathes[ptrPath + ptrSegment] & PATH_HAS_CURVES_BIT;
+				if (lastSegmentPointIdx == lastPathPointIdx) // last segment of path, dont draw end point here
+					lastSegmentPointIdx--;
+				while (str.cp <= lastSegmentPointIdx)
+					_draw_segment(ctx, &str, &dc, curved);
+
+				ptrSegment++;
+				uint32_t cptSegPts = ctx->pathes[ptrPath + ptrSegment] & PATH_ELT_MASK;
+				lastSegmentPointIdx = str.cp + cptSegPts - 1;
+				if (lastSegmentPointIdx == lastPathPointIdx && cptSegPts == 1) {
+					// single point last segment
+					ptrSegment++;
+					break;
+				}
+			}
+		}
+		else
+			while (str.cp < lastPathPointIdx)
+				_draw_segment(ctx, &str, &dc, false);
+
+		if (p->t->dashCount > 0) {
+			if (_path_is_closed(ctx, ptrPath)) {
+				str.iR = firstPathPointIdx;
+
+				_draw_dashed_segment(ctx, &str, &dc, false);
+
+				str.iL++;
+				str.cp++;
+			}
+			if (!dc.dashOn) {
+				// finishing last dash that is already started, draw end caps but not too close to start
+				// the default gap is the next void
+				int32_t prevDash = (int32_t)dc.curDash - 1;
+				if (prevDash < 0)
+					dc.curDash = p->t->dashCount - 1;
+				float m = fminf(p->t->dashes[prevDash] - dc.curDashOffset, p->t->dashes[dc.curDash]);
+				glm::vec2  p2 = vec2_sub(ctx->points[str.iR], vec2_mult_s(dc.normal, m));
+				_draw_stoke_cap(ctx, &str, p2, dc.normal, false);
+			}
+		}
+		else if (_path_is_closed(ctx, ptrPath)) {
+			str.iR = firstPathPointIdx;
+			bool inverse = _build_vb_step(ctx, &str, false);
+			uint32_t* inds = &_indices[_indices.size() - 6];
+			uint32_t  ii = str.firstIdx;
+			if (inverse) {
+				inds[1] = ii + 1;
+				inds[4] = ii + 1;
+				inds[5] = ii;
+			}
+			else {
+				inds[1] = ii;
+				inds[4] = ii;
+				inds[5] = ii + 1;
+			}
+			str.cp++;
+		}
+		else
+			_draw_stoke_cap(ctx, &str, ctx->points[str.cp],
+				vec2_line_norm(ctx->points[str.cp - 1], ctx->points[str.cp]), false);
+
+		str.cp = firstPathPointIdx + pathPointCount;
+
+		if (ptrSegment > 0)
+			ptrPath += ptrSegment;
+		else
+			ptrPath++;
+
+	}
+	c.vertex.y = _vertex.size() - c.vertex.x;
+	c.index.y = _indices.size() - c.index.x;
+	cmdlist.push_back(c);
+
+}
+
+void rvg_t::_free_rvgst(vg_state_save_t* t)
+{
+	if (ac && t) {
+		if (t->dashes && t->dashCount > 0) {
+			ac->free_mem(t->dashes, t->dashCount);
+		}
+		ac->free_mem(t, 1);
+	}
+}
+void rvg_t::_cp_cmd_st(vg_state_save_t** dst, vg_state_save_t* t)
+{
+	if (!ac || !t)return;
+	auto state = *dst ? *dst : (vg_state_save_t*)ac->allocate(sizeof(vg_state_save_t) * 1);
+	if (!state)return;
+	if (state->dashes) {
+		ac->free_mem(state->dashes, state->dashCount);
+	}
+	*dst = state;
+	*state = *t;
+	if (t->dashes && t->dashCount > 0) {
+		state->dashes = (float*)ac->allocate(sizeof(float) * t->dashCount);
+		if (state->dashes)
+			memcpy(state->dashes, t->dashes, sizeof(float) * t->dashCount);
+		else
+			state->dashCount = 0;
+	}
+}
+
+void rvg_t::_add_triangle_indices(ovg_path_t* ctx, uint32_t i0, uint32_t i1, uint32_t i2) {
+	_indices.push_back(i0);
+	_indices.push_back(i1);
+	_indices.push_back(i2);
+}
+void rvg_t::_add_tri_indices_for_rect(uint32_t i) {
+	_indices.resize(_indices.size() + 6);
+	uint32_t* inds = _indices.data() + _indices.size() - 6;
+	inds[0] = i;
+	inds[1] = i + 2;
+	inds[2] = i + 1;
+	inds[3] = i + 1;
+	inds[4] = i + 2;
+	inds[5] = i + 3;
+}
+void rvg_t::_add_vertexf(ovg_path_t* ctx, float x, float y) {
+	Vertex v = {};
+	v.pos = { x,y };
+	v.color = ctx->color;
+	v.uv.z = -1;
+	_vertex.push_back(v);
+}
+bool rvg_t::_build_vb_step(ovg_path_t* ctx, stroke_context_t* str, bool isCurve) {
+	Vertex v = {};
+	v.color = ctx->color; v.uv = { 0, 0, -1 };
+	glm::vec2   p0 = ctx->points[str->cp];
+	glm::vec2   v0 = p0 - ctx->points[str->iL];
+	glm::vec2   v1 = ctx->points[str->iR] - p0;
+	float  length_v0 = glm::length(v0);
+	float  length_v1 = glm::length(v1);
+	if (length_v0 < FLT_EPSILON || length_v1 < FLT_EPSILON) {
+		return false;
+	}
+	glm::vec2  v0n = (v0 / length_v0);
+	glm::vec2  v1n = (v1 / length_v1);
+	float dot = glm::dot(v0n, v1n);
+	float det = v0n.x * v1n.y - v0n.y * v1n.x;
+	if (EQUF(dot, 1.0f)) { // colinear
+
+		return false;
+	}
+	if (EQUF(dot, -1.0f)) { // cusp (could draw line butt?)
+		glm::vec2 vPerp = (vec2_perp(v0n) * str->hw);
+		uint32_t idx = (uint32_t)(_vertex.size() - ctx->curVertOffset);
+		v.pos = (p0 + vPerp);
+		_vertex.push_back(v);
+		v.pos = (p0 - vPerp);
+		_vertex.push_back(v);
+		_add_triangle_indices(ctx, idx, idx + 1, idx + 2);
+		_add_triangle_indices(ctx, idx, idx + 2, idx + 3);
+		return true;
+	}
+	glm::vec2  bisec_n = glm::normalize(v0n + v1n); // bisec/bisec_perp are inverted names
+	float alpha = acosf(dot);
+
+	if (det < 0)
+		alpha = -alpha;
+	float halfAlpha = alpha / 2.f;
+	float cosHalfAlpha = cosf(halfAlpha);
+	float lh = str->hw / cosHalfAlpha;
+	glm::vec2  bisec_n_perp = vec2_perp(bisec_n);
+	// limit bisectrice length
+	float rlh = lh; // rlh is for inside pos tweeks
+	if (dot < 0.f)
+		rlh = fminf(rlh, fminf(length_v0, length_v1));
+	//---
+
+	glm::vec2 bisec = (bisec_n_perp * rlh);
+
+	uint32_t idx = (uint32_t)(_vertex.size() - ctx->curVertOffset);
+
+	glm::vec2 rlh_inside_pos, rlh_outside_pos;
+	if (rlh < lh) {
+		glm::vec2 vnPerp;
+		if (length_v0 < length_v1)
+			vnPerp = vec2_perp(v1n);
+		else
+			vnPerp = vec2_perp(v0n);
+		glm::vec2 vHwPerp = (vnPerp * str->hw);
+
+		double lbc = cosHalfAlpha * rlh;
+		if (det < 0.f) {
+			rlh_inside_pos = ((vnPerp * glm::vec2(-lbc) + (p0 + bisec)) + vHwPerp);
+			rlh_outside_pos = (p0 - (bisec_n_perp * lh));
+		}
+		else {
+			rlh_inside_pos = vec2_sub(vec2_add(vec2_mult_s(vnPerp, lbc), vec2_sub(p0, bisec)), vHwPerp);
+			rlh_outside_pos = vec2_add(p0, vec2_mult_s(bisec_n_perp, lh));
+		}
+	}
+	else {
+		if (det < 0.0) {
+			rlh_inside_pos = vec2_add(p0, bisec);
+			rlh_outside_pos = vec2_sub(p0, bisec);
+		}
+		else {
+			rlh_inside_pos = vec2_sub(p0, bisec);
+			rlh_outside_pos = vec2_add(p0, bisec);
+		}
+	}
+
+	auto join = (vg_line_join_t)ctx->t->lineJoin;
+
+	if (isCurve) {
+		if (dot < 0.8f)
+			join = VG_LINE_JOIN_ROUND;
+		else
+			join = VG_LINE_JOIN_MITER;
+	}
+
+	if (join == VG_LINE_JOIN_MITER) {
+		if (lh > str->lhMax) { // miter limit
+			double x = (lh - str->lhMax) * cosHalfAlpha;
+			glm::vec2   bisecPerp = vec2_mult_s(bisec_n, x);
+			bisec = vec2_mult_s(bisec_n_perp, str->lhMax);
+			if (det < 0) {
+				v.pos = rlh_inside_pos;
+				_vertex.push_back(v);
+
+				glm::vec2 p = vec2_sub(p0, bisec);
+
+				v.pos = vec2_sub(p, bisecPerp);
+				_vertex.push_back(v);
+				v.pos = vec2_add(p, bisecPerp);
+				_vertex.push_back(v);
+
+				_add_triangle_indices(ctx, idx, idx + 2, idx + 1);
+				_add_triangle_indices(ctx, idx + 2, idx + 4, idx);
+				_add_triangle_indices(ctx, idx, idx + 3, idx + 4);
+				return true;
+			}
+			else {
+				glm::vec2 p = vec2_add(p0, bisec);
+				v.pos = vec2_sub(p, bisecPerp);
+				_vertex.push_back(v);
+
+				v.pos = rlh_inside_pos;
+				_vertex.push_back(v);
+
+				v.pos = vec2_add(p, bisecPerp);
+				_vertex.push_back(v);
+
+				_add_triangle_indices(ctx, idx, idx + 2, idx + 1);
+				_add_triangle_indices(ctx, idx + 2, idx + 3, idx + 1);
+				_add_triangle_indices(ctx, idx + 1, idx + 3, idx + 4);
+				return false;
+			}
+
+		}
+		else { // normal miter
+			if (det < 0) {
+				v.pos = rlh_inside_pos;
+				_vertex.push_back(v);
+				v.pos = rlh_outside_pos;
+				_vertex.push_back(v);
+			}
+			else {
+				v.pos = rlh_outside_pos;
+				_vertex.push_back(v);
+				v.pos = rlh_inside_pos;
+				_vertex.push_back(v);
+			}
+
+			_add_tri_indices_for_rect(idx);
+			return false;
+		}
+	}
+	else {
+		glm::vec2 vp = vec2_perp(v0n);
+
+		if (det < 0) {
+			if (dot < 0 && rlh < lh)
+				v.pos = rlh_inside_pos;
+			else
+				v.pos = vec2_add(p0, bisec);
+			_vertex.push_back(v);
+			v.pos = vec2_sub(p0, vec2_mult_s(vp, str->hw));
+		}
+		else {
+			v.pos = vec2_add(p0, vec2_mult_s(vp, str->hw));
+			_vertex.push_back(v);
+			if (dot < 0 && rlh < lh)
+				v.pos = rlh_inside_pos;
+			else
+				v.pos = vec2_sub(p0, bisec);
+		}
+		_vertex.push_back(v);
+
+		if (join == VG_LINE_JOIN_BEVEL) {
+			if (det < 0) {
+				_add_triangle_indices(ctx, idx, idx + 2, idx + 1);
+				_add_triangle_indices(ctx, idx + 2, idx + 4, idx + 0);
+				_add_triangle_indices(ctx, idx, idx + 3, idx + 4);
+			}
+			else {
+				_add_triangle_indices(ctx, idx, idx + 2, idx + 1);
+				_add_triangle_indices(ctx, idx + 2, idx + 3, idx + 1);
+				_add_triangle_indices(ctx, idx + 1, idx + 3, idx + 4);
+			}
+		}
+		else if (join == VG_LINE_JOIN_ROUND) {
+			if (!str->arcStep)
+				str->arcStep = _get_arc_step(ctx, str->hw);
+			float a = acosf(vp.x);
+			if (vp.y < 0)
+				a = -a;
+
+			if (det < 0) {
+				a += M_PI;
+				float a1 = a + alpha;
+				a -= str->arcStep;
+				while (a > a1) {
+					_add_vertexf(ctx, cosf(a) * str->hw + p0.x, sinf(a) * str->hw + p0.y);
+					a -= str->arcStep;
+				}
+			}
+			else {
+				float a1 = a + alpha;
+				a += str->arcStep;
+				while (a < a1) {
+					_add_vertexf(ctx, cosf(a) * str->hw + p0.x, sinf(a) * str->hw + p0.y);
+					a += str->arcStep;
+				}
+			}
+			uint32_t p0Idx = (uint32_t)(_vertex.size() - ctx->curVertOffset);
+			_add_triangle_indices(ctx, idx, idx + 2, idx + 1);
+			if (det < 0) {
+				for (uint32_t p = idx + 2; p < p0Idx; p++)
+					_add_triangle_indices(ctx, p, p + 1, idx);
+				_add_triangle_indices(ctx, p0Idx, p0Idx + 2, idx);
+				_add_triangle_indices(ctx, idx, p0Idx + 1, p0Idx + 2);
+			}
+			else {
+				for (uint32_t p = idx + 2; p < p0Idx; p++)
+					_add_triangle_indices(ctx, p, p + 1, idx + 1);
+				_add_triangle_indices(ctx, p0Idx, p0Idx + 1, idx + 1);
+				_add_triangle_indices(ctx, idx + 1, p0Idx + 1, p0Idx + 2);
+			}
+		}
+
+		vp = vec2_mult_s(vec2_perp(v1n), str->hw);
+		if (det < 0)
+			v.pos = vec2_sub(p0, vp);
+		else
+			v.pos = vec2_add(p0, vp);
+		_vertex.push_back(v);
+	}
+
+	return (det < 0);
+}
+
+void rvg_t::_draw_stoke_cap(ovg_path_t* ctx, stroke_context_t* str, glm::vec2 p0, glm::vec2 n, bool isStart) {
+	Vertex v = {}; v.color = ctx->color; v.uv = { 0, 0, -1 };
+
+	uint32_t firstIdx = (uint32_t)(_vertex.size() - ctx->curVertOffset);
+
+	if (isStart) {
+		glm::vec2 vhw = vec2_mult_s(n, str->hw);
+
+		if (ctx->t->lineCap == VG_LINE_CAP_SQUARE)
+			p0 = vec2_sub(p0, vhw);
+
+		vhw = vec2_perp(vhw);
+
+		if (ctx->t->lineCap == VG_LINE_CAP_ROUND) {
+			if (!str->arcStep)
+				str->arcStep = _get_arc_step(ctx, str->hw);
+
+			float a = acosf(n.x) + M_PI_2;
+			if (n.y < 0)
+				a = M_PI - a;
+			float a1 = a + M_PI;
+
+			a += str->arcStep;
+			while (a < a1) {
+				_add_vertexf(ctx, cosf(a) * str->hw + p0.x, sinf(a) * str->hw + p0.y);
+				a += str->arcStep;
+			}
+			uint32_t p0Idx = (uint32_t)(_vertex.size() - ctx->curVertOffset);
+			for (uint32_t p = firstIdx; p < p0Idx; p++)
+				_add_triangle_indices(ctx, p0Idx + 1, p, p + 1);
+			firstIdx = p0Idx;
+		}
+
+		v.pos = vec2_add(p0, vhw);
+		_vertex.push_back(v);
+		v.pos = vec2_sub(p0, vhw);
+		_vertex.push_back(v);
+
+		_add_tri_indices_for_rect(firstIdx);
+	}
+	else {
+		glm::vec2 vhw = vec2_mult_s(n, str->hw);
+
+		if (ctx->t->lineCap == VG_LINE_CAP_SQUARE)
+			p0 = vec2_add(p0, vhw);
+
+		vhw = vec2_perp(vhw);
+
+		v.pos = vec2_add(p0, vhw);
+		_vertex.push_back(v);
+		v.pos = vec2_sub(p0, vhw);
+		_vertex.push_back(v);
+
+		firstIdx = (uint32_t)(_vertex.size() - ctx->curVertOffset);
+
+		if (ctx->t->lineCap == VG_LINE_CAP_ROUND) {
+			if (!str->arcStep)
+				str->arcStep = _get_arc_step(ctx, str->hw);
+
+			float a = acosf(n.x) + M_PI_2;
+			if (n.y < 0)
+				a = M_PI - a;
+			float a1 = a - M_PI;
+
+			a -= str->arcStep;
+			while (a > a1) {
+				_add_vertexf(ctx, cosf(a) * str->hw + p0.x, sinf(a) * str->hw + p0.y);
+				a -= str->arcStep;
+			}
+
+			uint32_t p0Idx = (uint32_t)(_vertex.size() - ctx->curVertOffset);
+			for (uint32_t p = firstIdx - 1; p < p0Idx; p++)
+				_add_triangle_indices(ctx, p + 1, p, firstIdx - 2);
+		}
+	}
+}
+float rvg_t::_draw_dashed_segment(ovg_path_t* ctx, stroke_context_t* str, dash_context_t* dc, bool isCurve) {
+	// vec2 pL = ctx->points[str->iL];
+	glm::vec2 p = ctx->points[str->cp];
+	glm::vec2 pR = ctx->points[str->iR];
+
+	if (!dc->dashOn) // we test in fact the next dash start, if dashOn = true => next segment is a void.
+		_build_vb_step(ctx, str, isCurve);
+
+	glm::vec2 d = vec2_sub(pR, p);
+	dc->normal = vec2_norm(d);
+	float segmentLength = glm::length(d);
+
+	while (dc->curDashOffset < segmentLength) {
+		glm::vec2 p0 = vec2_add(p, vec2_mult_s(dc->normal, dc->curDashOffset));
+
+		_draw_stoke_cap(ctx, str, p0, dc->normal, dc->dashOn);
+		dc->dashOn ^= true;
+		dc->curDashOffset += ctx->t->dashes[dc->curDash];
+		if (++dc->curDash == ctx->t->dashCount)
+			dc->curDash = 0;
+	}
+	dc->curDashOffset -= segmentLength;
+	dc->curDashOffset = fmodf(dc->curDashOffset, dc->totDashLength);
+	return segmentLength;
+}
+void rvg_t::_draw_segment(ovg_path_t* ctx, stroke_context_t* str, dash_context_t* dc, bool isCurve) {
+	str->iR = str->cp + 1;
+	if (ctx->t->dashCount > 0)
+		_draw_dashed_segment(ctx, str, dc, isCurve);
+	else
+		_build_vb_step(ctx, str, isCurve);
+	str->iL = str->cp++;
+}
+
+// todo 渲染操作，rvg_t可以多次执行fill或stroke/clip
 rvg_t* ovg_new_rvg(mem_resource_t* ac0)
 {
 	auto ac = (usp_ac_cx*)ac0;
@@ -2928,15 +3587,21 @@ void ovg_destroy_rvg(rvg_t* p) {
 }
 void ovg_set_path(rvg_t* v, ovg_path_t* path, vg_state_save_t* st)
 {
-
+	if (!v)return;
+	if (path)v->cur_path = path;
+	if (st) {
+		v->_cp_cmd_st(&v->cur_st, st);
+	}
 }
 void ovg_stroke(rvg_t* v)
 {
-
+	if (!v)return;
+	v->stroke_preserve();
+	ovg_clear_path(v->cur_path);
 }
-void ovg_stroke_preserve(rvg_t* v)
-{
-
+void ovg_stroke_preserve(rvg_t* v) {
+	if (!v)return;
+	v->stroke_preserve();
 }
 void ovg_fill(rvg_t* v)
 {
