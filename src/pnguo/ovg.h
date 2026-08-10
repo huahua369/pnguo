@@ -324,6 +324,9 @@ struct ovg_ctx_t;
 ovg_device_t* new_vkdevctx(VkDevice vkdev, VkPhysicalDevice phy, VkInstance instance);
 void free_vkdevctx(ovg_device_t* dev);
 ovg_ctx_t* new_ovgctx(ovg_device_t* dev, VkFormat colorFormat, VkFormat depthFormat, VkSampleCountFlags samples);
+void free_ovgctx(ovg_ctx_t* p);
+ovg_canvas_cb* get_canvas_cb(ovg_ctx_t* ctx);// 不需要释放
 
-ovg_canvas_cb* get_canvas_cb(ovg_ctx_t* ctx);
+ovg_canvas_cb* new_canvas_cb();
+void free_canvas_cb(ovg_canvas_cb*);
 

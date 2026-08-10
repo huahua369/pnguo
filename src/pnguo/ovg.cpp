@@ -1313,8 +1313,8 @@ struct ovg_device_t {
 };
 struct ovg_ctx_t {
 	ovg_device_t* dev = 0;
-	VkFormat colorFormat; VkFormat depthFormat;
-	VkSampleCountFlags samples;
+	VkFormat colorFormat = VK_FORMAT_R8G8B8A8_UNORM; VkFormat depthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
+	VkSampleCountFlags samples = VK_SAMPLE_COUNT_1_BIT;
 
 	VkDescriptorSetLayout dslPushDset = 0;
 	VkPipelineLayout pipelineLayout = 0;
@@ -1325,6 +1325,9 @@ struct ovg_ctx_t {
 	VkPipeline pipelineClipping = 0; /**< draw on stencil to update clipping regions */
 
 	ovg_canvas_cb ccb = {};
+public:
+	ovg_ctx_t();
+	~ovg_ctx_t();
 };
 template <typename T>
 inline T ovgAlignUp(T val, T align)
@@ -1547,12 +1550,27 @@ ovg_ctx_t* new_ovgctx(ovg_device_t* dev, VkFormat colorFormat, VkFormat depthFor
 	vkDestroyShaderModule(dev->dev, modFrag, NULL);
 	return ctx;
 }
+void free_ovgctx(ovg_ctx_t* p) {
+	if (!p)return;
+	p->dev->ac->free_obj(p);
+}
 
 ovg_canvas_cb* get_canvas_cb(ovg_ctx_t* ctx)
 {
 	return &ctx->ccb;
 }
 
+ovg_canvas_cb* new_canvas_cb()
+{
+	auto p = new ovg_canvas_cb();
+	auto ac = new usp_ac_cx();
+	p->ac = (mem_resource_t*)ac;
+	init_ovg_cb(p);
+	return p;
+}
+void free_canvas_cb(ovg_canvas_cb* p) {
+	if (p)delete p;
+}
 void** get_ctx_pipe(ovg_ctx_t* ctx)
 {
 	return (void**)&ctx->pipelineLayout;
@@ -3032,9 +3050,9 @@ struct rvg_t {
 	};
 	usp_ac_cx* ac = 0;
 	mbpool_t mac;
-	std::pmr::vector<gcmd_t> cmdlist;// 命令列表	// 输出
-	std::pmr::vector<Vertex> _vertex;
-	std::pmr::vector<uint32_t> _indices;
+	std::pmr::vector<gcmd_t> cmdlist;		// 命令列表
+	std::pmr::vector<Vertex> _vertex;		// 矢量顶点
+	std::pmr::vector<uint32_t> _indices;	// 矢量索引
 	// 临时缓冲用
 	std::pmr::vector<ear_clip_point> ecpsd;
 	std::pmr::vector<glm::vec2> _normals;
@@ -3077,8 +3095,39 @@ public:
 	// 复制状态，自动释放
 	void cp_cmdt(vgcmd_t* c, vg_state_save_t* t);
 };
-struct drawlist_t {
-	usp_ac_cx* ac;
+
+class geom_primitive {
+public:
+	struct Vertex1 {
+		glm::vec3 pos;
+		glm::vec2 uv;
+		uint32_t color;
+	};
+	struct Vertex2 {
+		glm::vec3 pos;
+		glm::vec2 uv;
+		uint32_t color;
+		uint32_t color1;
+	};
+public:
+	std::pmr::vector<Vertex1> vd1;	// 单面顶点
+	std::pmr::vector<Vertex2> vd2;	// 双面顶点
+	std::pmr::vector<uint32_t> ids;	// 索引 
+	glm::mat4 mat = glm::mat4(1.0f);// 当前矩阵
+	gem_info_t curState = {};		// 当前状态	 
+public:
+	geom_primitive();
+	~geom_primitive();
+public:
+	// 清空数据
+	void clear();
+	void set_state(gem_info_t* info, const glm::mat4* matrix);
+	// 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据，color_type=0表示float4，1表示uint32_t
+	bool add_geometry(void* texture, const float* xy, int xy_stride, const void* color, int color_stride
+		, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
+	// 添加3D几何数据到缓冲区，xyz顶点坐标，color顶点颜色（双面则要双倍），uv顶点纹理坐标，indices索引数据
+	bool add_geometry3d(void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride
+		, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
 };
 
 rvg_t::rvg_t()
@@ -4185,10 +4234,31 @@ void ovg_destroy_rvg(rvg_t* p) {
 		p->ac->free_obj(p);
 	}
 }
+void ovg_clear(rvg_t* v)
+{
+	if (v)v->clear_all();
+}
 void ovg_set_path(rvg_t* v, ovg_path_t* path, vg_state_save_t* st)
 {
 	if (!v)return;
 	v->set_path(path, st);
+}
+void ovg_reset_clip(rvg_t* v)
+{
+	if (v)v->clip0();
+}
+void ovg_clip(rvg_t* v)
+{
+	if (v)v->clip();
+}
+void ovg_clip_preserve(rvg_t* v)
+{
+	if (v)v->clip_preserve();
+}
+void ovg_clip_rect(rvg_t* v, int x, int y, int width, int height)
+{
+	glm::ivec4 c[1] = { {x,y,width,height} };
+	if (v)v->clip(c);
 }
 void ovg_stroke(rvg_t* v)
 {
@@ -4215,33 +4285,7 @@ void ovg_paint(rvg_t* v)
 {
 	if (v)v->paint();
 }
-void ovg_clear(rvg_t* v)
-{
-	if (v)v->clear_all();
-}
-void ovg_reset_clip(rvg_t* v)
-{
-	if (v)v->clip0();
-}
-void ovg_clip(rvg_t* v)
-{
-	if (v)v->clip();
-}
-void ovg_clip_preserve(rvg_t* v)
-{
-	if (v)v->clip_preserve();
-}
-void ovg_clip_rect(rvg_t* v, int x, int y, int width, int height)
-{
-	glm::ivec4 c[1] = { {x,y,width,height} };
-	if (v)v->clip(c);
-}
 
-// 添加矢量对象，dst渲染的坐标/宽高，rect为对象的区域坐标/宽高
-void  ovg_add_vg(rvg_t* dc, rvg_t* v, const glm::vec4* dst, const glm::ivec4* rect)
-{
-
-}
 // 添加文本，风格，渲染区可选
 void  ovg_add_text(rvg_t* dc, text_st_t* p, text_style_t* ts, text_box_rt* box)
 {
@@ -4359,3 +4403,49 @@ void init_ovg_cb(ovg_canvas_cb* cb) {
 }
 
 #endif // 1
+
+ovg_ctx_t::ovg_ctx_t()
+{}
+
+ovg_ctx_t::~ovg_ctx_t()
+{
+	vkDestroyPipelineLayout(dev->dev, pipelineLayout, NULL);
+	vkDestroyDescriptorSetLayout(dev->dev, dslPushDset, NULL);
+#ifndef __APPLE__
+	vkDestroyPipeline(dev->dev, pipelinePolyFill, NULL);
+#endif
+	vkDestroyPipeline(dev->dev, pipelineClipping, NULL);
+
+	vkDestroyPipeline(dev->dev, pipe_OVER, NULL);
+	vkDestroyPipeline(dev->dev, pipe_SUB, NULL);
+	vkDestroyPipeline(dev->dev, pipe_CLEAR, NULL);
+	dslPushDset = 0;
+	pipelineLayout = 0;
+	pipe_OVER = 0;
+	pipe_SUB = 0;
+	pipe_CLEAR = 0;
+	pipelinePolyFill = 0;
+	pipelineClipping = 0;
+}
+
+geom_primitive::geom_primitive()
+{}
+
+geom_primitive::~geom_primitive()
+{}
+
+void geom_primitive::clear()
+{}
+
+void geom_primitive::set_state(gem_info_t* info, const glm::mat4* matrix)
+{}
+
+bool geom_primitive::add_geometry(void* texture, const float* xy, int xy_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type)
+{
+	return false;
+}
+
+bool geom_primitive::add_geometry3d(void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type)
+{
+	return false;
+}
