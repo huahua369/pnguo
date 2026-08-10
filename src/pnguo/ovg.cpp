@@ -1766,7 +1766,7 @@ void o_remove_last_point(ovg_path_t* ctx) {
 }
 // test equality of two single precision vectors
 inline bool vec2_equ(const glm::vec2& a, const glm::vec2& b) { return (EQUF(a.x, b.x) & EQUF(a.y, b.y)); }
-inline glm::vec2 vec2_line_norm(glm::vec2 a, glm::vec2 b) {
+inline glm::vec2 vec2_line_norm(const glm::vec2& a, const glm::vec2& b) {
 	glm::vec2  d = { b.x - a.x, b.y - a.y };
 	float md = sqrtf(d.x * d.x + d.y * d.y);
 	d.x /= md;
@@ -1774,22 +1774,54 @@ inline glm::vec2 vec2_line_norm(glm::vec2 a, glm::vec2 b) {
 	return d;
 }
 // compute sum of two single precision vectors
-inline glm::vec2 vec2_add(glm::vec2 a, glm::vec2 b) { return glm::vec2{ a.x + b.x, a.y + b.y }; }
+inline glm::vec2 vec2_add(const glm::vec2& a, const glm::vec2& b) { return glm::vec2{ a.x + b.x, a.y + b.y }; }
 // compute subbstraction of two single precision vectors
-inline glm::vec2 vec2_sub(glm::vec2 a, glm::vec2 b) { return glm::vec2{ a.x - b.x, a.y - b.y }; }
+inline glm::vec2 vec2_sub(const glm::vec2& a, const glm::vec2& b) { return glm::vec2{ a.x - b.x, a.y - b.y }; }
 // multiply 2d vector by scalar
-inline glm::vec2 vec2_mult_s(glm::vec2 a, float m) { return glm::vec2{ a.x * m, a.y * m }; }
+inline glm::vec2 vec2_mult_s(const glm::vec2& a, float m) { return glm::vec2{ a.x * m, a.y * m }; }
 // devide 2d vector by scalar
-inline glm::vec2 vec2_div_s(glm::vec2 a, float m) { return glm::vec2{ a.x / m, a.y / m }; }
+inline glm::vec2 vec2_div_s(const glm::vec2& a, float m) { return glm::vec2{ a.x / m, a.y / m }; }
 // normalize float vector
-inline glm::vec2 vec2_norm(glm::vec2 a) {
+inline glm::vec2 vec2_norm(const glm::vec2& a) {
 	float m = sqrtf(a.x * a.x + a.y * a.y);
 	return glm::vec2{ a.x / m, a.y / m };
 }
-inline glm::vec2 vec2_perp(glm::vec2 a) { return glm::vec2{ a.y, -a.x }; }
+inline glm::vec2 vec2_perp(const glm::vec2& a) { return glm::vec2{ a.y, -a.x }; }
 
 
+void matrix_transform_point(const glm::mat3x2* matrix, float* x, float* y) {
+	glm::mat3x2 m = *matrix;
+	glm::vec3 v = { *x,*y,1.0f };
+	auto vv = m * v;
+	*x = v.x; *y = v.y;
+}
 
+inline float vec2_zcross(const glm::vec2& v1, const glm::vec2& v2) { return v1.x * v2.y - v1.y * v2.x; }
+
+#ifndef VG_COL32_A_MASK
+#define VG_COL32_A_MASK     0xFF000000
+#endif // !VG_COL32_A_MASK
+#ifndef FIXNORMAL2F_MAX_INVLEN2
+void normalize2f_over_zero(float& VX, float& VY)
+{
+	float d2 = VX * VX + VY * VY;
+	if (d2 > 0.0f) {
+		float inv_len = 1.0f / sqrtf(d2);
+		VX *= inv_len; VY *= inv_len;
+	}
+}
+#define FIXNORMAL2F_MAX_INVLEN2          100.0f // 500.0f (see #4053, #3366)
+void fixnormal2f(float& VX, float& VY)
+{
+	float d2 = VX * VX + VY * VY;
+	if (d2 > 0.000001f) {
+		float inv_len2 = 1.0f / d2;
+		if (inv_len2 > FIXNORMAL2F_MAX_INVLEN2)
+			inv_len2 = FIXNORMAL2F_MAX_INVLEN2;
+		VX *= inv_len2; VY *= inv_len2;
+	}
+}
+#endif
 bool o_path_has_curves(uint32_t* pathes, uint32_t ptrPath) { return   pathes[ptrPath] & PATH_HAS_CURVES_BIT; }
 
 void _ovg_path_extents(ovg_path_t* ctx, bool transformed, float* x1, float* y1, float* x2, float* y2) {
@@ -1804,8 +1836,8 @@ void _ovg_path_extents(ovg_path_t* ctx, bool transformed, float* x1, float* y1, 
 
 		for (uint32_t i = firstPtIdx; i < firstPtIdx + pathPointCount; i++) {
 			glm::vec2 p = ctx->points[i];
-			//if (transformed)
-			//	vkvg_matrix_transform_point(&ctx->pushConsts.mat, &p.x, &p.y);
+			if (transformed)
+				matrix_transform_point(&ctx->t->pushConsts.mat, &p.x, &p.y);
 			if (p.x < xMin)
 				xMin = p.x;
 			if (p.x > xMax)
@@ -2938,6 +2970,7 @@ struct pipelinestate_p
 };
 // 普通三角形命令
 struct geom_cmd_t {
+	int stype = 1;
 	gem_info_t state = {};
 	void* texture = nullptr;
 	glm::mat4 mat = glm::mat4(1.0f);
@@ -2952,6 +2985,7 @@ struct scmd {
 };
 // 矢量命令
 struct vgcmd_t {
+	int stype = 0;
 	scmd* v = 0;
 	int vc = 0;
 	int full_screen_quad = 0;
@@ -2961,7 +2995,10 @@ struct vgcmd_t {
 	glm::vec4 bounds = {};			// 全屏填充,odd/clip专用
 	int8_t type = 0;			// 类型：填充0、描边1、裁剪2、全屏3、清屏4
 };
-
+union gcmd_t {
+	vgcmd_t vg;
+	geom_cmd_t g;
+};
 
 struct dash_context_t {
 	bool     dashOn;
@@ -2993,14 +3030,15 @@ struct rvg_t {
 		uint32_t idx;
 		struct ear_clip_point* next;
 	};
-	usp_ac_cx* ac;
-	std::pmr::vector<vgcmd_t> cmdlist;// 命令列表	// 输出
+	usp_ac_cx* ac = 0;
+	mbpool_t mac;
+	std::pmr::vector<gcmd_t> cmdlist;// 命令列表	// 输出
 	std::pmr::vector<Vertex> _vertex;
 	std::pmr::vector<uint32_t> _indices;
 	// 临时缓冲用
 	std::pmr::vector<ear_clip_point> ecpsd;
 	std::pmr::vector<glm::vec2> _normals;
-#if VKVG_FILL_NZ_GLUTESS
+#ifndef NOT_FILL_NZ_GLUTESS
 	void (*vertex_cb)(uint32_t, rvg_t*) = 0; // tesselator vertex callback
 	uint32_t tesselator_fan_start = 0;
 	uint32_t tesselator_idx_counter = 0;
@@ -3008,36 +3046,61 @@ struct rvg_t {
 	vg_state_save_t* cur_st = 0;
 	ovg_path_t* cur_path = 0;
 	size_t gCount = 0;	// ubo数量
-	size_t curVertOffset = 0;
+	size_t _curVertOffset = 0;
 	uint32_t curColor = 0;
 public:
 	rvg_t();
 	~rvg_t();
+	void clear_all();
+	void set_path(ovg_path_t* path, vg_state_save_t* st);
 	void stroke_preserve();
+	void fill_preserve();
+	void clip_preserve();
+	void fill();
+	void paint();
+	void clip();
+	void clip0();
+	void clip(const glm::ivec4* rc);
 public:
+	void poly_fill(ovg_path_t* ctx, glm::vec4* bounds, vgcmd_t& c);
+	void glutess_fill_non_zero(ovg_path_t* p);
+	void fill_non_zero(ovg_path_t* p);
+
 	bool _build_vb_step(ovg_path_t* ctx, stroke_context_t* str, bool isCurve);
 	void _draw_stoke_cap(ovg_path_t* ctx, stroke_context_t* str, glm::vec2 p0, glm::vec2 n, bool isStart);
 	float _draw_dashed_segment(ovg_path_t* ctx, stroke_context_t* str, dash_context_t* dc, bool isCurve);
 	void _draw_segment(ovg_path_t* ctx, stroke_context_t* str, dash_context_t* dc, bool isCurve);
 
-	void _free_rvgst(vg_state_save_t* t);
-	void _cp_cmd_st(vg_state_save_t** dst, vg_state_save_t* t);
 	void _add_triangle_indices(ovg_path_t* ctx, uint32_t i0, uint32_t i1, uint32_t i2);
 	void _add_tri_indices_for_rect(uint32_t i);
 	void _add_vertexf(ovg_path_t* ctx, float x, float y);
+	// 复制状态，自动释放
+	void cp_cmdt(vgcmd_t* c, vg_state_save_t* t);
 };
 struct drawlist_t {
 	usp_ac_cx* ac;
 };
 
 rvg_t::rvg_t()
-{
-	if (cur_st)
-		_free_rvgst(cur_st);
-}
+{}
 
 rvg_t::~rvg_t()
 {}
+void rvg_t::clear_all()
+{
+	cur_path = 0;
+	_curVertOffset = 0;
+	gCount = 0;
+	mac.release();
+	_vertex.clear();
+	_indices.clear();
+	cmdlist.clear();
+}
+void rvg_t::set_path(ovg_path_t* path, vg_state_save_t* st)
+{
+	cur_path = path;
+	cur_st = st;
+}
 void rvg_t::stroke_preserve()
 {
 	o_finish_path(cur_path);
@@ -3052,7 +3115,7 @@ void rvg_t::stroke_preserve()
 	c.vertex.x = _vertex.size();
 	c.index.x = _indices.size();
 	c.type = 1;
-	_cp_cmd_st(&c.state, cur_st);
+	cp_cmdt(&c, cur_st);
 	ctx->curVertOffset = c.vertex.x;
 	stroke_context_t str = { 0 };
 	str.hw = p->t->lineWidth * 0.5f;
@@ -3177,37 +3240,560 @@ void rvg_t::stroke_preserve()
 	}
 	c.vertex.y = _vertex.size() - c.vertex.x;
 	c.index.y = _indices.size() - c.index.x;
-	cmdlist.push_back(c);
+	cmdlist.push_back({ c });
 
 }
 
-void rvg_t::_free_rvgst(vg_state_save_t* t)
+void rvg_t::fill_preserve()
 {
-	if (ac && t) {
-		if (t->dashes && t->dashCount > 0) {
-			ac->free_mem(t->dashes, t->dashCount);
+	o_finish_path(cur_path);
+	if (!cur_path || !cur_path->pathPtr || !cur_st)
+		return;
+	auto p = cur_path;
+	p->t = cur_st;
+	if (p->t->pattern)
+		gCount++;
+	vgcmd_t c = {};
+	if (p->t->curFillRule == VG_FILL_RULE_EVEN_ODD) {
+
+		glm::vec4 bounds = { FLT_MAX, FLT_MAX, FLT_MIN, FLT_MIN };
+		c.type = 0;
+		poly_fill(p, &bounds, c);
+		c.full_screen_quad = _vertex.size();
+		Vertex v = {};
+		v.pos = { -1,-1 };
+		v.color = p->t->color;
+		v.uv.z = -1;
+		_vertex.push_back(v);
+		v.pos = { 3,-1 };
+		_vertex.push_back(v);
+		v.pos = { -1,3 };
+		_vertex.push_back(v);
+	}
+	else
+	{
+		c.vertex.x = _vertex.size();
+		c.index.x = _indices.size();
+		c.type = 0;
+		cp_cmdt(&c, cur_st);
+		p->curVertOffset = c.vertex.x;
+		fill_non_zero(p);
+		c.vertex.y = _vertex.size() - c.vertex.x;
+		c.index.y = _indices.size() - c.index.x;
+
+	}
+	cmdlist.push_back({ c });
+}
+
+void rvg_t::clip_preserve()
+{
+	o_finish_path(cur_path);
+	if (!cur_path || !cur_path->pathPtr || !cur_st)
+		return;
+	cur_path->t = cur_st;
+	auto p = cur_path;
+	auto t = cur_st;
+	vgcmd_t c = {};
+	c.type = 2;
+	if (t->curFillRule == VG_FILL_RULE_EVEN_ODD) {
+		poly_fill(p, NULL, c);
+	}
+	else {
+		c.vertex.x = _vertex.size();
+		c.index.x = _indices.size();
+		cp_cmdt(&c, t);
+		p->curVertOffset = c.vertex.x;
+		fill_non_zero(p);
+		c.vertex.y = _vertex.size() - c.vertex.x;
+		c.index.y = _indices.size() - c.index.x;
+
+	}
+	c.full_screen_quad = _vertex.size();
+	//gt->push(&c);
+	cmdlist.push_back({ c });
+	Vertex v = {};
+	v.pos = { -1,-1 };
+	v.color = t->color;
+	v.uv.z = -1;
+	_vertex.push_back(v);
+	v.pos = { 3,-1 };
+	_vertex.push_back(v);
+	v.pos = { -1,3 };
+	_vertex.push_back(v);
+}
+void rvg_t::clip0()
+{
+	vgcmd_t c = {};
+	c.type = 2;
+	cmdlist.push_back({ c });
+}
+
+void rvg_t::clip()
+{
+	clip_preserve();
+	ovg_clear_path(cur_path);
+}
+void rvg_t::clip(const glm::ivec4* rc)
+{
+	if (rc)
+	{
+		vgcmd_t c = {};
+		c.type = 2;
+		c.bounds = *rc;// vec4{ (float)rc->x, (float)rc->y, (float)rc->z, (float)rc->w };
+		cmdlist.push_back({ c });
+	}
+}
+void rvg_t::fill()
+{
+	fill_preserve();
+	ovg_clear_path(cur_path);
+}
+
+void rvg_t::paint()
+{
+	auto ph = cur_path;
+	o_finish_path(ph);
+	if (!cur_path || !cur_path->pathPtr || !cur_st)return;
+	if (ph->pathPtr) {
+		fill();
+		return;
+	}
+	vgcmd_t c = {};
+	c.type = 3;
+	c.full_screen_quad = _vertex.size();
+	Vertex v = {};
+	v.pos = { -1,-1 };
+	v.color = cur_st->color;
+	v.uv.z = -1;
+	_vertex.push_back(v);
+	v.pos = { 3,-1 };
+	_vertex.push_back(v);
+	v.pos = { -1,3 };
+	_vertex.push_back(v);
+	cmdlist.push_back({ c });
+}
+
+
+void rvg_t::poly_fill(ovg_path_t* ctx, glm::vec4* bounds, vgcmd_t& c)
+{
+	Vertex v = {}; v.color = ctx->color; v.uv = { 0, 0, -1 };
+
+	uint32_t ptrPath = 0;
+	uint32_t firstPtIdx = 0;
+	size_t nc = 0;
+	while (ptrPath < ctx->pathPtr) {
+		uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
+		if (pathPointCount > 2) {
+			nc++;
 		}
-		ac->free_mem(t, 1);
-	}
-}
-void rvg_t::_cp_cmd_st(vg_state_save_t** dst, vg_state_save_t* t)
-{
-	if (!ac || !t)return;
-	auto state = *dst ? *dst : (vg_state_save_t*)ac->allocate(sizeof(vg_state_save_t) * 1);
-	if (!state)return;
-	if (state->dashes) {
-		ac->free_mem(state->dashes, state->dashCount);
-	}
-	*dst = state;
-	*state = *t;
-	if (t->dashes && t->dashCount > 0) {
-		state->dashes = (float*)ac->allocate(sizeof(float) * t->dashCount);
-		if (state->dashes)
-			memcpy(state->dashes, t->dashes, sizeof(float) * t->dashCount);
+		if (o_path_has_curves(ctx->pathes.data(), ptrPath)) {
+			ptrPath++;
+			uint32_t totPts = 0;
+			while (totPts < pathPointCount)
+				totPts += (ctx->pathes[ptrPath++] & PATH_ELT_MASK);
+		}
 		else
-			state->dashCount = 0;
+			ptrPath++;
+	}
+	if (!nc)return;
+	ptrPath = 0;
+
+	c.v = (scmd*)mac.allocate(sizeof(scmd) * nc);
+	if (!c.v)return;
+	cp_cmdt(&c, ctx->t);
+	c.vc = nc;
+	ctx->curVertOffset = _vertex.size();
+	auto cv = c.v;
+	while (ptrPath < ctx->pathPtr) {
+		uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
+		if (pathPointCount > 2) {
+			uint32_t firstVertIdx = (uint32_t)_vertex.size();
+			c.vertex.x = _vertex.size();
+			for (uint32_t i = 0; i < pathPointCount; i++) {
+				v.pos = ctx->points[i + firstPtIdx];
+				_vertex.push_back(v);
+				if (!bounds)
+					continue;
+				matrix_transform_point(&c.state->pushConsts.mat, &v.pos.x, &v.pos.y);
+				if (v.pos.x < bounds->x)
+					bounds->x = v.pos.x;
+				if (v.pos.x > bounds->z)
+					bounds->z = v.pos.x;
+				if (v.pos.y < bounds->y)
+					bounds->y = v.pos.y;
+				if (v.pos.y > bounds->w)
+					bounds->w = v.pos.y;
+			}
+			cv->firstVertex = firstVertIdx;
+			cv->vertexCount = pathPointCount;
+			cv++;
+		}
+		firstPtIdx += pathPointCount;
+
+		if (o_path_has_curves(ctx->pathes.data(), ptrPath)) {
+			ptrPath++;
+			uint32_t totPts = 0;
+			while (totPts < pathPointCount)
+				totPts += (ctx->pathes[ptrPath++] & PATH_ELT_MASK);
+		}
+		else
+			ptrPath++;
+	}
+	if (bounds)
+		c.bounds = *bounds;
+}
+
+#ifndef NOT_FILL_NZ_GLUTESS
+
+#include <glutess.h>
+namespace glutess_p {
+	void a_set_vertex(rvg_t* ctx, uint32_t idx, rvg_t::Vertex v) { ctx->_vertex[idx] = v; }
+
+	void _add_indicea(rvg_t* ctx, uint32_t i) {
+		ctx->_indices.push_back(i);
+	}
+	void _add_indice_for_fana(rvg_t* ctx, uint32_t i) {
+		uint32_t inds[3] = { ctx->tesselator_fan_start, ctx->_indices.back(),i };
+		ctx->_indices.insert(ctx->_indices.end(), inds, inds + 3);
+	}
+	void _add_indice_for_stripa(rvg_t* ctx, uint32_t i, bool odd) {
+		uint32_t inds[3] = {};
+		auto indCount = ctx->_indices.size();
+		assert(indCount > 2);
+		if (odd) {
+			inds[0] = ctx->_indices[indCount - 2];
+			inds[1] = i;
+			inds[2] = ctx->_indices[indCount - 1];
+		}
+		else {
+			inds[0] = ctx->_indices[indCount - 1];
+			inds[1] = ctx->_indices[indCount - 2];
+			inds[2] = i;
+		}
+		ctx->_indices.insert(ctx->_indices.end(), inds, inds + 3);
+	}
+	void fan_vertex2a(uint32_t v, rvg_t* ctx) {
+		uint32_t i = (uint32_t)v;
+		switch (ctx->tesselator_idx_counter) {
+		case 0:
+			_add_indicea(ctx, i);
+			ctx->tesselator_fan_start = i;
+			ctx->tesselator_idx_counter++;
+			break;
+		case 1:
+		case 2:
+			_add_indicea(ctx, i);
+			ctx->tesselator_idx_counter++;
+			break;
+		default:
+			_add_indice_for_fana(ctx, i);
+			break;
+		}
+	}
+	void strip_vertex2a(uint32_t v, rvg_t* ctx) {
+		uint32_t i = (uint32_t)v;
+		if (ctx->tesselator_idx_counter < 3) {
+			_add_indicea(ctx, i);
+		}
+		else
+			_add_indice_for_stripa(ctx, i, ctx->tesselator_idx_counter % 2);
+		ctx->tesselator_idx_counter++;
+	}
+	void triangle_vertex2a(uint32_t v, rvg_t* ctx) {
+		uint32_t i = (uint32_t)v;
+		_add_indicea(ctx, i);
+	}
+	void skip_vertex2a(uint32_t v, rvg_t* ctx) {}
+	void begin2a(GLenum which, void* poly_data) {
+		rvg_t* ctx = (rvg_t*)poly_data;
+		switch (which) {
+		case GL_TRIANGLES:
+			ctx->vertex_cb = &triangle_vertex2a;
+			break;
+		case GL_TRIANGLE_STRIP:
+			ctx->tesselator_idx_counter = 0;
+			ctx->vertex_cb = &strip_vertex2a;
+			break;
+		case GL_TRIANGLE_FAN:
+			ctx->tesselator_idx_counter = ctx->tesselator_fan_start = 0;
+			ctx->vertex_cb = &fan_vertex2a;
+			break;
+		default:
+			fprintf(stderr, "ERROR, can't handle %d\n", (int)which);
+			ctx->vertex_cb = &skip_vertex2a;
+		}
+	}
+
+	void combine2a(const GLdouble newVertex[3], const void* neighborVertex_s[4], const GLfloat neighborWeight[4],
+		void** outData, void* poly_data) {
+		rvg_t* ctx = (rvg_t*)poly_data;
+		rvg_t::Vertex      v = { {newVertex[0], newVertex[1]}, ctx->curColor, {0, 0, -1} };
+		*outData = (void*)(ctx->_vertex.size() - ctx->_curVertOffset);
+		ctx->_vertex.push_back(v);
+	}
+	void vertex2a(void* vertex_data, void* poly_data) {
+		uint32_t i = (uint32_t)vertex_data;
+		rvg_t* ctx = (rvg_t*)poly_data;
+		ctx->vertex_cb(i, ctx);
+	}
+	void g_fill_non_zero(rvg_t* r, ovg_path_t* ctx)
+	{
+		rvg_t::Vertex v = { {0,0}, ctx->color, {0, 0, -1} };
+		r->curColor = ctx->color;
+		uint32_t ptrPath = 0;
+		uint32_t firstPtIdx = 0;
+		r->_curVertOffset = ctx->curVertOffset;
+		if (ctx->pathPtr == 1 && ctx->pathes[0] & PATH_IS_CONVEX_BIT) {
+			uint32_t firstVertIdx = (uint32_t)(r->_vertex.size() - ctx->curVertOffset);
+			uint32_t            pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
+			uint32_t i = 0;
+			while (i < 2) {
+				v.pos = ctx->points[i++];
+				r->_vertex.push_back(v);
+			}
+			while (i < pathPointCount) {
+				v.pos = ctx->points[i];
+				r->_vertex.push_back(v);
+				uint32_t ind[3] = { firstVertIdx, firstVertIdx + i - 1, firstVertIdx + i };
+				r->_indices.insert(r->_indices.end(), ind + 0, ind + 3);
+				i++;
+			}
+			return;
+		}
+		GLUtesselator* tess = gluNewTess();
+		gluTessProperty(tess, GLU_TESS_WINDING_RULE, GLU_TESS_WINDING_NONZERO);
+		gluTessCallback(tess, GLU_TESS_VERTEX_DATA, (GLvoid(*)()) & vertex2a);
+		gluTessCallback(tess, GLU_TESS_BEGIN_DATA, (GLvoid(*)()) & begin2a);
+		gluTessCallback(tess, GLU_TESS_COMBINE_DATA, (GLvoid(*)()) & combine2a);
+		gluTessBeginPolygon(tess, r);
+		while (ptrPath < ctx->pathPtr) {
+			uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
+
+			if (pathPointCount > 2) {
+				uint32_t firstVertIdx = (uint32_t)(r->_vertex.size() - ctx->curVertOffset);
+				gluTessBeginContour(tess);
+				uint32_t i = 0;
+
+				while (i < pathPointCount) {
+					v.pos = ctx->points[i + firstPtIdx];
+					double dp[] = { v.pos.x, v.pos.y, 0 };
+					r->_vertex.push_back(v);
+					gluTessVertex(tess, dp, (void*)((unsigned long)firstVertIdx + i));
+					i++;
+				}
+				gluTessEndContour(tess);
+			}
+			firstPtIdx += pathPointCount;
+			if (o_path_has_curves(ctx->pathes.data(), ptrPath)) {
+				ptrPath++;
+				uint32_t totPts = 0;
+				while (totPts < pathPointCount)
+					totPts += (ctx->pathes[ptrPath++] & PATH_ELT_MASK);
+			}
+			else
+				ptrPath++;
+		}
+		gluTessEndPolygon(tess);
+		gluDeleteTess(tess);
 	}
 }
+#endif
+void rvg_t::glutess_fill_non_zero(ovg_path_t* p)
+{
+	glutess_p::g_fill_non_zero(this, p);
+}
+
+inline float ecp_zcross(rvg_t::ear_clip_point* p0, rvg_t::ear_clip_point* p1, rvg_t::ear_clip_point* p2) {
+	return vec2_zcross(vec2_sub(p1->pos, p0->pos), vec2_sub(p2->pos, p0->pos));
+}
+
+bool ptInTriangle(const glm::vec2& p, const glm::vec2& p0, const glm::vec2& p1, const glm::vec2& p2) {
+	float dX = p.x - p2.x;
+	float dY = p.y - p2.y;
+	float dX21 = p2.x - p1.x;
+	float dY12 = p1.y - p2.y;
+	float D = dY12 * (p0.x - p2.x) + dX21 * (p0.y - p2.y);
+	float s = dY12 * dX + dX21 * dY;
+	float t = (p2.y - p0.y) * dX + (p0.x - p2.x) * dY;
+	if (D < 0)
+		return (s <= 0) && (t <= 0) && (s + t >= D);
+	return (s >= 0) && (t >= 0) && (s + t <= D);
+}
+void rvg_t::fill_non_zero(ovg_path_t* p)
+{
+
+	auto t = p->t;
+	uint32_t color = t->color;
+	p->color = color;
+	if (t->glutessEnable)
+	{
+#ifndef NOT_FILL_NZ_GLUTESS
+		glutess_fill_non_zero(p);
+		return;
+#endif
+	}
+	uint32_t ptrPath = 0;
+	uint32_t firstPtIdx = 0;
+	const glm::vec3 uv = { 0,0,-1 };
+	bool aa = false;// t->aa; 
+	Vertex v = {}; v.color = color; v.uv = { 0, 0, -1 };
+	uint32_t cur_idx = _vertex.size() - p->curVertOffset;
+	auto pcolor = p->colors.data();
+	auto pcn = p->colors.size();
+	if (p->colors.empty())pcolor = 0;
+	while (ptrPath < p->pathPtr) {
+		uint32_t pathPointCount = p->pathes[ptrPath] & PATH_ELT_MASK;
+		auto col = pcolor && ptrPath < pcn ? pcolor[ptrPath] : color;
+		v.color = col;
+		if (pathPointCount > 2) {
+			uint32_t firstVertIdx = (uint32_t)cur_idx;
+			ecpsd.resize(pathPointCount);
+			auto ecps = ecpsd.data();
+			if (!ecps)break;
+			uint32_t            ecps_count = pathPointCount;
+			uint32_t i = 0;
+			auto points = p->points.data() + firstPtIdx;
+			while (i < pathPointCount - 1) {
+				v.pos = points[i];
+				ear_clip_point ecp = { v.pos, firstVertIdx + i, &ecps[i + 1] };
+				ecps[i] = ecp;
+				if (!aa)
+					_vertex.push_back(v);
+				i++;
+			}
+			v.pos = points[i];
+			ear_clip_point ecp = { v.pos, firstVertIdx + i, ecps };
+			ecps[i] = ecp;
+			if (!aa)
+				_vertex.push_back(v);
+
+			ear_clip_point* ecp_current = ecps;
+			uint32_t        tries = 0;
+
+			while (ecps_count > 3) {
+				if (tries > ecps_count) {
+					break;
+				}
+				ear_clip_point* v0 = ecp_current->next, * v1 = ecp_current, * v2 = ecp_current->next->next;
+				if (ecp_zcross(v0, v2, v1) < 0) {
+					ecp_current = ecp_current->next;
+					tries++;
+					continue;
+				}
+				ear_clip_point* vP = v2->next;
+				bool            isEar = true;
+				while (vP != v1) {
+					if (ptInTriangle(vP->pos, v0->pos, v2->pos, v1->pos)) {
+						isEar = false;
+						break;
+					}
+					vP = vP->next;
+				}
+				if (isEar) {
+					uint32_t t3[3] = { v0->idx, v1->idx, v2->idx };
+					if (aa) {
+						t3[0] = v0->idx << 1;
+						t3[1] = v1->idx << 1;
+						t3[1] = v2->idx << 1;
+					}
+					_indices.insert(_indices.end(), t3, t3 + 3);
+					v1->next = v2;
+					ecps_count--;
+					tries = 0;
+				}
+				else {
+					ecp_current = ecp_current->next;
+					tries++;
+				}
+			}
+			if (ecps_count == 3)
+			{
+				uint32_t t3[3] = { ecp_current->next->idx, ecp_current->idx, ecp_current->next->next->idx };
+				if (aa) {
+					t3[0] = t3[0] << 1;
+					t3[1] = t3[1] << 1;
+					t3[1] = t3[1] << 1;
+				}
+				_indices.insert(_indices.end(), t3, t3 + 3);
+			}
+			// todo 抗锯齿填充有bug。Anti-aliased Fill
+			if (aa)
+			{
+				auto points_count = pathPointCount;
+				const float AA_SIZE = 1.0;
+				const uint32_t col_trans = col & ~VG_COL32_A_MASK;
+				const int idx_count = (points_count - 2) * 3 + points_count * 6;
+				const int vtx_count = (points_count * 2);
+				//PrimReserve(idx_count, vtx_count);
+				auto ips = _indices.size();
+				_indices.resize(idx_count);
+				auto idxw = _indices.data() + ips;
+				// Add indexes for fill
+				unsigned int vtx_inner_idx = firstVertIdx;
+				unsigned int vtx_outer_idx = firstVertIdx + 1;
+
+				// Compute normals
+				_normals.resize(points_count);
+				auto temp_normals = _normals.data();
+				for (int i0 = points_count - 1, i1 = 0; i1 < points_count; i0 = i1++)
+				{
+					const glm::vec2& p0 = points[i0];
+					const glm::vec2& p1 = points[i1];
+					float dx = p1.x - p0.x;
+					float dy = p1.y - p0.y;
+					normalize2f_over_zero(dx, dy);
+					temp_normals[i0].x = dy;
+					temp_normals[i0].y = -dx;
+				}
+
+				for (int i0 = points_count - 1, i1 = 0; i1 < points_count; i0 = i1++)
+				{
+					// Average normals
+					const glm::vec2& n0 = temp_normals[i0];
+					const glm::vec2& n1 = temp_normals[i1];
+					float dm_x = (n0.x + n1.x) * 0.5f;
+					float dm_y = (n0.y + n1.y) * 0.5f;
+					fixnormal2f(dm_x, dm_y);
+					dm_x *= AA_SIZE * 0.5f;
+					dm_y *= AA_SIZE * 0.5f;
+					// Add vertices
+					v.pos = { (points[i1].x - dm_x),(points[i1].y - dm_y) };
+					v.color = col;      // Inner
+					_vertex.push_back(v);
+					v.pos = { (points[i1].x + dm_x),(points[i1].y + dm_y) };
+					v.color = col_trans;  // Outer					 
+					_vertex.push_back(v);
+
+					// Add indexes for fringes
+					idxw[0] = (vtx_inner_idx + (i1 << 1));
+					idxw[1] = (vtx_inner_idx + (i0 << 1));
+					idxw[2] = (vtx_outer_idx + (i0 << 1));
+					idxw[3] = (vtx_outer_idx + (i0 << 1));
+					idxw[4] = (vtx_outer_idx + (i1 << 1));
+					idxw[5] = (vtx_inner_idx + (i1 << 1));
+					idxw += 6;
+				}
+				cur_idx += vtx_count;
+			}
+			else {
+				cur_idx += pathPointCount;
+			}
+		}
+
+		firstPtIdx += pathPointCount;
+		if (o_path_has_curves(p->pathes.data(), ptrPath)) {
+			// skip segments lengths used in stroke
+			ptrPath++;
+			uint32_t totPts = 0;
+			while (totPts < pathPointCount)
+				totPts += (p->pathes[ptrPath++] & PATH_ELT_MASK);
+		}
+		else
+			ptrPath++;
+	}
+}
+
+
 
 void rvg_t::_add_triangle_indices(ovg_path_t* ctx, uint32_t i0, uint32_t i1, uint32_t i2) {
 	_indices.push_back(i0);
@@ -3230,6 +3816,20 @@ void rvg_t::_add_vertexf(ovg_path_t* ctx, float x, float y) {
 	v.color = ctx->color;
 	v.uv.z = -1;
 	_vertex.push_back(v);
+}
+void rvg_t::cp_cmdt(vgcmd_t* c, vg_state_save_t* t)
+{
+	c->state = (vg_state_save_t*)mac.allocate(sizeof(vg_state_save_t) * 1);
+	if (!c->state)return;
+	*c->state = *t;
+	if (t->dashes && t->dashCount > 0) {
+		c->state->dashes = (float*)mac.allocate(sizeof(float) * t->dashCount);
+		if (c->state->dashes)
+			memcpy(c->state->dashes, t->dashes, sizeof(float) * t->dashCount);
+		else
+			c->state->dashCount = 0;
+	}
+
 }
 bool rvg_t::_build_vb_step(ovg_path_t* ctx, stroke_context_t* str, bool isCurve) {
 	Vertex v = {};
@@ -3588,10 +4188,7 @@ void ovg_destroy_rvg(rvg_t* p) {
 void ovg_set_path(rvg_t* v, ovg_path_t* path, vg_state_save_t* st)
 {
 	if (!v)return;
-	if (path)v->cur_path = path;
-	if (st) {
-		v->_cp_cmd_st(&v->cur_st, st);
-	}
+	v->set_path(path, st);
 }
 void ovg_stroke(rvg_t* v)
 {
@@ -3605,87 +4202,68 @@ void ovg_stroke_preserve(rvg_t* v) {
 }
 void ovg_fill(rvg_t* v)
 {
-
+	if (!v)return;
+	v->fill_preserve();
+	ovg_clear_path(v->cur_path);
 }
 void ovg_fill_preserve(rvg_t* v)
 {
-
+	if (!v)return;
+	v->fill_preserve();
 }
 void ovg_paint(rvg_t* v)
 {
-
+	if (v)v->paint();
 }
 void ovg_clear(rvg_t* v)
 {
-
+	if (v)v->clear_all();
 }
 void ovg_reset_clip(rvg_t* v)
 {
-
+	if (v)v->clip0();
 }
 void ovg_clip(rvg_t* v)
 {
-
+	if (v)v->clip();
 }
 void ovg_clip_preserve(rvg_t* v)
 {
-
+	if (v)v->clip_preserve();
 }
 void ovg_clip_rect(rvg_t* v, int x, int y, int width, int height)
 {
-
+	glm::ivec4 c[1] = { {x,y,width,height} };
+	if (v)v->clip(c);
 }
 
-// 渲染列表
-drawlist_t* ovg_new_drawlist(mem_resource_t* ac0)
-{
-	auto ac = (usp_ac_cx*)ac0;
-	if (!ac) {
-		return 0;
-	}
-	auto p = ac->new_obj<drawlist_t>();
-	return p;
-}
-void ovg_destroy_drawlist(drawlist_t* p) {
-	if (p && p->ac) {
-		p->ac->free_obj(p);
-	}
-}
-void ovg_clear_all(drawlist_t* v)
-{
-
-}
-void ovg_scissor(drawlist_t* v, int x, int y, int width, int height)
-{
-
-}
 // 添加矢量对象，dst渲染的坐标/宽高，rect为对象的区域坐标/宽高
-void  ovg_add_vg(drawlist_t* dc, rvg_t* v, const glm::vec4* dst, const glm::ivec4* rect)
+void  ovg_add_vg(rvg_t* dc, rvg_t* v, const glm::vec4* dst, const glm::ivec4* rect)
 {
 
 }
 // 添加文本，风格，渲染区可选
-void  ovg_add_text(drawlist_t* dc, text_st_t* p, text_style_t* ts, text_box_rt* box)
+void  ovg_add_text(rvg_t* dc, text_st_t* p, text_style_t* ts, text_box_rt* box)
 {
 
 }
 // 普通图片，支持九宫格、混合颜色
-void  ovg_add_image(drawlist_t* dc, ovg_image_r* r)
+void  ovg_add_image(rvg_t* dc, ovg_image_r* r)
 {
 
 }
 // 原始三角形，输入0则不修改
-void  ovg_set_geom_state(drawlist_t* dc, gem_info_t* info, const glm::mat4* matrix)
+void  ovg_set_geom_state(rvg_t* dc, gem_info_t* info, const glm::mat4* matrix)
 {
 
 }
 // 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据，color_type=0表示float4，1表示uint32_t
-void  ovg_add_geometry(drawlist_t* dc, void* texture, const float* xy, int xy_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type)
+void  ovg_add_geometry(rvg_t* dc, void* texture, const float* xy, int xy_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type)
 {
 
 }
 // 添加3D几何数据到缓冲区，xyz顶点坐标，color顶点颜色（双面则要双倍），uv顶点纹理坐标，indices索引数据
-void  ovg_add_geometry3d(drawlist_t* dc, void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type)
+void  ovg_add_geometry3d(rvg_t* dc, void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type)
 {
 
 }
@@ -3772,15 +4350,9 @@ void init_ovg_cb(ovg_canvas_cb* cb) {
 	cb->clip = ovg_clip;
 	cb->clip_preserve = ovg_clip_preserve;
 	cb->clip_rect = ovg_clip_rect;
-	// 渲染列表
-	cb->new_drawlist = ovg_new_drawlist;
-	cb->destroy_drawlist = ovg_destroy_drawlist;
-	cb->clear_all = ovg_clear_all;
-	cb->scissor = ovg_scissor;
-	cb->add_vg = (void (*)(drawlist_t*, rvg_t*, const float*, const int*)) ovg_add_vg;
 	cb->add_text = ovg_add_text;
 	cb->add_image = ovg_add_image;
-	cb->set_geom_state = (void (*)(drawlist_t*, gem_info_t*, const void*)) ovg_set_geom_state;
+	cb->set_geom_state = (void (*)(rvg_t*, gem_info_t*, const void*)) ovg_set_geom_state;
 	cb->add_geometry = ovg_add_geometry;
 	cb->add_geometry3d = ovg_add_geometry3d;
 

@@ -66,6 +66,10 @@ enum vg_line_join_t :uint8_t {
 	VG_LINE_JOIN_ROUND,
 	VG_LINE_JOIN_BEVEL
 };
+enum vg_fill_rule_t {
+	VG_FILL_RULE_EVEN_ODD,
+	VG_FILL_RULE_NON_ZERO
+};
 enum vg_extend_t :uint8_t {
 	VG_EXTEND_NONE,
 	VG_EXTEND_REPEAT,
@@ -82,13 +86,13 @@ enum vg_filter_t :uint8_t {
 	VG_FILTER_GAUSSIAN,
 };
 enum class vg_pattern_type_t :uint8_t {
-	VG_PATTERN_TYPE_SOLID,         /*!< single color pattern */
-	VG_PATTERN_TYPE_SURFACE,       /*!< vg surface pattern */
-	VG_PATTERN_TYPE_LINEAR,        /*!< linear gradient pattern */
-	VG_PATTERN_TYPE_RADIAL,        /*!< radial gradient pattern */
-	VG_PATTERN_TYPE_MESH,          /*!< not implemented */
-	VG_PATTERN_TYPE_RASTER_SOURCE, /*!< not implemented */
-	VG_PATTERN_TYPE_SWEEP, /*!< 锥形渐变 */
+	VG_PATTERN_TYPE_SOLID,        // 单色
+	VG_PATTERN_TYPE_SURFACE,      // 纹理填充
+	VG_PATTERN_TYPE_LINEAR,       // 线性渐变 /*!< linear gradient pattern */
+	VG_PATTERN_TYPE_RADIAL,       // 径向渐变 /*!< radial gradient pattern */
+	VG_PATTERN_TYPE_MESH,         // 网格渐变 /*!< not implemented */
+	VG_PATTERN_TYPE_RASTER_SOURCE, //
+	VG_PATTERN_TYPE_SWEEP,			// 锥形渐变 
 };
 enum vg_clip_state_t :uint8_t {
 	vg_clip_state_none = 0x00,
@@ -164,6 +168,7 @@ struct vg_state_save_t {
 	vg_clip_state_t		clippingState;
 	uint32_t			references = 1;
 	bool aa = true;
+	bool glutessEnable = false;
 };
 
 struct ovg_image_r
@@ -286,36 +291,28 @@ struct ovg_canvas_cb {
 	// 渲染操作，rvg_t可以多次执行fill或stroke/clip
 	rvg_t* (*new_rvg)(mem_resource_t* ac);
 	void (*destroy_rvg)(rvg_t* p);
+	void(*clear)(rvg_t* v);			// 清空画布
 	void(*set_path)(rvg_t* v, ovg_path_t* path, vg_state_save_t* st);
 	void(*stroke)(rvg_t* v);
 	void(*stroke_preserve)(rvg_t* v);
 	void(*fill)(rvg_t* v);
 	void(*fill_preserve)(rvg_t* v);
 	void(*paint)(rvg_t* v);			// 全屏渲染
-	void(*clear)(rvg_t* v);			// 清空画布
 	void(*reset_clip)(rvg_t* v);	// 重置裁剪
 	void(*clip)(rvg_t* v);			// 路径裁剪，清空当前路径
 	void(*clip_preserve)(rvg_t* v);	// 路径裁剪
 	void(*clip_rect)(rvg_t* v, int x, int y, int width, int height);	// 矩形裁剪
 
-	// 渲染列表
-	drawlist_t* (*new_drawlist)(mem_resource_t* ac);
-	void (*destroy_drawlist)(drawlist_t* p);
-	// 清空渲染列表
-	void(*clear_all)(drawlist_t* v);
-	void(*scissor)(drawlist_t* v, int x, int y, int width, int height);	// 矩形裁剪
-	// 添加矢量对象，dst渲染的vec4坐标/宽高，rect为对象的区域ivec4坐标/宽高
-	void (*add_vg)(drawlist_t* dc, rvg_t* v, const float* dst4, const int* rect4);
 	// 添加文本，风格，渲染区可选
-	void (*add_text)(drawlist_t* dc, text_st_t* p, text_style_t* ts, text_box_rt* box);
+	void (*add_text)(rvg_t* dc, text_st_t* p, text_style_t* ts, text_box_rt* box);
 	// 普通图片，支持九宫格、混合颜色
-	void (*add_image)(drawlist_t* dc, ovg_image_r* r);
+	void (*add_image)(rvg_t* dc, ovg_image_r* r);
 	// 原始三角形，输入0则不修改
-	void (*set_geom_state)(drawlist_t* dc, gem_info_t* info, const void* matrix4x4);
+	void (*set_geom_state)(rvg_t* dc, gem_info_t* info, const void* matrix4x4);
 	// 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据，color_type=0表示float4，1表示uint32_t
-	void (*add_geometry)(drawlist_t* dc, void* texture, const float* xy, int xy_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
+	void (*add_geometry)(rvg_t* dc, void* texture, const float* xy, int xy_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
 	// 添加3D几何数据到缓冲区，xyz顶点坐标，color顶点颜色（双面则要双倍），uv顶点纹理坐标，indices索引数据
-	void (*add_geometry3d)(drawlist_t* dc, void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
+	void (*add_geometry3d)(rvg_t* dc, void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
 
 };
 

@@ -154,18 +154,18 @@ bool load_text_style_str(font_rctx* ctx, const std::string& json_str, text_style
 std::string save_color_style(const color_style* data, int indent) {
 	njson0 j = *data;
 	hz::save_json0("temp/test_color_style.json", j, indent);
-	return j.dump(indent);  // 缩进2 
+	return j.dump(indent);
 }
 
 // 保存：将结构体转为 JSON 字符串 
 std::string save_flex_data(const flex_data& data, int indent) {
 	njson0 j = data;
-	return j.dump(indent);  // 缩进2 
+	return j.dump(indent);
 }
 
 std::string save_flex_data1(const flex_data1& data, int indent) {
 	njson0 j = data;
-	return j.dump(indent);  // 缩进2 
+	return j.dump(indent);
 }
 
 // 加载：从 JSON 字符串解析结构体 
