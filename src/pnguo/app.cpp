@@ -732,6 +732,7 @@ void app_x::init(bool has3d)
 
 	auto fctx = app->font_ctx;
 	fctx->set_cache_size(font_csize.x, font_csize.y);
+	//fctx->add2file(R"(D:\Android\android-sdk\platforms\android-26\data\fonts\NotoSansThai-Regular.ttf)", 0);,Noto Sans Thai104uh
 	family = new_font_family(fctx, (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Consolas");
 	// 准备使用3D渲染器的设备创建SDL渲染器
 	app->set_dev(devinfo.inst, devinfo.phy, devinfo.vkdev);

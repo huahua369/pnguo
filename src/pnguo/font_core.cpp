@@ -6131,7 +6131,7 @@ void free_fonts_ctx(font_rctx* p)
 
 
 
- 
+
 
 
 #endif
@@ -7696,7 +7696,9 @@ font_family_t* new_font_family(font_rctx* ctx, const char* family, const char* s
 		auto t = p->familys;
 		for (auto& it : v)
 		{
-			auto font = ctx->get_font(it.c_str(), style);
+			auto font = ctx->get_mfont(it);
+			if (!font)
+				font = ctx->get_font(it.c_str(), style);
 			if (ix < st.size())
 			{
 				style = st.size() ? st[ix].c_str() : nullptr;

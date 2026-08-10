@@ -617,6 +617,17 @@ void canvas_gui(viewdev_cx* view, font_family_t* family)
 	dvv->flex_child.margin_top = 2;
 	dvv->flex_child.margin_bottom = 2;
 	dvv->draggable = true;
+	auto edit1 = new edit_cx();
+	{
+		auto r = edit1;
+		r->set_size({ 300,200 });
+		r->set_single(false);
+		r->style.fontsize = 50;
+		r->placeholder = (char*)u8"输入文本";
+		dvv->add_widget(r);
+		r->dindex = 0;
+	}
+
 	for (int i = 0; i < 7; i++) {
 		auto btn = new color_btn();
 		btn->rounding = 4;
