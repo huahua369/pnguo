@@ -632,7 +632,7 @@ struct layout_block_st {
 	std::set<void*> gv;						// *用到的vkvg纹理对象
 	std::map<size_t, text_temp_t> temp_map;	// 临时数据，key为文本块索引
 	flex_ctx* lctx = 0;
-	vg_vector<node_dt>* fv = 0;
+	std::vector<node_dt> fv;
 	hz::usp_ac ac;
 	~layout_block_st();
 };

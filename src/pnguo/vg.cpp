@@ -101,14 +101,14 @@ public:
 	float frame[4] = {};	// 输出坐标、大小
 	flex_item* parent = 0;	// 父级
 	size_t line_count = 0;
-	vg_vector<flex_item*> children;	// 子级  
-	vg_vector<char> temp_layout;
-	hz::usp_ac* ac = 0;
+	t_vector<flex_item*> children;	// 子级  
+	t_vector<char> temp_layout;
+	//hz::usp_ac* ac = 0;
 public:
 	flex_item();
 	~flex_item();
 
-	void init(hz::usp_ac* pac);
+	void init();
 	void setdata(flex_data* d);
 	void update_should_order_children();	// 子元素属性改变时执行
 
@@ -140,11 +140,8 @@ void flex_item::update_should_order_children()
 	}
 }
 
-void flex_item::init(hz::usp_ac* pac)
+void flex_item::init()
 {
-	ac = pac;
-	children.ac = ac;
-	temp_layout.ac = ac;
 	children.clear();
 	temp_layout.clear();
 	parent = NULL;
@@ -170,7 +167,7 @@ void flex_item::item_add(flex_item* child)
 void flex_item::item_insert(uint32_t index, flex_item* child)
 {
 	flex_item* item = this;
-	children.insert(index, child);
+	children.insert(children.begin() + index, child);
 	child->parent = item;
 	child->update_should_order_children();
 }
@@ -179,7 +176,7 @@ void flex_item::item_insert(uint32_t index, flex_item* child)
 flex_item* flex_item::item_delete(uint32_t index)
 {
 	flex_item* child = children.data()[index];
-	children.erase(index);
+	children.erase(children.begin() + index);
 	if (child)
 		child->parent = 0;
 	return child;
@@ -190,7 +187,7 @@ flex_item* flex_item::detach(flex_item* c)
 	size_t i = 0;
 	flex_item* child = 0;
 	auto p = children.data();
-	for (i = 0; i < children._size; i++)
+	for (i = 0; i < children.size(); i++)
 	{
 		if (p[i] == c)
 		{
@@ -198,7 +195,7 @@ flex_item* flex_item::detach(flex_item* c)
 			break;
 		}
 	}
-	children.erase(i);
+	children.erase(children.begin() + i);
 	if (child)
 		child->parent = 0;
 	return child;
@@ -865,7 +862,7 @@ glm::vec4 flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_
 	auto fitem = items.data();
 	if (!fitem) return rect;
 	for (size_t i = 0; i < node_count; i++) {
-		fitem[i].init(ctx->ac);
+		fitem[i].init();
 	}
 	size_t idx = 0;
 	auto q = ctx->q;  // 队列存储待处理坐标 

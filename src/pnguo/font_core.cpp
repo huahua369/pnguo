@@ -9880,12 +9880,12 @@ void mrt_layout1(multi_rich_text_t* mrt, tbox_s* pbox, layout_block_st* p) {
 		st.line_count++;
 		st.linex.push_back({ st.ct1,st.ct,st.xxx });
 	}
-	auto ac = (hz::usp_ac*)flex_ctx_ac(p->lctx);
-	if (!p->fv) {
-		p->fv = ac->new_obj<vg_vector<node_dt>>();
-		p->fv->ac = ac;
-	}
-	auto& fv = *p->fv;
+	//auto ac = (hz::usp_ac*)flex_ctx_ac(p->lctx);
+	//if (!p->fv) {
+	//	p->fv = ac->new_obj<vg_vector<node_dt>>();
+	//	p->fv->ac = ac;
+	//}
+	auto& fv = p->fv;
 	fv.resize(dcount + 1);
 	node_dt* fnode = fv.data();
 	for (size_t i = 0; i < dcount + 1; i++)
@@ -10037,12 +10037,12 @@ box_text_d* mrt_get_box_index(multi_rich_text_t* p, size_t index)
 	return nullptr;
 }
 layout_block_st::~layout_block_st() {
-	if (fv)
-	{
-		auto ac = fv->ac;
-		ac->free_obj(fv);
-		fv = 0;
-	}
+	//if (fv)
+	//{
+	//	auto ac = fv->ac;
+	//	ac->free_obj(fv);
+	//	fv = 0;
+	//}
 	free_flex_ctx(lctx); lctx = 0;
 }
 

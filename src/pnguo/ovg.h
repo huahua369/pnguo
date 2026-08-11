@@ -87,7 +87,7 @@ enum vg_filter_t :uint8_t {
 	VG_FILTER_BILINEAR,
 	VG_FILTER_GAUSSIAN,
 };
-enum class vg_pattern_type_t :uint8_t {
+enum vg_pattern_type_t :uint8_t {
 	VG_PATTERN_TYPE_SOLID,        // 单色
 	VG_PATTERN_TYPE_SURFACE,      // 纹理填充
 	VG_PATTERN_TYPE_LINEAR,       // 线性渐变 /*!< linear gradient pattern */
@@ -103,6 +103,14 @@ enum vg_clip_state_t :uint8_t {
 	vg_clip_state_clip_saved = 0x06,
 };
 
+enum vg_operator_t :uint8_t {
+	VG_OPERATOR_CLEAR,
+
+	VG_OPERATOR_SOURCE,
+	VG_OPERATOR_OVER,
+	VG_OPERATOR_DIFFERENCE,
+	VG_OPERATOR_MAX,
+};
 #ifndef d_doubleSided
 #define d_doubleSided 0x01
 #define d_depthTestEnable 0x02
@@ -325,17 +333,16 @@ struct ovg_canvas_cb {
 
 };
 
-// 测试
-void* new_gpu();
-
-struct ovg_device_t;
-struct ovg_ctx_t;
-ovg_device_t* new_vkdevctx(VkDevice vkdev, VkPhysicalDevice phy, VkInstance instance);
-void free_vkdevctx(ovg_device_t* dev);
-ovg_ctx_t* new_ovgctx(ovg_device_t* dev, VkFormat colorFormat, VkFormat depthFormat, VkSampleCountFlags samples);
-void free_ovgctx(ovg_ctx_t* p);
-ovg_canvas_cb* get_canvas_cb(ovg_ctx_t* ctx);// 不需要释放
-
 ovg_canvas_cb* new_canvas_cb();
 void free_canvas_cb(ovg_canvas_cb*);
+// 测试
+//void* new_gpu();
+//struct ovg_device_t;
+//struct ovg_ctx_t;
+//ovg_device_t* new_vkdevctx(VkDevice vkdev, VkPhysicalDevice phy, VkInstance instance);
+//void free_vkdevctx(ovg_device_t* dev);
+//ovg_ctx_t* new_ovgctx(ovg_device_t* dev, VkFormat colorFormat, VkFormat depthFormat, VkSampleCountFlags samples);
+//void free_ovgctx(ovg_ctx_t* p);
+//ovg_canvas_cb* get_canvas_cb(ovg_ctx_t* ctx);// 不需要释放
+
 

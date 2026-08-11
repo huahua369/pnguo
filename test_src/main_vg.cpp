@@ -1001,6 +1001,7 @@ void examples1(viewdev_cx* view, font_family_t* family)
 	}
 #endif
 }
+#if 0
 ovg_ctx_t* test_ovg(dev_info_cx* devinfo) {
 	ovg_device_t* ovgdev = new_vkdevctx((VkDevice)devinfo->vkdev, (VkPhysicalDevice)devinfo->phy, (VkInstance)devinfo->inst);
 	// free_vkdevctx(ovgdev);
@@ -1019,6 +1020,7 @@ ovg_ctx_t* test_ovg(dev_info_cx* devinfo) {
 	}
 	return octx;
 }
+#endif
 void testgui() {
 
 	//test_vkvg("temp/vgtest0618.png", 0);
@@ -1113,8 +1115,8 @@ void testgui() {
 	dev_info_cx devinfo = {};
 	get_dev_info(appx->dctx, &devinfo);
 
-	auto gpu = new_gpu();
-	auto octx = test_ovg(&devinfo);
+	//auto gpu = new_gpu();
+	//auto octx = test_ovg(&devinfo);
 
 	//dom_cx* dom0 = view->get_dom(form0);
 	//examples1(view, appx->family);
