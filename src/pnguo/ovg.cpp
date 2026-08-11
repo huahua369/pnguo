@@ -3323,7 +3323,9 @@ namespace glutess_p {
 #endif
 void rvg_t::glutess_fill_non_zero(ovg_path_t* p)
 {
+#ifndef NOT_FILL_NZ_GLUTESS
 	glutess_p::g_fill_non_zero(this, p);
+#endif
 }
 
 inline float ecp_zcross(rvg_t::ear_clip_point* p0, rvg_t::ear_clip_point* p1, rvg_t::ear_clip_point* p2) {
