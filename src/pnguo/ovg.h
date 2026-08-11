@@ -319,6 +319,8 @@ struct ovg_canvas_cb {
 	void(*clip)(rvg_t* v);			// 路径裁剪，清空当前路径
 	void(*clip_preserve)(rvg_t* v);	// 路径裁剪
 	void(*clip_rect)(rvg_t* v, int x, int y, int width, int height);	// 矩形裁剪
+	void(*set_clip_rect)(rvg_t* v, void* rc);	// 矩形裁剪,int[4]
+	void(*get_clip_rect)(rvg_t* v, void* rc);	// 获取矩形裁剪
 
 	// 添加文本，风格，渲染区可选
 	void (*add_text)(rvg_t* dc, text_st_t* p, text_style_t* ts, text_box_rt* box);

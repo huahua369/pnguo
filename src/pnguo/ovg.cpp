@@ -2726,6 +2726,7 @@ public:
 	glm::mat4 mat = glm::mat4(1.0f);// 当前矩阵
 	gem_info_t curState = {};		// 当前状态	 
 	std::pmr::vector<gcmd_t>* gt = 0;
+	rvg_t* dc = 0;
 public:
 	geom_primitive();
 	~geom_primitive();
@@ -2774,6 +2775,7 @@ struct rvg_t {
 	size_t gCount = 0;	// ubo数量
 	size_t _curVertOffset = 0;
 	uint32_t curColor = 0;
+	glm::ivec4 curClip = {};
 public:
 	rvg_t();
 	~rvg_t();
@@ -2807,6 +2809,7 @@ public:
 rvg_t::rvg_t()
 {
 	gps.gt = &cmdlist;
+	gps.dc = this;
 }
 
 rvg_t::~rvg_t()
@@ -3061,6 +3064,7 @@ void rvg_t::clip(const glm::ivec4* rc)
 {
 	if (rc)
 	{
+		curClip = *rc;
 		vgcmd_t c = {};
 		c.type = 2;
 		c.bounds = *rc;// vec4{ (float)rc->x, (float)rc->y, (float)rc->z, (float)rc->w };
@@ -3935,6 +3939,16 @@ void ovg_clip_rect(rvg_t* v, int x, int y, int width, int height)
 	glm::ivec4 c[1] = { {x,y,width,height} };
 	if (v)v->clip(c);
 }
+void ovg_set_clip_rect(rvg_t* v, void* rc) {
+	if (v && rc) {
+		if (v)v->clip((glm::ivec4*)rc);
+	}
+}
+void ovg_get_clip_rect(rvg_t* v, void* rc) {
+	if (v && rc) {
+		*((glm::ivec4*)rc) = v->curClip;
+	}
+}
 void ovg_stroke(rvg_t* v)
 {
 	if (!v)return;
@@ -4069,6 +4083,8 @@ void init_ovg_cb(ovg_canvas_cb* cb) {
 	cb->clip = ovg_clip;
 	cb->clip_preserve = ovg_clip_preserve;
 	cb->clip_rect = ovg_clip_rect;
+	cb->set_clip_rect = ovg_set_clip_rect;
+	cb->get_clip_rect = ovg_get_clip_rect;
 	cb->add_text = ovg_add_text;
 	cb->add_image = ovg_add_image;
 	cb->set_geom_state = (void (*)(rvg_t*, gem_info_t*, const void*)) ovg_set_geom_state;
@@ -4346,12 +4362,89 @@ void geom_primitive::add_text(text_st_t* p, text_style_t* ts, text_box_rt* box)
 	if (!p || !p->text || !*p->text || !ts || !ts->family || ts->fontsize < 1)return;
 
 }
+
+glm::mat4 ovg_ortho(float width, float height, float znear, float zfar, bool is_top)
+{
+	return is_top ? glm::ortho(0.0f, width, height, 0.0f, znear, zfar) : glm::ortho(0.0f, width, 0.0f, height, znear, zfar);
+}
+void draw_mesh2d_x(rvg_t* ctx, geom_primitive* gp, const glm::vec2& render_scale)
+{
+	mesh2d_x* dc = gp;
+	glm::vec2 clip_off = {};
+	glm::vec2 clip_scale = render_scale;
+	glm::ivec4 vp = { 0,0,-1,-1 };
+	if (dc->viewport.z > 0 && dc->viewport.w > 0)
+	{
+		vp.x = dc->viewport.x;
+		vp.y = dc->viewport.y;
+		vp.z = dc->viewport.z;
+		vp.w = dc->viewport.w;
+	}
+	auto av = dc;
+	auto vd = av->vtxs.data();
+	auto vdt = av->vtxs.data();
+	auto idv = av->idxs.data();
+	auto vbs = av->vtxs.size();
+	auto ibs = av->idxs.size();
+	std::vector<int> idxs;
+	struct { void* texture; uint32_t blendMode; } states = {};
+	glm::ivec4 oldclip = {};
+	ovg_get_clip_rect(ctx, (int*)&oldclip);
+	size_t cclip = 0;
+	gem_info_t info = {};
+	info.blendMode = (uint8_t)blendMode_e::normal;
+	info.topology = 3;
+	//info.doubleSided = false;
+	//info.depthTestEnable = false;
+	//info.depthWriteEnable = false;
+	//info.stencilTestEnable = true;
+	info.flags = d_stencilTestEnable;
+	info.frontFace = 0;
+	info.cullMode = 0;
+	glm::mat4 mat = ovg_ortho(dc->viewport.z, dc->viewport.w, -1.0f, 1.0f, 0);
+	ovg_set_clip_rect(ctx, &vp);
+	gp->set_state(&info, &mat);
+	for (auto& pcmd : av->cmd_data)
+	{
+		glm::vec2 clip_min((pcmd.clip_rect.x - clip_off.x) * clip_scale.x, (pcmd.clip_rect.y - clip_off.y) * clip_scale.y);
+		glm::vec2 clip_max((pcmd.clip_rect.z - clip_off.x) * clip_scale.x, (pcmd.clip_rect.w - clip_off.y) * clip_scale.y);
+		if (clip_max.x <= clip_min.x || clip_max.y <= clip_min.y)
+		{
+			ovg_set_clip_rect(ctx, &vp); cclip++;
+		}
+		else
+		{
+			glm::ivec4 r = { (int)(clip_min.x), (int)(clip_min.y), (int)(clip_max.x - clip_min.x), (int)(clip_max.y - clip_min.y) };
+			ovg_set_clip_rect(ctx, &r); cclip++;
+		}
+		auto texture = pcmd.texid;
+		auto vertices = vdt + pcmd.vtxOffset;
+		const float* xy = &vertices->position.x;
+		int stride = sizeof(mesh2d_x::vertex_t);
+		auto color = &vertices->color;
+		const float* uv = &vertices->tex_coord.x;
+		int size_indices = 4;
+		auto indices = ibs ? idv + pcmd.idxOffset : nullptr;
+		auto num_indices = pcmd.elemCount;
+		uint32_t blend = pcmd.blend_mode;
+		if (states.blendMode != blend) {
+			states.blendMode = blend;
+			info.blendMode = states.blendMode;
+			gp->set_state(&info, &mat);
+		}
+		gp->add_geometry(texture, xy, stride, color, stride, uv, stride, pcmd.vCount, indices, num_indices, size_indices, 1);
+	}
+	dc->clear_m2d();
+	if (cclip > 0) {
+		ovg_set_clip_rect(ctx, &oldclip);
+	}
+}
+
 void geom_primitive::add_image(ovg_image_r* r)
 {
 	if (!r || !r->img || (r->dst.z * r->dst.w <= 0) || (r->rc.z < 1 || r->rc.w < 1))return;
-
 	add_image0(r->img, r->texsize, {}, r->dst, r->rc, r->sliced, r->color);
-
+	draw_mesh2d_x(dc, this, { 1.0,1.0 });
 }
 #if 1
 
