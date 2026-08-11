@@ -46,14 +46,16 @@ enum class path_type_et :uint32_t
 	LINE_JOIN_BEVEL2
 */
 
-// 混合模式
-enum class blendMode_e :int8_t {
-	none = -1,
+// 混合模式 
+enum class blendMode_e :int {
+	none = -1,	// 不混合
 	normal = 0,	// 普通混合
 	additive,
 	multiply,
 	modulate,
-	screen
+	screen,
+	normal_prem,	// 预乘alpha
+	additive_prem,
 };
 enum vg_line_cap_t :uint8_t {
 	VG_LINE_CAP_BUTT,
@@ -171,13 +173,20 @@ struct vg_state_save_t {
 	bool glutessEnable = false;
 };
 
+enum ImageFlipMode
+{
+	FLIP_NONE,			// 不翻转
+	FLIP_HORIZONTAL,	// 水平翻转 
+	FLIP_VERTICAL,		// 垂直翻转
+	FLIP_HORIZONTAL_AND_VERTICAL = (FLIP_HORIZONTAL | FLIP_VERTICAL)    // 水平和垂直翻转（不是对角翻转）
+};
 struct ovg_image_r
 {
 	void* img;
 	glm::ivec4 rc;		// 所在纹理区域
 	glm::ivec4 sliced;	// 九宫格
-	glm::ivec2 dsize;	// 渲染大小
-	glm::ivec2 pos;		// 渲染坐标
+	glm::ivec2 texsize;	// 纹理大小
+	glm::ivec4 dst;		// 渲染坐标大小 
 	uint32_t color;		// 混合颜色
 	int8_t type;		// img的类型
 };
@@ -222,7 +231,7 @@ struct rvg_t;
 struct drawlist_t;
 // 接口
 struct ovg_canvas_cb {
-	mem_resource_t* ac = 0;
+	mem_resource_t* ac;
 	// 路径操作
 	ovg_path_t* (*new_path)(mem_resource_t* ac);
 	void(*path_destroy)(ovg_path_t* path);

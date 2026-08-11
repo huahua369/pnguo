@@ -2997,6 +2997,16 @@ struct geom_cmd_t {
 	int32_t  vertexOffset = 0;
 	size_t offset = 0, ioffset = 0;
 };
+struct geom2d_cmd_c
+{
+	glm::ivec4 clip_rect = {};
+	void* texid = 0;
+	uint32_t vtxOffset = 0;
+	uint32_t idxOffset = 0;
+	uint32_t elemCount = 0;
+	uint32_t vCount = 0;
+	uint16_t blend_mode = 0;		// 混合模式	 
+};
 struct scmd {
 	uint32_t vertexCount;
 	uint32_t firstVertex;
@@ -3016,6 +3026,7 @@ struct vgcmd_t {
 union gcmd_t {
 	vgcmd_t vg;
 	geom_cmd_t g;
+	size_t m2d_index;	// 图片2d
 };
 
 struct dash_context_t {
@@ -3037,6 +3048,79 @@ struct stroke_context_t {
 	float arcStep; // cached arcStep, prevent compute multiple times for same stroke, 0 if not yet computed
 };
 
+class mesh2d_x
+{
+public:
+	struct vertex_t
+	{
+		glm::vec2 position = {};		// 坐标	
+		glm::vec2 tex_coord = {};		// 纹理uv
+		uint32_t color = 0xffffffff;	// 顶点颜色 
+	};
+
+	std::vector<geom2d_cmd_c> cmd_data;	// 渲染命令
+	std::vector<vertex_t> vtxs;		// 顶点数据
+	std::vector<int> idxs;				// 索引
+	glm::ivec4 viewport = { 0,0,0,0 };
+	glm::ivec4 _clip_rect = { };// 当前裁剪 
+public:
+	mesh2d_x();
+	virtual ~mesh2d_x();
+	void set_viewport(const glm::ivec4& vp);
+	void set_clip(const glm::ivec4& rc);
+	// 清除数据,保留viewport
+	void clear_m2d();
+	bool nohas_clip(glm::ivec4 a);
+	// 添加相同纹理/裁剪区域则自动合批
+	void add(void* user_image, std::vector<vertex_t>& vertex, std::vector<int>& vt_index, const glm::ivec4& clip);
+	void add(void* user_image, vertex_t* vertex, size_t vcount, int* vt_index, size_t icount, const glm::ivec4& clip);
+	// 添加图片渲染，自动生成顶点数据
+	void add_image0(void* img, const glm::ivec2& texsize, const glm::ivec4& clip, const glm::ivec4& dst, const glm::ivec4& src, const glm::ivec4& sliced, uint32_t color = 0xffffffff);
+	// 添加九宫格图片渲染
+	void add_image_sliced(void* user_image, const glm::ivec2& texsize, const glm::ivec4& a, const glm::ivec4& sliced, const glm::ivec4& rect, uint32_t col, const glm::ivec4& clip);
+	// 添加旋转图片渲染，angle为旋转角度，center为旋转中心坐标（相对于dst）
+	void add_image_angle(void* img, const glm::ivec2& texsize, const glm::ivec4& src, const glm::ivec4& dst, float angle, const glm::vec2* center, uint32_t col, const glm::ivec4& clip, int flip);
+private:
+
+};
+
+class geom_primitive :public mesh2d_x {
+public:
+	struct Vertex1 {
+		glm::vec3 pos;
+		glm::vec2 uv;
+		uint32_t color;
+	};
+	struct Vertex2 {
+		glm::vec3 pos;
+		glm::vec2 uv;
+		uint32_t color;
+		uint32_t color1;
+	};
+public:
+	std::pmr::vector<Vertex1> vd1;	// 单面顶点
+	std::pmr::vector<Vertex2> vd2;	// 双面顶点
+	std::pmr::vector<uint32_t> ids;	// 索引 
+	glm::mat4 mat = glm::mat4(1.0f);// 当前矩阵
+	gem_info_t curState = {};		// 当前状态	 
+	std::pmr::vector<gcmd_t>* gt = 0;
+public:
+	geom_primitive();
+	~geom_primitive();
+public:
+	// 清空数据
+	void clear();
+	void set_state(gem_info_t* info, const glm::mat4* matrix);
+	// 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据，color_type=0表示float4，1表示uint32_t
+	bool add_geometry(void* texture, const float* xy, int xy_stride, const void* color, int color_stride
+		, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
+	// 添加3D几何数据到缓冲区，xyz顶点坐标，color顶点颜色（双面则要双倍），uv顶点纹理坐标，indices索引数据
+	bool add_geometry3d(void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride
+		, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
+	void add_text(text_st_t* p, text_style_t* ts, text_box_rt* box);
+	void add_image(ovg_image_r* r);
+};
+
 struct rvg_t {
 	struct Vertex {
 		glm::vec2     pos;
@@ -3056,6 +3140,8 @@ struct rvg_t {
 	// 临时缓冲用
 	std::pmr::vector<ear_clip_point> ecpsd;
 	std::pmr::vector<glm::vec2> _normals;
+	// 23d
+	geom_primitive gps = {};
 #ifndef NOT_FILL_NZ_GLUTESS
 	void (*vertex_cb)(uint32_t, rvg_t*) = 0; // tesselator vertex callback
 	uint32_t tesselator_fan_start = 0;
@@ -3096,42 +3182,10 @@ public:
 	void cp_cmdt(vgcmd_t* c, vg_state_save_t* t);
 };
 
-class geom_primitive {
-public:
-	struct Vertex1 {
-		glm::vec3 pos;
-		glm::vec2 uv;
-		uint32_t color;
-	};
-	struct Vertex2 {
-		glm::vec3 pos;
-		glm::vec2 uv;
-		uint32_t color;
-		uint32_t color1;
-	};
-public:
-	std::pmr::vector<Vertex1> vd1;	// 单面顶点
-	std::pmr::vector<Vertex2> vd2;	// 双面顶点
-	std::pmr::vector<uint32_t> ids;	// 索引 
-	glm::mat4 mat = glm::mat4(1.0f);// 当前矩阵
-	gem_info_t curState = {};		// 当前状态	 
-public:
-	geom_primitive();
-	~geom_primitive();
-public:
-	// 清空数据
-	void clear();
-	void set_state(gem_info_t* info, const glm::mat4* matrix);
-	// 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据，color_type=0表示float4，1表示uint32_t
-	bool add_geometry(void* texture, const float* xy, int xy_stride, const void* color, int color_stride
-		, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
-	// 添加3D几何数据到缓冲区，xyz顶点坐标，color顶点颜色（双面则要双倍），uv顶点纹理坐标，indices索引数据
-	bool add_geometry3d(void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride
-		, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
-};
-
 rvg_t::rvg_t()
-{}
+{
+	gps.gt = &cmdlist;
+}
 
 rvg_t::~rvg_t()
 {}
@@ -3289,7 +3343,7 @@ void rvg_t::stroke_preserve()
 	}
 	c.vertex.y = _vertex.size() - c.vertex.x;
 	c.index.y = _indices.size() - c.index.x;
-	cmdlist.push_back({ c });
+	cmdlist.push_back({ .vg = c });
 
 }
 
@@ -3331,7 +3385,7 @@ void rvg_t::fill_preserve()
 		c.index.y = _indices.size() - c.index.x;
 
 	}
-	cmdlist.push_back({ c });
+	cmdlist.push_back({ .vg = c });
 }
 
 void rvg_t::clip_preserve()
@@ -3359,7 +3413,7 @@ void rvg_t::clip_preserve()
 	}
 	c.full_screen_quad = _vertex.size();
 	//gt->push(&c);
-	cmdlist.push_back({ c });
+	cmdlist.push_back({ .vg = c });
 	Vertex v = {};
 	v.pos = { -1,-1 };
 	v.color = t->color;
@@ -3374,7 +3428,7 @@ void rvg_t::clip0()
 {
 	vgcmd_t c = {};
 	c.type = 2;
-	cmdlist.push_back({ c });
+	cmdlist.push_back({ .vg = c });
 }
 
 void rvg_t::clip()
@@ -3389,7 +3443,7 @@ void rvg_t::clip(const glm::ivec4* rc)
 		vgcmd_t c = {};
 		c.type = 2;
 		c.bounds = *rc;// vec4{ (float)rc->x, (float)rc->y, (float)rc->z, (float)rc->w };
-		cmdlist.push_back({ c });
+		cmdlist.push_back({ .vg = c });
 	}
 }
 void rvg_t::fill()
@@ -3419,7 +3473,7 @@ void rvg_t::paint()
 	_vertex.push_back(v);
 	v.pos = { -1,3 };
 	_vertex.push_back(v);
-	cmdlist.push_back({ c });
+	cmdlist.push_back({ .vg = c });
 }
 
 
@@ -4289,27 +4343,27 @@ void ovg_paint(rvg_t* v)
 // 添加文本，风格，渲染区可选
 void  ovg_add_text(rvg_t* dc, text_st_t* p, text_style_t* ts, text_box_rt* box)
 {
-
+	if (dc)dc->gps.add_text(p, ts, box);
 }
 // 普通图片，支持九宫格、混合颜色
 void  ovg_add_image(rvg_t* dc, ovg_image_r* r)
 {
-
+	if (dc)dc->gps.add_image(r);
 }
 // 原始三角形，输入0则不修改
 void  ovg_set_geom_state(rvg_t* dc, gem_info_t* info, const glm::mat4* matrix)
 {
-
+	if (dc)dc->gps.set_state(info, matrix);
 }
 // 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据，color_type=0表示float4，1表示uint32_t
 void  ovg_add_geometry(rvg_t* dc, void* texture, const float* xy, int xy_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type)
 {
-
+	if (dc)dc->gps.add_geometry(texture, xy, xy_stride, color, color_stride, uv, uv_stride, num_vertices, indices, num_indices, size_indices, color_type);
 }
 // 添加3D几何数据到缓冲区，xyz顶点坐标，color顶点颜色（双面则要双倍），uv顶点纹理坐标，indices索引数据
 void  ovg_add_geometry3d(rvg_t* dc, void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type)
 {
-
+	if (dc)dc->gps.add_geometry3d(texture, xyz, xyz_stride, color, color_stride, uv, uv_stride, num_vertices, indices, num_indices, size_indices, color_type);
 }
 
 #endif // 1
@@ -4435,17 +4489,622 @@ geom_primitive::~geom_primitive()
 {}
 
 void geom_primitive::clear()
-{}
+{
+	vd1.clear();
+	vd2.clear();
+	ids.clear();
+	mat = glm::mat4(1.0f);
+	curState = {};
+}
 
 void geom_primitive::set_state(gem_info_t* info, const glm::mat4* matrix)
-{}
+{
+	if (info) { curState = *info; }
+	if (matrix) { mat = *matrix; }
+}
 
 bool geom_primitive::add_geometry(void* texture, const float* xy, int xy_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type)
 {
-	return false;
+	if (!xy || num_vertices < 1)return false;
+	geom_cmd_t c = {};
+	c.state = curState;
+	c.texture = texture;
+	c.mat = mat;
+	c.ioffset = 0;
+	float scale_x = 1.0, scale_y = 1.0;
+	float u_scale = 1.0, v_scale = 1.0;
+	size_indices = indices ? size_indices : 0;
+	ids.reserve(ids.size() + num_indices);
+	c.firstIndex = ids.size();
+	c.count = num_indices;
+	if (num_indices < 1 || size_indices < 1)
+	{
+		c.count = num_vertices;
+	}
+	if (curState.flags & d_doubleSided) {
+		c.vertexOffset = vd2.size();
+		c.offset = 1;
+		vd2.resize(vd2.size() + num_vertices);
+		auto mem = vd2.data() + c.vertexOffset;	// 双面顶点
+		auto verts = mem;
+		for (size_t i = 0; i < num_indices; i++) {
+			int j;
+			float* xy_;
+			if (size_indices == 4) {
+				j = ((const uint32_t*)indices)[i];
+			}
+			else if (size_indices == 2) {
+				j = ((const uint16_t*)indices)[i];
+			}
+			else if (size_indices == 1) {
+				j = ((const uint8_t*)indices)[i];
+			}
+			else {
+				j = i;
+			}
+			ids.push_back(j);
+		}
+		for (size_t i = 0; i < num_vertices; i++) {
+			float* xy_;
+			xy_ = (float*)((char*)xy + i * xy_stride);
+			verts->pos.x = xy_[0] * scale_x;
+			verts->pos.y = xy_[1] * scale_y;
+			if (color_type == 1) {
+				auto c8 = (uint32_t*)((char*)color + i * color_stride);
+				verts->color = *c8; c8++;
+				verts->color1 = *c8;
+			}
+			else
+			{
+				auto c4 = (glm::vec4*)((char*)color + i * color_stride);
+				verts->color = CreateRgbaf(c4->x, c4->y, c4->z, c4->w); c4++;
+				verts->color1 = CreateRgbaf(c4->x, c4->y, c4->z, c4->w);
+			}
+			if (texture && uv) {
+				float* uv_ = (float*)((char*)uv + i * uv_stride);
+				verts->uv.x = uv_[0] * u_scale;
+				verts->uv.y = uv_[1] * v_scale;
+			}
+			else {
+				verts->uv = { 0.0f, 0.0f };
+			}
+			verts += 1;
+		}
+	}
+	else
+	{
+		c.vertexOffset = vd1.size();
+		vd1.resize(vd1.size() + num_vertices);
+		auto mem = vd1.data() + c.vertexOffset;	// 单面顶点
+		auto verts = mem;
+		for (size_t i = 0; i < num_indices; i++) {
+			int j;
+			float* xy_;
+			if (size_indices == 4) {
+				j = ((const uint32_t*)indices)[i];
+			}
+			else if (size_indices == 2) {
+				j = ((const uint16_t*)indices)[i];
+			}
+			else if (size_indices == 1) {
+				j = ((const uint8_t*)indices)[i];
+			}
+			else {
+				j = i;
+			}
+			ids.push_back(j);
+		}
+		for (size_t i = 0; i < num_vertices; i++) {
+			float* xy_;
+			xy_ = (float*)((char*)xy + i * xy_stride);
+			verts->pos.x = xy_[0] * scale_x;
+			verts->pos.y = xy_[1] * scale_y;
+			if (color_type == 1) {
+				auto c8 = (uint32_t*)((char*)color + i * color_stride);
+				verts->color = *c8; c8++;
+			}
+			else
+			{
+				auto c4 = (glm::vec4*)((char*)color + i * color_stride);
+				verts->color = CreateRgbaf(c4->x, c4->y, c4->z, c4->w);
+			}
+			if (texture && uv) {
+				float* uv_ = (float*)((char*)uv + i * uv_stride);
+				verts->uv.x = uv_[0] * u_scale;
+				verts->uv.y = uv_[1] * v_scale;
+			}
+			else {
+				verts->uv = { 0.0f, 0.0f };
+			}
+			verts += 1;
+		}
+	}
+
+	gt->push_back({ .g = c });
+	return true;
 }
 
 bool geom_primitive::add_geometry3d(void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type)
 {
-	return false;
+	if (!xyz || num_vertices < 1)return false;
+	geom_cmd_t c = {};
+	c.state = curState;
+	c.texture = texture;
+	c.mat = mat;
+	c.ioffset = 0;
+	float scale_x = 1.0, scale_y = 1.0, scale_z = 1.0;
+	float u_scale = 1.0, v_scale = 1.0;
+	size_indices = indices ? size_indices : 0;
+	ids.reserve(ids.size() + num_indices);
+	c.firstIndex = ids.size();
+	c.count = num_indices;
+	if (num_indices < 1 || size_indices < 1)
+	{
+		c.count = num_vertices;
+	}
+	if (curState.flags & d_doubleSided) {
+		c.vertexOffset = vd2.size();
+		c.offset = 1;
+		vd2.resize(vd2.size() + num_vertices);
+		auto mem = vd2.data() + c.vertexOffset;	// 双面顶点
+		auto verts = mem;
+		for (size_t i = 0; i < num_indices; i++) {
+			int j;
+			if (size_indices == 4) {
+				j = ((const uint32_t*)indices)[i];
+			}
+			else if (size_indices == 2) {
+				j = ((const uint16_t*)indices)[i];
+			}
+			else if (size_indices == 1) {
+				j = ((const uint8_t*)indices)[i];
+			}
+			else {
+				j = i;
+			}
+			ids.push_back(j);
+		}
+		for (size_t i = 0; i < num_vertices; i++) {
+			float* xyz_;
+			xyz_ = (float*)((char*)xyz + i * xyz_stride);
+			verts->pos.x = xyz_[0] * scale_x;
+			verts->pos.y = xyz_[1] * scale_y;
+			verts->pos.z = xyz_[2] * scale_z;
+			if (color_type == 1) {
+				auto c8 = (uint32_t*)((char*)color + i * color_stride);
+				verts->color = *c8; c8++;
+				verts->color1 = *c8;
+			}
+			else
+			{
+				auto c4 = (glm::vec4*)((char*)color + i * color_stride);
+				verts->color = CreateRgbaf(c4->x, c4->y, c4->z, c4->w); c4++;
+				verts->color1 = CreateRgbaf(c4->x, c4->y, c4->z, c4->w);
+			}
+			if (texture && uv) {
+				float* uv_ = (float*)((char*)uv + i * uv_stride);
+				verts->uv.x = uv_[0] * u_scale;
+				verts->uv.y = uv_[1] * v_scale;
+			}
+			else {
+				verts->uv = { 0.0f, 0.0f };
+			}
+			verts += 1;
+		}
+	}
+	else
+	{
+		c.vertexOffset = vd1.size();
+		vd1.resize(vd1.size() + num_vertices);
+		auto mem = vd1.data() + c.vertexOffset;	// 单面顶点
+		auto verts = mem;
+		for (size_t i = 0; i < num_indices; i++) {
+			int j;
+			if (size_indices == 4) {
+				j = ((const uint32_t*)indices)[i];
+			}
+			else if (size_indices == 2) {
+				j = ((const uint16_t*)indices)[i];
+			}
+			else if (size_indices == 1) {
+				j = ((const uint8_t*)indices)[i];
+			}
+			else {
+				j = i;
+			}
+			ids.push_back(j);
+		}
+		for (size_t i = 0; i < num_vertices; i++) {
+			float* xyz_;
+			xyz_ = (float*)((char*)xyz + i * xyz_stride);
+			verts->pos.x = xyz_[0] * scale_x;
+			verts->pos.y = xyz_[1] * scale_y;
+			verts->pos.z = xyz_[2] * scale_z;
+			if (color_type == 1) {
+				auto c8 = (uint32_t*)((char*)color + i * color_stride);
+				verts->color = *c8; c8++;
+			}
+			else
+			{
+				auto c4 = (glm::vec4*)((char*)color + i * color_stride);
+				verts->color = CreateRgbaf(c4->x, c4->y, c4->z, c4->w);
+			}
+			if (texture && uv) {
+				float* uv_ = (float*)((char*)uv + i * uv_stride);
+				verts->uv.x = uv_[0] * u_scale;
+				verts->uv.y = uv_[1] * v_scale;
+			}
+			else {
+				verts->uv = { 0.0f, 0.0f };
+			}
+			verts += 1;
+		}
+	}
+	gt->push_back({ .g = c });
+	return true;
 }
+void geom_primitive::add_text(text_st_t* p, text_style_t* ts, text_box_rt* box)
+{
+	if (!p || !p->text || !*p->text || !ts || !ts->family || ts->fontsize < 1)return;
+
+}
+void geom_primitive::add_image(ovg_image_r* r)
+{
+	if (!r || !r->img || (r->dst.z * r->dst.w <= 0) || (r->rc.z < 1 || r->rc.w < 1))return;
+
+	add_image0(r->img, r->texsize, {}, r->dst, r->rc, r->sliced, r->color);
+
+}
+#if 1
+
+mesh2d_x::mesh2d_x()
+{}
+
+mesh2d_x::~mesh2d_x()
+{}
+
+void mesh2d_x::set_viewport(const glm::ivec4& vp)
+{
+	viewport = vp;
+}
+
+void mesh2d_x::set_clip(const glm::ivec4& rc)
+{
+	_clip_rect = rc;
+}
+
+void mesh2d_x::clear_m2d()
+{
+	vtxs.clear();
+	idxs.clear();
+	cmd_data.clear();
+	_clip_rect = viewport;
+	_clip_rect.x = _clip_rect.y = 0;
+}
+
+inline uint8_t is_rect_intersect0(int x01, int x02, int y01, int y02,
+	int x11, int x12, int y11, int y12)
+{
+	int zx = abs(x01 + x02 - x11 - x12);
+	int x = abs(x01 - x02) + abs(x11 - x12);
+	int zy = abs(y01 + y02 - y11 - y12);
+	int y = abs(y01 - y02) + abs(y11 - y12);
+	if (zx <= x && zy <= y)
+		return 1;
+	else
+		return 0;
+}
+inline bool is_rect_intersect(glm::vec4 r1, glm::vec4 r2)
+{
+	//第一种情况：如果b.x > a.x + a.w，则a和b一定不相交，
+	//第二种情况：如果a.y > b.y + b.h，则a和b一定不相交，
+	//第三种情况：如果b.y > a.y + a.h，则a和b一定不相交，
+	//第四种情况：如果a.x > b.x + b.w，则a和b一定不相交
+	auto& a = r1; auto& b = r2;
+	if (a.x > b.x + b.z || b.x > a.x + a.z || a.y > b.y + b.w || b.y > a.y + a.w) {
+		return false;
+	}
+	else {
+		return true;
+	}
+	return is_rect_intersect0(r1.x, r1.y, r1.z, r1.w, r2.x, r2.y, r2.z, r2.w);
+}
+bool mesh2d_x::nohas_clip(glm::ivec4 a)
+{
+	auto clip = _clip_rect;
+	if (clip.z > viewport.z || clip.z < 0)clip.z = viewport.z;
+	if (clip.w > viewport.w || clip.w < 0)clip.w = viewport.w;
+	if (clip.z < 0 || clip.w < 0)
+	{
+		return false;
+	}
+	return (!is_rect_intersect(clip, a));
+}
+void mesh2d_x::add(void* user_image, std::vector<vertex_t>& vertex, std::vector<int>& vt_index, const glm::ivec4& clip)
+{
+	add(user_image, vertex.data(), vertex.size(), vt_index.data(), vt_index.size(), clip);
+}
+
+void mesh2d_x::add(void* user_image, vertex_t* vertex, size_t vcount, int* vt_index, size_t icount, const glm::ivec4& clip)
+{
+	auto ps0 = vcount;
+	auto ps = vtxs.size();
+	auto ix = idxs.size();
+	auto ic = icount;
+	vtxs.resize(ps + vcount);
+	idxs.resize(ix + icount);
+	auto& cd = cmd_data;
+	if (cd.empty())
+	{
+		cd.push_back({});
+	}
+	auto dt = &cd.back();
+	auto pidx = idxs.data() + ix;
+	if (dt->texid != user_image || dt->clip_rect != clip)
+	{
+		if (dt->elemCount > 0)
+			cd.push_back({});
+		dt = &cd.back();
+		dt->texid = user_image;
+		dt->clip_rect = clip;
+		dt->vtxOffset = ps;
+		dt->idxOffset = ix;
+		dt->elemCount = ic;
+		dt->vCount = ps0;
+	}
+	else
+	{
+		// 合批
+		dt->elemCount += ic;
+		dt->vCount += ps0;
+		auto idt = vt_index;
+		for (size_t i = 0; i < ic; i++)
+		{
+			idt[i] += ix;
+		}
+	}
+	memcpy(vtxs.data() + ps, vertex, vcount * sizeof(vertex[0]));
+	memcpy(pidx, vt_index, icount * sizeof(vt_index[0]));
+}
+
+
+void mesh2d_x::add_image0(void* img, const glm::ivec2& texsize, const glm::ivec4& clip, const glm::ivec4& dst, const glm::ivec4& src, const glm::ivec4& sliced, uint32_t color)
+{
+	auto a = glm::vec4(dst);
+	glm::ivec2 pos = { a.x, a.y }, size = { a.z, a.w };
+	glm::vec4 v4 = { 0, 0, 1, 1 };
+	glm::vec4 uv = v4;
+	glm::vec2 s = size;
+	if (a.z < 0)
+		a.z *= -std::min(src.z, texsize.x);
+	if (a.w < 0)
+		a.w *= -std::min(src.w, texsize.y);
+	if (nohas_clip(a))
+		return;
+
+	if (sliced.x > 0)
+	{
+		add_image_sliced(img, texsize, a, sliced, src, color, clip);// 生成九宫格到mesh
+	}
+	else
+	{
+		if (!(src.x < 0))
+		{
+			v4 = src;
+			v4.z += v4.x; v4.w += v4.y;//加上原点坐标
+			v4.z = glm::min(v4.z, (float)texsize.x);
+			v4.w = glm::min(v4.w, (float)texsize.y);
+			uv = { v4.x / texsize.x, v4.y / texsize.y, v4.z / texsize.x, v4.w / texsize.y };
+			if (uv.x < 0) { uv.x = 0; }
+			if (uv.y < 0) { uv.y = 0; }
+		}
+		glm::vec2 av = pos, cv = { pos.x + s.x, pos.y + s.y }, uv_a = { uv.x, uv.y }, uv_c{ uv.z, uv.w };
+		auto& col = color;
+		glm::vec2 bv(cv.x, av.y), dv(av.x, cv.y), uv_b(uv_c.x, uv_a.y), uv_d(uv_a.x, uv_c.y);
+
+		vertex_t vertex[] = {
+		   {av, uv_a, col},
+		   {bv, uv_b, col},
+		   {cv, uv_c, col},
+		   {dv, uv_d, col},
+		};
+		int rect_index_order[] = { 0, 1, 2, 0, 2, 3 };
+		add(img, vertex, 4, rect_index_order, 6, clip);// 添加矩形(两个三角形)到mesh
+	}
+}
+
+/*
+
+
+九宫格渲染:
++--+---------------+--+
+|0 |       1       |2 |
++--+---------------+--+
+|  |               |  |
+|  |               |  |
+|3 |    center     |4 |
+|  |               |  |
++--+---------------+--+
+|5 |       6       |7 |
++--+---------------+--+
+
+九宫格:索引
+0  12                     14  2
+8  4                      6   10
+
+9  5                      7   11
+1  13                     15  3
++--+-------------------------+--+
+|  |                         |  |
++--+-------------------------+--+
+|  |                         |  |
+|  |                         |  |
++--+-------------------------+--+
+|  |                         |  |
++--+-------------------------+--+
+sliced.x=左宽，y上高，z右宽，w下高
+
+*/
+void mesh2d_x::add_image_sliced(void* user_image, const glm::ivec2& texsize, const glm::ivec4& a, const glm::ivec4& sliced, const glm::ivec4& rect, uint32_t col, const glm::ivec4& clip)
+{
+	static std::vector<int> vt_index =// { 0,8,12,4,14,6,2,10,11,6,7,4,5,8,9,1,5,13,7,15,11,3 };//E_TRIANGLE_STRIP
+	{ 0, 8, 12, 8, 12, 4, 12, 4, 14, 4, 14, 6, 14, 6, 2, 6, 2, 10,
+		6, 7, 10, 7, 10, 11, 4, 5, 6, 5, 6, 7, 8, 9, 4, 9, 4, 5,
+		9, 1, 5, 1, 5, 13, 5, 13, 7, 13, 7, 15, 7, 15, 11, 15, 11, 3 };//E_TRIANGLE_LIST
+
+	glm::ivec2 pos = { a.x, a.y }, size = { a.z, a.w };
+	glm::vec4 uv = { 0, 0, 1, 1 };
+	glm::vec4 v4 = { 0, 0, texsize.x, texsize.y };
+	if (!(rect.x < 0))
+	{
+		v4 = rect;
+		v4.z += v4.x; v4.w += v4.y;//加上原点坐标
+		uv = { v4.x / texsize.x, v4.y / texsize.y, v4.z / texsize.x, v4.w / texsize.y, };
+	}
+	float left = sliced.x,
+		top = sliced.y,
+		right = sliced.z,
+		bottom = sliced.w;
+	float x = pos.x, y = pos.y, width = size.x, height = size.y;
+	glm::vec4 suv = { (left + v4.x) / texsize.x, (top + v4.y) / texsize.y,
+		(v4.z - right) / texsize.x, (v4.w - bottom) / texsize.y };
+
+	vertex_t vertex[] = {
+		//0
+		{{x, y}, {uv.x, uv.y}, col},
+		//1
+		{{x, y + height}, {uv.x, uv.w}, col},
+		//2
+		{{x + width, y}, {uv.z, uv.y}, col},
+		//3
+		{{x + width, y + height}, {uv.z, uv.w}, col},
+		//4
+		{{x + left, y + top}, {suv.x, suv.y}, col},
+		//5
+		{{x + left, y + height - bottom}, {suv.x, suv.w}, col},
+		//6
+		{{x + width - right, y + top}, {suv.z, suv.y}, col},
+		//7
+		{{x + width - right, y + height - bottom}, {suv.z, suv.w}, col},
+		//8
+		{{x, y + top}, {uv.x, suv.y}, col},
+		//9
+		{{x, y + height - bottom}, {uv.x, suv.w}, col},
+		//10
+		{{x + width, y + top}, {uv.z, suv.y}, col},
+		//11
+		{{x + width, y + height - bottom}, {uv.z, suv.w}, col},
+		//12
+		{{x + left, y}, {suv.x, uv.y}, col},
+		//13
+		{{x + left, y + height}, {suv.x, uv.w}, col},
+		//14
+		{{x + width - right, y}, {suv.z, uv.y}, col},
+		//15
+		{{x + width - right, y + height}, {suv.z, uv.w}, col}
+	};
+
+	add(user_image, vertex, 16, vt_index.data(), vt_index.size(), clip);
+
+	return;
+}
+void mesh2d_x::add_image_angle(void* img, const glm::ivec2& texsize, const glm::ivec4& srcrect, const glm::ivec4& dstrect, float angle, const glm::vec2* center, uint32_t col, const glm::ivec4& clip, int flip)
+{
+	int rect_index_order[] = { 0, 1, 2, 0, 2, 3 };
+	glm::ivec4 real_srcrect = {};
+	glm::vec2 real_center = {};
+	if (flip == FLIP_NONE && (int)(angle / 360) == angle / 360) { // fast path when we don't need rotation or flipping
+		add_image0(img, texsize, clip, srcrect, dstrect, {}, col);
+		return;
+	}
+	real_srcrect.x = 0.0f;
+	real_srcrect.y = 0.0f;
+	real_srcrect.z = (float)texsize.x;
+	real_srcrect.w = (float)texsize.y;
+	if (center) {
+		real_center = *center;
+	}
+	else {
+		real_center.x = dstrect.z / 2.0f;
+		real_center.y = dstrect.w / 2.0f;
+	}
+	vertex_t v[4];
+	//float xy[8];
+	const int xy_stride = 2 * sizeof(float);
+	//float uv[8];
+	const int uv_stride = 2 * sizeof(float);
+	const int num_vertices = 4;
+	const int* indices = rect_index_order;
+	const int num_indices = 6;
+	const int size_indices = 4;
+	glm::vec2 minuv, maxuv;
+	glm::vec2 minxy, maxxy;
+	float centerx, centery;
+
+	float s_minx, s_miny, s_maxx, s_maxy;
+	float c_minx, c_miny, c_maxx, c_maxy;
+
+	const float radian_angle = glm::radians(angle);
+	const float s = glm::sin(radian_angle);
+	const float c = glm::cos(radian_angle);
+
+	minuv.x = real_srcrect.x / texsize.x;
+	minuv.y = real_srcrect.y / texsize.y;
+	maxuv.x = (real_srcrect.x + real_srcrect.z) / texsize.x;
+	maxuv.y = (real_srcrect.y + real_srcrect.w) / texsize.y;
+
+	centerx = real_center.x + dstrect.x;
+	centery = real_center.y + dstrect.y;
+
+	if (flip & FLIP_HORIZONTAL) {
+		minxy.x = dstrect.x + dstrect.z;
+		maxxy.x = dstrect.x;
+	}
+	else {
+		minxy.x = dstrect.x;
+		maxxy.x = dstrect.x + dstrect.z;
+	}
+
+	if (flip & FLIP_VERTICAL) {
+		minxy.y = dstrect.y + dstrect.w;
+		maxxy.y = dstrect.y;
+	}
+	else {
+		minxy.y = dstrect.y;
+		maxxy.y = dstrect.y + dstrect.w;
+	}
+
+	v[0].tex_coord = minuv;
+	v[1].tex_coord = maxuv;
+	v[2].tex_coord = maxuv;
+	v[3].tex_coord = minuv;
+
+	/* apply rotation with 2x2 matrix ( c -s )
+	 *                                ( s  c ) */
+	s_minx = s * (minxy.x - centerx);
+	s_miny = s * (minxy.y - centery);
+	s_maxx = s * (maxxy.x - centerx);
+	s_maxy = s * (maxxy.y - centery);
+	c_minx = c * (minxy.x - centerx);
+	c_miny = c * (minxy.y - centery);
+	c_maxx = c * (maxxy.x - centerx);
+	c_maxy = c * (maxxy.y - centery);
+
+	// (minx, miny)
+	v[0].position = glm::vec2((c_minx - s_miny) + centerx, (s_minx + c_miny) + centery);
+	// (maxx, miny)
+	v[1].position = glm::vec2((c_maxx - s_miny) + centerx, (s_maxx + c_miny) + centery);
+	// (maxx, maxy)
+	v[2].position = glm::vec2((c_maxx - s_maxy) + centerx, (s_maxx + c_maxy) + centery);
+	// (minx, maxy)
+	v[3].position = glm::vec2((c_minx - s_maxy) + centerx, (s_minx + c_maxy) + centery);
+	auto c4 = (col);
+	v[0].color = c4;
+	v[1].color = c4;
+	v[2].color = c4;
+	v[3].color = c4;
+	add(img, v, 4, rect_index_order, 6, clip);
+}
+
+
+#endif // 1

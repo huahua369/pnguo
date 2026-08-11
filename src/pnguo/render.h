@@ -231,7 +231,7 @@ int render_build(Drawable auto& drawable);
 
 // 混合模式
 enum class blendmode_e :int {
-	none = -1,
+	none = -1,	// 不混合
 	normal = 0,	// 普通混合
 	additive,
 	multiply,
