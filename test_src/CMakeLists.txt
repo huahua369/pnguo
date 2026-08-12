@@ -68,8 +68,7 @@ list(APPEND src_mmd
     "../njson.natvis"
 ) 
 list(APPEND src_vkvg   
-    "main_vg.cpp" 
-    ${VKH_SRC} 
+    "main_vg.cpp"  
     "../third_party/tinyspline/parson.c"
     "../third_party/tinyspline/tinyspline.c"
     "../third_party/tinyspline/tinysplinecxx.cpp"  

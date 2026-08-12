@@ -36,27 +36,7 @@ enum class path_type_et :uint32_t
 	e_vcurve,	// 二次曲线
 	e_vcubic	// 三次曲线
 };
-
-/*
-	LINE_CAP_BUTT,0
-	LINE_CAP_ROUND,1
-	LINE_CAP_SQUARE2
-	LINE_JOIN_MITER,0
-	LINE_JOIN_ROUND,1
-	LINE_JOIN_BEVEL2
-*/
-
-// 混合模式 
-enum class blendMode_e :int {
-	none = -1,	// 不混合
-	normal = 0,	// 普通混合
-	additive,
-	multiply,
-	modulate,
-	screen,
-	normal_prem,	// 预乘alpha
-	additive_prem,
-};
+ 
 enum vg_line_cap_t :uint8_t {
 	VG_LINE_CAP_BUTT,
 	VG_LINE_CAP_ROUND,
@@ -111,22 +91,44 @@ enum vg_operator_t :uint8_t {
 	VG_OPERATOR_DIFFERENCE,
 	VG_OPERATOR_MAX,
 };
-#ifndef d_doubleSided
-#define d_doubleSided 0x01
-#define d_depthTestEnable 0x02
-#define d_depthWriteEnable 0x04
-#define d_stencilTestEnable 0x08
-#endif // !d_doubleSided
-
+#ifndef D_DEPTHTESTENABLE 
+#define D_DEPTHTESTENABLE 0x01
+#define D_DEPTHWRITEENABLE 0x02
+#define D_STENCILTESTENABLE 0x04 
+#endif
+// 混合模式 
+enum class blendMode_e :int {
+	none = -1,	// 不混合
+	normal = 0,	// 普通混合
+	additive,
+	multiply,
+	modulate,
+	screen,
+	normal_prem,	// 预乘alpha
+	additive_prem,
+};
+enum shader_type_e :uint8_t {
+	ST_NONE,
+	ST_MASK,
+	ST_DOUBLESIDED,
+	ST_INSTANCE,
+	ST_INSTANCE_DOUBLESIDED,
+};
+// 0矢量图管线						2d
+// 0普通三角形(纹理)					2d/3d		tex0
+// 1普通三角形+遮罩纹理				2d/3d		tex0、tex1
+// 2双面三角形(两种颜色/纹理)			doubleSided	tex0
+// 3三角形(纹理)实例化							ubo0、tex1
+// 4双面三角形(两种颜色/纹理)实例化				ubo0、tex1
 struct gem_info_t {
 	uint8_t blendMode = 0;
 	uint8_t topology = 0;
 	uint8_t polygon = 0;
-	uint8_t frontFace = 0;     // COUNTER_CLOCKWISE = 0, CLOCKWISE = 1,
-	uint8_t cullMode = 0;      // NONE=0, FRONT=1, BACK=2, FRONT_AND_BACK=3
-	uint8_t flags = 0;         // doubleSided, depthTestEnable, depthWriteEnable, stencilTestEnable
+	uint8_t frontFace = 0;	// COUNTER_CLOCKWISE = 0, CLOCKWISE = 1,
+	uint8_t cullMode = 0;	// NONE=0, FRONT=1, BACK=2, FRONT_AND_BACK=3
+	uint8_t flags = 0;		// depthTestEnable, depthWriteEnable, stencilTestEnable
 	uint8_t lineWidth = 1;
-	uint8_t pad[1] = { 0 };
+	uint8_t shader = 0;		// shader_type_e
 };
 
 
@@ -337,14 +339,21 @@ struct ovg_canvas_cb {
 
 ovg_canvas_cb* new_canvas_cb();
 void free_canvas_cb(ovg_canvas_cb*);
+struct vg_fbo_t
+{
+	uint32_t width, height;
+	void* img;
+	void* imgMS;
+	void* depthStencil;
+};
 // 测试
 //void* new_gpu();
 struct ovg_device_t;
 struct ovg_ctx_t;
-ovg_device_t* new_vkdevctx(VkDevice vkdev, VkPhysicalDevice phy, VkInstance instance);
+ovg_device_t* new_vkdevctx(VkDevice vkdev, VkPhysicalDevice phy, VkInstance instance, uint32_t qFamIdx);
 void free_vkdevctx(ovg_device_t* dev);
 ovg_ctx_t* new_ovgctx(ovg_device_t* dev, VkFormat colorFormat, VkFormat depthFormat, VkSampleCountFlags samples);
 void free_ovgctx(ovg_ctx_t* p);
 ovg_canvas_cb* get_canvas_cb(ovg_ctx_t* ctx);// 不需要释放
-
-
+vg_fbo_t new_vgfbo(ovg_ctx_t* p, int width, int height);
+void free_vgfbo(vg_fbo_t*);

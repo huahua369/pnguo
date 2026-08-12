@@ -21,10 +21,11 @@ struct VSOutput
 struct PushConsts
 {
 	float4x4 mvp;
+	float masktime;
 };
 [[vk::push_constant]] PushConsts pc;
 #ifdef ID_INSTANCING
-[[vk::binding(0, 2)]] StructuredBuffer<float4x4> instance_model_matrix;
+StructuredBuffer<float4x4> instance_model_matrix;
 [shader("vertex")]
 VSOutput main(VSInput input, uint InstanceIndex : SV_InstanceID)
 {
@@ -53,15 +54,23 @@ VSOutput main(VSInput input)
 }
 #endif
 
-[[vk::binding(0, 1)]] Sampler2D samplerColor;
-in bool frontFacing;
+Sampler2D samplerColor;
+#ifdef COLOR_MASK
+Sampler2D samplerMask;
+#endif
 [shader("fragment")]
-float4 fragMain(VSOutput input)
+float4 fragMain(VSOutput input, bool FrontFacing : SV_IsFrontFace) : SV_TARGET
 {
 	float4 color = input.color;
 #ifdef DOUBLESIDEDCOLOR
-	color = frontFacing ? input.color : input.color1;
+	color = FrontFacing ? input.color : input.color1;
 #endif
-	color = samplerColor.Sample(input.uv) * input.color;
+	color *= samplerColor.Sample(input.uv);
+#ifdef COLOR_MASK
+	color *= 1.0 - step(pc.masktime, samplerMask.Sample(input.uv).r);
+#endif
+#ifndef NOT_PREMULT_ALPHA
+	color.rgb *= color.a;
+#endif
 	return color;
 }

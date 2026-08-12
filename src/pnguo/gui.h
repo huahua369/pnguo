@@ -659,6 +659,7 @@ public:
 	bool show_input_cursor = true;
 	bool roundselect = true;	// 圆角选区
 	bool up_text = true;	// 更新文本了
+	bool first_height = false;	 
 public:
 	edit_cx();
 	~edit_cx();
