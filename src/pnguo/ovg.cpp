@@ -1519,18 +1519,6 @@ void ovg_state_destroy(vg_state_save_t* p) {
 #if 1
 
 
-// 普通三角形命令
-struct geom_cmd_t {
-	int stype = 1;
-	gem_info_t state = {};
-	void* texture = nullptr;
-	glm::mat4 mat = glm::mat4(1.0f);	// 矩阵
-	float mask_time = 1.0;				// 遮罩时间
-	uint32_t count = 0;
-	uint32_t firstIndex = 0;
-	int32_t  vertexOffset = 0;
-	size_t offset = 0, ioffset = 0;
-};
 struct geom2d_cmd_c
 {
 	glm::ivec4 clip_rect = {};
@@ -1540,26 +1528,6 @@ struct geom2d_cmd_c
 	uint32_t elemCount = 0;
 	uint32_t vCount = 0;
 	uint16_t blend_mode = 0;		// 混合模式	 
-};
-struct scmd {
-	uint32_t vertexCount;
-	uint32_t firstVertex;
-};
-// 矢量命令
-struct vgcmd_t {
-	int stype = 0;
-	scmd* v = 0;
-	int vc = 0;
-	int full_screen_quad = 0;
-	glm::ivec2 vertex = {};			// 顶点开始、数量
-	glm::ivec2 index = {};			// 索引开始、数量
-	vg_state_save_t* state = {};	// 渲染参数
-	glm::vec4 bounds = {};			// 全屏填充,odd/clip专用
-	int8_t type = 0;			// 类型：填充0、描边1、裁剪2、全屏3、清屏4
-};
-union gcmd_t {
-	vgcmd_t vg;
-	geom_cmd_t g;
 };
 
 struct dash_context_t {
@@ -2036,7 +2004,7 @@ void rvg_t::poly_fill(ovg_path_t* ctx, glm::vec4* bounds, vgcmd_t& c)
 	if (!nc)return;
 	ptrPath = 0;
 
-	c.v = (scmd*)mac.allocate(sizeof(scmd) * nc);
+	c.v = (vg_sub_cmd*)mac.allocate(sizeof(vg_sub_cmd) * nc);
 	if (!c.v)return;
 	cp_cmdt(&c, ctx->t);
 	c.vc = nc;
@@ -3035,20 +3003,20 @@ bool geom_primitive::add_geometry(void* texture, const float* xy, int xy_stride,
 	c.state = curState;
 	c.texture = texture;
 	c.mat = mat;
-	c.ioffset = 0;
+	c.i_offset = 0;
 	float scale_x = 1.0, scale_y = 1.0;
 	float u_scale = 1.0, v_scale = 1.0;
 	size_indices = indices ? size_indices : 0;
 	ids.reserve(ids.size() + num_indices);
 	c.firstIndex = ids.size();
-	c.count = num_indices;
+	c.elemCount = num_indices;
 	if (num_indices < 1 || size_indices < 1)
 	{
-		c.count = num_vertices;
+		c.elemCount = num_vertices;
 	}
 	if (curState.shader == ST_DOUBLESIDED) {
 		c.vertexOffset = vd2.size();
-		c.offset = 1;
+		c.v_offset = 1;
 		vd2.resize(vd2.size() + num_vertices);
 		auto mem = vd2.data() + c.vertexOffset;	// 双面顶点
 		auto verts = mem;
@@ -3156,20 +3124,20 @@ bool geom_primitive::add_geometry3d(void* texture, const float* xyz, int xyz_str
 	c.state = curState;
 	c.texture = texture;
 	c.mat = mat;
-	c.ioffset = 0;
+	c.i_offset = 0;
 	float scale_x = 1.0, scale_y = 1.0, scale_z = 1.0;
 	float u_scale = 1.0, v_scale = 1.0;
 	size_indices = indices ? size_indices : 0;
 	ids.reserve(ids.size() + num_indices);
 	c.firstIndex = ids.size();
-	c.count = num_indices;
+	c.elemCount = num_indices;
 	if (num_indices < 1 || size_indices < 1)
 	{
-		c.count = num_vertices;
+		c.elemCount = num_vertices;
 	}
 	if (curState.shader == ST_DOUBLESIDED) {
 		c.vertexOffset = vd2.size();
-		c.offset = 1;
+		c.v_offset = 1;
 		vd2.resize(vd2.size() + num_vertices);
 		auto mem = vd2.data() + c.vertexOffset;	// 双面顶点
 		auto verts = mem;
@@ -3309,7 +3277,7 @@ void draw_mesh2d_x(rvg_t* ctx, geom_primitive* gp, const glm::vec2& render_scale
 	//info.depthTestEnable = false;
 	//info.depthWriteEnable = false;
 	//info.stencilTestEnable = true;
-	info.flags = D_STENCILTESTENABLE;
+	info.flags = (uint8_t)depth_stencil_State::d_stenciltest_enable;
 	info.frontFace = 0;
 	info.cullMode = 0;
 	glm::mat4 mat = ovg_ortho(dc->viewport.z, dc->viewport.w, -1.0f, 1.0f, 0);
@@ -4267,6 +4235,7 @@ void ovg_ctx_t::draw_dynamic(rvg_t* rvg, VkCommandBuffer cmd, vg_fbo_t* fbo, boo
 	VkhImage image = (VkhImage)(fbo->imgMS ? fbo->imgMS : fbo->img);
 	VkhImage depthStencil = (VkhImage)fbo->depthStencil;
 	if (!image || !depthStencil)return;
+	clearRect = { {{0}, {fbo->width,fbo->height}}, 0, 1 };
 	update_va(rvg);
 	vkh_cmd_begin(cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
@@ -4985,8 +4954,8 @@ namespace ovg {
 		ds.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 		ds.pNext = NULL;
 		ds.flags = 0;
-		ds.depthTestEnable = info->flags & D_DEPTHTESTENABLE;
-		ds.depthWriteEnable = info->flags & D_DEPTHWRITEENABLE;
+		ds.depthTestEnable = info->flags & (uint8_t)depth_stencil_State::d_depthtest_enable;
+		ds.depthWriteEnable = info->flags & (uint8_t)depth_stencil_State::d_depthwrite_enable;
 		ds.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 		ds.back.failOp = VK_STENCIL_OP_KEEP;
 		ds.back.passOp = VK_STENCIL_OP_KEEP;
@@ -4998,7 +4967,7 @@ namespace ovg {
 		ds.depthBoundsTestEnable = VK_FALSE;
 		ds.minDepthBounds = 0;
 		ds.maxDepthBounds = 0;
-		ds.stencilTestEnable = info->flags & D_STENCILTESTENABLE;
+		ds.stencilTestEnable = info->flags & (uint8_t)depth_stencil_State::d_stenciltest_enable;
 		ds.front = ds.back;
 		VkStencilOpState clipingOpState = { VK_STENCIL_OP_ZERO,
 										VK_STENCIL_OP_REPLACE,
@@ -5129,11 +5098,11 @@ void ovg_ctx_t::draw_geom(VkCommandBuffer cmd, geom_cmd_t* c)
 			, sizeof(glm::mat4) + sizeof(float), &c->mat);
 		push_update_descriptor_set(cmd, cp, (VkhImage)c->texture);
 	}
-	bind_geom(cmd, c->offset * v2offset, c->ioffset);
+	bind_geom(cmd, c->v_offset * v2offset, c->i_offset);
 	if (c->firstIndex == -1)
-		vkCmdDraw(cmd, c->count, 1, c->vertexOffset, 0);
+		vkCmdDraw(cmd, c->elemCount, 1, c->vertexOffset, 0);
 	else
-		vkCmdDrawIndexed(cmd, c->count, 1, c->firstIndex, c->vertexOffset, 0);
+		vkCmdDrawIndexed(cmd, c->elemCount, 1, c->firstIndex, c->vertexOffset, 0);
 }
 const VkClearAttachment clearStencil = { VK_IMAGE_ASPECT_STENCIL_BIT, 1, {{{1,0}}} };
 const VkClearAttachment clearColorAttach = { VK_IMAGE_ASPECT_COLOR_BIT, 0, {{{0}}} };
@@ -5216,7 +5185,21 @@ void ovg_ctx_t::draw_vg(VkCommandBuffer cmd, vgcmd_t* c, VkRect2D& cuclip)
 	{
 		VkClearAttachment ca[2] = { clearColorAttach, clearStencil };
 		ca[1].clearValue.depthStencil.depth = 1;
-		vkCmdClearAttachments(cmd, 2, ca, 1, &clearRect);
+		glm::ivec4 ccrt = c->bounds;
+		VkClearRect cr = clearRect;
+		if (ccrt.z > 0 && ccrt.w > 0) {
+			if (ccrt.x < 0)
+			{
+				ccrt.z += ccrt.x; ccrt.x = 0;
+			}
+			if (ccrt.y < 0)
+			{
+				ccrt.w += ccrt.y; ccrt.y = 0;
+			}
+			cr.rect.offset = { ccrt.x,ccrt.y };
+			cr.rect.extent = { std::min((uint32_t)ccrt.z,cr.rect.extent.width - ccrt.x), std::min((uint32_t)ccrt.w,cr.rect.extent.height - ccrt.y) };
+		}
+		vkCmdClearAttachments(cmd, 2, ca, 1, &cr);
 	}
 	break;
 	}

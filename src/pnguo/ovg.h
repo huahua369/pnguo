@@ -36,7 +36,7 @@ enum class path_type_et :uint32_t
 	e_vcurve,	// 二次曲线
 	e_vcubic	// 三次曲线
 };
- 
+
 enum vg_line_cap_t :uint8_t {
 	VG_LINE_CAP_BUTT,
 	VG_LINE_CAP_ROUND,
@@ -91,46 +91,6 @@ enum vg_operator_t :uint8_t {
 	VG_OPERATOR_DIFFERENCE,
 	VG_OPERATOR_MAX,
 };
-#ifndef D_DEPTHTESTENABLE 
-#define D_DEPTHTESTENABLE 0x01
-#define D_DEPTHWRITEENABLE 0x02
-#define D_STENCILTESTENABLE 0x04 
-#endif
-// 混合模式 
-enum class blendMode_e :int {
-	none = -1,	// 不混合
-	normal = 0,	// 普通混合
-	additive,
-	multiply,
-	modulate,
-	screen,
-	normal_prem,	// 预乘alpha
-	additive_prem,
-};
-enum shader_type_e :uint8_t {
-	ST_NONE,
-	ST_MASK,
-	ST_DOUBLESIDED,
-	ST_INSTANCE,
-	ST_INSTANCE_DOUBLESIDED,
-};
-// 0矢量图管线						2d
-// 0普通三角形(纹理)					2d/3d		tex0
-// 1普通三角形+遮罩纹理				2d/3d		tex0、tex1
-// 2双面三角形(两种颜色/纹理)			doubleSided	tex0
-// 3三角形(纹理)实例化							ubo0、tex1
-// 4双面三角形(两种颜色/纹理)实例化				ubo0、tex1
-struct gem_info_t {
-	uint8_t blendMode = 0;
-	uint8_t topology = 0;
-	uint8_t polygon = 0;
-	uint8_t frontFace = 0;	// COUNTER_CLOCKWISE = 0, CLOCKWISE = 1,
-	uint8_t cullMode = 0;	// NONE=0, FRONT=1, BACK=2, FRONT_AND_BACK=3
-	uint8_t flags = 0;		// depthTestEnable, depthWriteEnable, stencilTestEnable
-	uint8_t lineWidth = 1;
-	uint8_t shader = 0;		// shader_type_e
-};
-
 
 struct push_constants_t {
 	glm::vec4          source;
@@ -182,6 +142,82 @@ struct vg_state_save_t {
 	bool aa = true;
 	bool glutessEnable = false;
 };
+enum class depth_stencil_State :uint8_t {
+	d_depthtest_enable = 0x01,
+	d_depthwrite_enable = 0x02,
+	d_stenciltest_enable = 0x04
+};
+// 混合模式 
+enum class blendMode_e :int {
+	none = -1,	// 不混合
+	normal = 0,	// 普通混合
+	additive,
+	multiply,
+	modulate,
+	screen,
+	normal_prem,	// 预乘alpha
+	additive_prem,
+};
+enum shader_type_e :uint8_t {
+	ST_NONE,
+	ST_MASK,
+	ST_DOUBLESIDED,
+	ST_INSTANCE,
+	ST_INSTANCE_DOUBLESIDED,
+};
+// 0矢量图管线						2d
+// 0普通三角形(纹理)					2d/3d		tex0
+// 1普通三角形+遮罩纹理				2d/3d		tex0、tex1
+// 2双面三角形(两种颜色/纹理)			doubleSided	tex0
+// 3三角形(纹理)实例化							ubo0、tex1
+// 4双面三角形(两种颜色/纹理)实例化				ubo0、tex1
+struct gem_info_t {
+	uint8_t blendMode = 0;
+	uint8_t topology = 0;
+	uint8_t polygon = 0;
+	uint8_t frontFace = 0;	// COUNTER_CLOCKWISE = 0, CLOCKWISE = 1,
+	uint8_t cullMode = 0;	// NONE=0, FRONT=1, BACK=2, FRONT_AND_BACK=3
+	uint8_t flags = 0;		// depthTestEnable, depthWriteEnable, stencilTestEnable
+	uint8_t lineWidth = 1;
+	uint8_t shader = 0;		// shader_type_e
+};
+
+// 渲染命令
+#if 1
+// 普通三角形命令
+struct geom_cmd_t {
+	int stype = 1;
+	gem_info_t state = {};
+	void* texture = nullptr;
+	glm::mat4 mat = glm::mat4(1.0f);	// 矩阵
+	float mask_time = 1.0;				// 遮罩时间
+	uint32_t elemCount = 0;				// 元素计数，索引数量或顶点数量
+	uint32_t firstIndex = 0;			// -1则非索引渲染
+	int32_t  vertexOffset = 0;
+	size_t v_offset = 0, i_offset = 0;	// vbo和ibo绑定偏移
+};
+
+struct vg_sub_cmd {
+	uint32_t vertexCount;
+	uint32_t firstVertex;
+};
+// 矢量命令
+struct vgcmd_t {
+	int stype = 0;
+	vg_sub_cmd* v = 0;
+	int vc = 0;
+	int full_screen_quad = 0;
+	glm::ivec2 vertex = {};			// 顶点开始、数量
+	glm::ivec2 index = {};			// 索引开始、数量
+	vg_state_save_t* state = {};	// 渲染参数
+	glm::vec4 bounds = {};			// 全屏填充,odd/clip专用
+	int8_t type = 0;				// 类型：填充0、描边1、裁剪2、全屏3、清屏4
+};
+union gcmd_t {
+	vgcmd_t vg;
+	geom_cmd_t g;
+};
+#endif
 
 enum ImageFlipMode
 {
@@ -339,6 +375,7 @@ struct ovg_canvas_cb {
 
 ovg_canvas_cb* new_canvas_cb();
 void free_canvas_cb(ovg_canvas_cb*);
+
 struct vg_fbo_t
 {
 	uint32_t width, height;
