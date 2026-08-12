@@ -34,3 +34,13 @@
 /out
 /bin
 /enc_temp_folder/c927f6287b4ba71854ec0d1a9226655
+/src/pnguo/shaders/a_base3d.frag.spv
+/src/pnguo/shaders/a_base3d.vert.spv
+/src/pnguo/shaders/a_base3d_dsc.frag.spv
+/src/pnguo/shaders/a_base3d_dsc.vert.spv
+/src/pnguo/shaders/a_base3d_dsc_inst.frag.spv
+/src/pnguo/shaders/a_base3d_dsc_inst.vert.spv
+/src/pnguo/shaders/a_base3d_inst.frag.spv
+/src/pnguo/shaders/a_base3d_inst.vert.spv
+/src/pnguo/shaders/a_vg.frag.spv
+/src/pnguo/shaders/a_vg.vert.spv
