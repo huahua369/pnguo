@@ -4177,7 +4177,9 @@ VkhImage dc_device_create_empty_texture(ovg_device_t* dev, VkFormat format, int 
 	vkh_image_set_layout(dev->cmd, emptyImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 	vkh_cmd_end(dev->cmd);
+	vkResetFences(dev->dev, 1, &dev->fence);
 	vkh_cmd_submit(dev->gQueue, &cmd, dev->fence);
+	vkWaitForFences(dev->dev, 1, &dev->fence, VK_TRUE, UINT64_MAX);
 	return emptyImg;
 }
 struct vg_fbo_t0

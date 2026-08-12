@@ -1145,13 +1145,18 @@ namespace vkg {
 			enabledMeshShaderFeatures.pNext = physicalDeviceFeatures2.pNext;
 			physicalDeviceFeatures2.pNext = &enabledMeshShaderFeatures;
 		}
-		VkPhysicalDeviceSamplerYcbcrConversionFeatures deviceSamplerYcbcrConversionFeatures = {  };
+		//VkPhysicalDeviceSamplerYcbcrConversionFeatures deviceSamplerYcbcrConversionFeatures = {  };
+		static VkPhysicalDeviceVulkan11Features ef11 = { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES };
+		ef11.shaderDrawParameters = VK_TRUE;
+		ef11.pNext = (void*)physicalDeviceFeatures2.pNext;
 		if (supportsKHRSamplerYCbCrConversion) {
-			deviceSamplerYcbcrConversionFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
-			deviceSamplerYcbcrConversionFeatures.samplerYcbcrConversion = VK_TRUE;
-			deviceSamplerYcbcrConversionFeatures.pNext = (void*)physicalDeviceFeatures2.pNext;
-			physicalDeviceFeatures2.pNext = &deviceSamplerYcbcrConversionFeatures;
+			ef11.samplerYcbcrConversion = VK_TRUE;
+			//deviceSamplerYcbcrConversionFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
+			//deviceSamplerYcbcrConversionFeatures.samplerYcbcrConversion = VK_TRUE;
+			//deviceSamplerYcbcrConversionFeatures.pNext = (void*)physicalDeviceFeatures2.pNext;
+			//
 		}
+		physicalDeviceFeatures2.pNext = &ef11;
 		VkPhysicalDeviceDynamicRenderingFeaturesKHR enabledDynamicRenderingFeaturesKHR = {};
 		if (dr && !dr13) {
 			enabledDynamicRenderingFeaturesKHR.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
