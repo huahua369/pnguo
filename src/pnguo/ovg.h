@@ -1,4 +1,7 @@
 ﻿#pragma once
+/*
+矢量/图片/文本/三角形录制到rvg_t对象
+*/
 #include <cstdint>
 
 
@@ -110,6 +113,7 @@ struct vg_gradient_t {
 	uint32_t count;
 	int extend;
 };
+// 纹理表面，由后端提供
 struct vg_surface_t;
 struct font_family_t;
 
@@ -194,7 +198,7 @@ struct geom_cmd_t {
 	uint32_t elemCount = 0;				// 元素计数，索引数量或顶点数量
 	uint32_t firstIndex = 0;			// -1则非索引渲染
 	int32_t  vertexOffset = 0;
-	size_t v_offset = 0, i_offset = 0;	// vbo和ibo绑定偏移
+	size_t v_offset = 0;				// vbo绑定偏移：0单面，1双面
 };
 
 struct vg_sub_cmd {
@@ -273,6 +277,23 @@ struct mem_resource_t;
 struct ovg_path_t;
 // 矢量对象
 struct rvg_t;
+
+struct ovgVertex {
+	glm::vec2	pos;
+	glm::vec2	uv;
+	uint32_t	color;
+};
+struct geomVertex1 {
+	glm::vec3 pos;
+	glm::vec2 uv;
+	uint32_t color;
+};
+struct geomVertex2 {
+	glm::vec3 pos;
+	glm::vec2 uv;
+	uint32_t color;
+	uint32_t color1;
+};
 // 渲染列表
 struct drawlist_t;
 // 接口
@@ -296,6 +317,7 @@ struct ovg_canvas_cb {
 	void(*rel_line_to)(ovg_path_t* path, float dx, float dy);
 	void(*arc)(ovg_path_t* path, float xc, float yc, float radius, float a1, float a2);
 	void(*arc_negative)(ovg_path_t* path, float xc, float yc, float radius, float a1, float a2);
+	// 有缩放时，先执行set_path一次再执行curve_to
 	void(*curve_to)(ovg_path_t* path, float x1, float y1, float x2, float y2, float x3, float y3);
 	void(*rel_curve_to)(ovg_path_t* path, float x1, float y1, float x2, float y2, float x3, float y3);
 	void(*quadratic_to)(ovg_path_t* path, float x1, float y1, float x2, float y2);
@@ -347,7 +369,7 @@ struct ovg_canvas_cb {
 	rvg_t* (*new_rvg)(mem_resource_t* ac);
 	void (*destroy_rvg)(rvg_t* p);
 	void(*clear)(rvg_t* v);			// 清空画布
-	void(*set_path)(rvg_t* v, ovg_path_t* path, vg_state_save_t* st);
+	void(*set_path)(rvg_t* v, ovg_path_t* path, vg_state_save_t* st);// 绑定路径和状态
 	void(*stroke)(rvg_t* v);
 	void(*stroke_preserve)(rvg_t* v);
 	void(*fill)(rvg_t* v);
@@ -367,30 +389,28 @@ struct ovg_canvas_cb {
 	// 原始三角形，输入0则不修改
 	void (*set_geom_state)(rvg_t* dc, gem_info_t* info, const void* matrix4x4);
 	// 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据，color_type=0表示float4，1表示uint32_t
-	void (*add_geometry)(rvg_t* dc, void* texture, const float* xy, int xy_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
+	void (*add_geometry)(rvg_t* dc, vg_surface_t* texture, const float* xy, int xy_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
 	// 添加3D几何数据到缓冲区，xyz顶点坐标，color顶点颜色（双面则要双倍），uv顶点纹理坐标，indices索引数据
-	void (*add_geometry3d)(rvg_t* dc, void* texture, const float* xyz, int xyz_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
+	void (*add_geometry3d)(rvg_t* dc, vg_surface_t* texture, const float* xyz, int xyz_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
 
 };
 
 ovg_canvas_cb* new_canvas_cb();
 void free_canvas_cb(ovg_canvas_cb*);
 
-struct vg_fbo_t
-{
-	uint32_t width, height;
-	void* img;
-	void* imgMS;
-	void* depthStencil;
+struct ovg_draw_data {
+	gcmd_t* d;				// 渲染命令列表
+	size_t count;
+	ovgVertex* vg_vertex;	// 矢量顶点
+	size_t v_count;
+	uint32_t* vg_indices;	// 矢量索引
+	size_t i_count;
+	size_t uboCount;		// 渐变ubo结构数量
+	geomVertex1* vertex1;	// 单面顶点
+	size_t v1_count;
+	geomVertex2* vertex2;	// 双面顶点
+	size_t v2_count;
+	uint32_t* geom_indices;	// 索引 
+	size_t g_count;
 };
-// 测试
-//void* new_gpu();
-struct ovg_device_t;
-struct ovg_ctx_t;
-ovg_device_t* new_vkdevctx(VkDevice vkdev, VkPhysicalDevice phy, VkInstance instance, uint32_t qFamIdx);
-void free_vkdevctx(ovg_device_t* dev);
-ovg_ctx_t* new_ovgctx(ovg_device_t* dev, VkFormat colorFormat, VkFormat depthFormat, VkSampleCountFlags samples);
-void free_ovgctx(ovg_ctx_t* p);
-ovg_canvas_cb* get_canvas_cb(ovg_ctx_t* ctx);// 不需要释放
-vg_fbo_t new_vgfbo(ovg_ctx_t* p, int width, int height);
-void free_vgfbo(vg_fbo_t*);
+ovg_draw_data get_draw_list(rvg_t* p);

@@ -1,5 +1,5 @@
-slangc vg.slang -target glsl -profile glsl_450 -force-glsl-scalar-layout -entry main -o spv_c/a_vg.vert.glsl
-slangc vg.slang -target glsl -profile glsl_450 -force-glsl-scalar-layout -entry fragMain -o spv_c/a_vg.frag.glsl 
+slangc avg.slang -target glsl -profile glsl_450 -force-glsl-scalar-layout -entry main -o spv_c/a_vg.vert.glsl
+slangc avg.slang -target glsl -profile glsl_450 -force-glsl-scalar-layout -entry fragMain -o spv_c/a_vg.frag.glsl 
 
 slangc base3d.slang -target glsl -profile glsl_450 -force-glsl-scalar-layout -entry main -o spv_c/a_base3d.vert.glsl  
 slangc base3d.slang -target glsl -profile glsl_450 -force-glsl-scalar-layout -entry fragMain -o spv_c/a_base3d.frag.glsl 

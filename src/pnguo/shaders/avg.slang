@@ -2,18 +2,18 @@
 struct VSInput
 {
 	float2 inPos;
+	float2 inUV;
 	float4 inColor;
-	float3 inUV;
 };
 
 struct VSOutput
 {
-	float3 UV : TEXCOORD0;
+	float4 pos : SV_Position;
+	float2 UV : TEXCOORD0;
 	float4 Src : TEXCOORD1;
 	nointerpolation int   PatType : TEXCOORD2;
 	nointerpolation float Opacity : TEXCOORD3;
-	float3x2 Mat : TEXCOORD4;
-	float4 pos : SV_Position;
+	float  Mat [8] : TEXCOORD4;
 };
 
 struct uboGrad_
@@ -27,21 +27,25 @@ struct uboGrad_
 	int		extend;
 };
 
-ConstantBuffer<uboGrad_> uboGrad;
 [[vk::constant_id(0)]] const int NUM_SAMPLES = 8;
 
 struct PushConsts
 {
+	float mat[8];
+	float matInv[8];
 	float4 source;
 	float2 size;
 	int    fullScreenQuad_srcType;
 	float  opacity;
-	float3x2 mat;
-	float3x2 matInv;
 };
 
+#ifdef PUSH_CONST
 [[vk::push_constant]] PushConsts pc;
-Sampler2D source;
+#else
+[[vk::binding(0, 1)]] ConstantBuffer<PushConsts> pc;
+#endif
+[[vk::binding(0, 3)]] ConstantBuffer<uboGrad_> uboGrad;
+[[vk::binding(0, 2)]] Sampler2D source;
 
 static const int FULLSCREEN_BIT = 0x10000000;
 static const int SRCTYPE_MASK = 0x000000FF;
@@ -65,15 +69,15 @@ VSOutput main(VSInput input)
 	if ((pc.fullScreenQuad_srcType & FULLSCREEN_BIT) == FULLSCREEN_BIT)
 	{
 		output.pos = float4(input.inPos, 0.0, 1.0);
-		output.UV = float3(0, 0, -1);
+		output.UV = float2(0, 0);
 		return output;
 	}
 
 	output.UV = input.inUV;
 
 	float2 p = float2(
-		pc.mat[0][0] * input.inPos.x + pc.mat[1][0] * input.inPos.y + pc.mat[2][0],
-		pc.mat[0][1] * input.inPos.x + pc.mat[1][1] * input.inPos.y + pc.mat[2][1]
+		pc.mat[0] * input.inPos.x + pc.mat[2] * input.inPos.y + pc.mat[4],
+		pc.mat[1] * input.inPos.x + pc.mat[3] * input.inPos.y + pc.mat[5]
 	);
 
 	output.pos = float4(p * 2.0 / pc.size - 1.0, 0.0, 1.0);
@@ -331,7 +335,7 @@ float4 gpu_sample_mesh(float2 renderCoord, float2 box, int stop_count, int exten
 	t = gpu_extend_t(t, extend);
 	return gpu_eval_stops(stop_count, t);
 }
-float4 gpu_paint(float2 renderCoord, float4 inSrc, float3x2 inMat, int inPatType)
+float4 gpu_paint(float2 renderCoord, float4 inSrc, float inMat[8], int inPatType)
 {
 	float2 box = inSrc.xy; 	// 画布大小,一般用最大值
 	box *= uboGrad.scale;
@@ -344,8 +348,10 @@ float4 gpu_paint(float2 renderCoord, float4 inSrc, float3x2 inMat, int inPatType
 	case SURFACE:
 		float2 p = (renderCoord.xy - inSrc.xy);
 		float2 uv = float2(
-			inMat[0][0] * p.x + inMat[1][0] * p.y + inMat[2][0],
-			inMat[0][1] * p.x + inMat[1][1] * p.y + inMat[2][1]
+			inMat[0] * p.x + inMat[2] * p.y + inMat[4],
+			inMat[1] * p.x + inMat[3] * p.y + inMat[5]
+			//inMat[0][0] * p.x + inMat[1][0] * p.y + inMat[2][0],
+			//inMat[0][1] * p.x + inMat[1][1] * p.y + inMat[2][1]
 		);
 		uv /= inSrc.zw;
 		/*if (uv.x < 0 || uv.y < 0 || uv.x > 1 || uv.y > 1)
