@@ -1,10 +1,10 @@
 ﻿/*
 2026/8/8
 sdl3 gpu规则
-set0 v 纹理
-set1 v ubo
-set2 f 纹理
-set3 f ubo
+set0 vert 纹理
+set1 vert ubo
+set2 frag 纹理
+set3 frag ubo
 
 */
 
@@ -405,7 +405,13 @@ void ovg_ctx_t::init(ovg_device_t* dev, VkFormat colorFormat, VkFormat depthForm
 										STENCIL_FILL_BIT,
 										STENCIL_FILL_BIT,
 										0x1 };
-
+	stencilOpState.failOp = VK_STENCIL_OP_KEEP;
+	stencilOpState.passOp = VK_STENCIL_OP_ZERO;
+	stencilOpState.depthFailOp = VK_STENCIL_OP_KEEP;
+	stencilOpState.compareOp = VK_COMPARE_OP_EQUAL;
+	stencilOpState.compareMask = STENCIL_FILL_BIT;
+	stencilOpState.writeMask = STENCIL_FILL_BIT;
+	stencilOpState.reference = 0x1;
 	VkPipelineDepthStencilStateCreateInfo dsStateCreateInfo = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
 		.depthTestEnable = VK_FALSE,
@@ -2989,3 +2995,4 @@ void free_vgfbo(vg_fbo_t* p) {
 	}
 }
 #endif // 
+

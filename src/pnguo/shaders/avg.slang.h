@@ -13,7 +13,7 @@ struct VSOutput
 	float4 Src : TEXCOORD1;
 	nointerpolation int   PatType : TEXCOORD2;
 	nointerpolation float Opacity : TEXCOORD3;
-	float  Mat [8] : TEXCOORD4;
+	float2x3  Mat : TEXCOORD4;
 };
 
 struct uboGrad_
@@ -31,8 +31,8 @@ struct uboGrad_
 
 struct PushConsts
 {
-	float mat[8];
-	float matInv[8];
+	float2x3 mat;
+	float2x3 matInv;
 	float4 source;
 	float2 size;
 	int    fullScreenQuad_srcType;
@@ -75,11 +75,7 @@ VSOutput main(VSInput input)
 
 	output.UV = input.inUV;
 
-	float2 p = float2(
-		pc.mat[0] * input.inPos.x + pc.mat[2] * input.inPos.y + pc.mat[4],
-		pc.mat[1] * input.inPos.x + pc.mat[3] * input.inPos.y + pc.mat[5]
-	);
-
+	float2 p = mul(pc.mat, float3(input.inPos, 1.0));
 	output.pos = float4(p * 2.0 / pc.size - 1.0, 0.0, 1.0);
 	return output;
 }
@@ -140,52 +136,36 @@ float2 gpu_apply_minv(int4 m, float2 v)
  * Evaluate t in untransformed space. */
 float4 gpu_sample_linear(float2 renderCoord, float2 box, int stop_count, int extend)
 {
-	float4 t0 = uboGrad.cp[0];
+	float4 cp = uboGrad.cp[0];
+	float2 rCoord = renderCoord / box;
+	float4 t0 = cp;
 	float2 p0 = float2(t0.xy / box);
 	float2 d = float2(t0.zw / box) - p0;
 	float denom = dot(d, d);
 	if (denom < 1e-6) return float4(0.0);
 	int4 m = uboGrad.m;
-	float2 p = renderCoord - p0;
+	float2 p1 = renderCoord - t0.xy;
+	float2 p = p1 / box;
 	p = gpu_apply_minv(m, p);
 	float t = dot(p, d) / denom;
 	t = gpu_extend_t(t, extend);
 	return gpu_eval_stops(stop_count, t);
 }
-float4 gpu_sample_linear0(float2 renderCoord, float2 box, int stop_count, int extend)
-{
-	float dist = 1;
-	float2 p0 = uboGrad.cp[0].xy / box;
-	float2 p1 = uboGrad.cp[0].zw / box;
-	float2 p = renderCoord;
-	float l = length(p1 - p0);
-	float2 u = normalize(p1 - p0);
-	if (u.y == 0)
-		if (u.x < 0)
-			dist = -(p.x - p0.x) / l;
-		else
-			dist = (p.x - p0.x) / l;
-	else {
-		float m = -u.x / u.y;
-		float bb = p0.y - m * p0.x;
-		dist = ((p.y - m * p.x - bb) / sqrt(1 + m * m)) / l;
-		if (u.y < 0)
-			dist = -dist;
-	}
-	dist = gpu_extend_t(dist, extend);
-	return gpu_eval_stops(stop_count, dist);
-}
+
 
 float4 gpu_sample_radial(float2 renderCoord, float2 box, int stop_count, int extend)
 {
+	float4 cp[2] = uboGrad.cp;
+	float2 rCoord = renderCoord / box;
 	int4 m = uboGrad.m;
-	float2 c0_r = uboGrad.cp[0].xy / box;
-	float2 cd = uboGrad.cp[1].xy / box;
+	float2 c0_r = cp[0].xy / box;
+	float2 cd = cp[1].xy / box;
 	cd -= c0_r;
-	float r0 = uboGrad.cp[0].z / box.x;
-	float r1 = uboGrad.cp[1].z / box.x;
+	float r0 = cp[0].z / box.x;
+	float r1 = cp[1].z / box.x;
 	float dr = r1 - r0;
-	float2 p = (renderCoord - c0_r);
+	float2 p1 = (renderCoord - cp[0].xy);
+	float2 p = (p1 / box);
 	p = gpu_apply_minv(m, p);
 
 	float A = dot(cd, cd) - dr * dr;
@@ -213,48 +193,20 @@ float4 gpu_sample_radial(float2 renderCoord, float2 box, int stop_count, int ext
 	t = gpu_extend_t(t, extend);
 	return gpu_eval_stops(stop_count, t);
 }
-float4 gpu_sample_radiala(float2 renderCoord, float2 box, int stop_count, int extend)
-{
-	float2 c0 = uboGrad.cp[0].xy / box;
-	float2 c1 = uboGrad.cp[1].xy / box;
-	float r0 = uboGrad.cp[0].z / box.x;
-	float r1 = uboGrad.cp[1].z / box.x;
-	float gradLength = 1.0;
-	float2 diff = c0 - c1;
-	float2 rayDir = normalize(renderCoord - c0);
-	int4 m = uboGrad.m;
-	rayDir = gpu_apply_minv(m, rayDir);
-	float a = dot(rayDir, rayDir);
-	float b = 2.0 * dot(rayDir, diff);
-	float cc = dot(diff, diff) - r1 * r1;
-	float disc = b * b - 4.0 * a * cc;
-	if (disc >= 0.0)
-	{
-		float t = (-b + sqrt(abs(disc))) / (2.0 * a);
-		float2 projection = c0 + rayDir * t;
-		gradLength = distance(projection, c0) - r0;
-	}
-	else
-	{
-		//return float4(0.0);
-		//gradient is undefined for this coordinate
-	}
-	float grad = (distance(renderCoord, c0) - r0) / gradLength;
-	float t = grad;
-	t = gpu_extend_t(t, extend);
-	return gpu_eval_stops(stop_count, t);
-}
 
 float4 gpu_sample_sweep(float2 renderCoord, float2 box, int stop_count, int extend)
 {
-	float4 t0 = uboGrad.cp[0];
+	float4 cp[2] = uboGrad.cp;
+	float2 rCoord = renderCoord / box;
+	float4 t0 = cp[0];
 	int4 m = uboGrad.m;// int4(1024, 0, 0, 1024);
 	float2 p0 = float2(t0.xy / box);
 	float a0 = t0.z;  /* fraction of pi */
 	float a1 = t0.w;
 	float span = a1 - a0;
 	if (abs(span) < 1e-6) return float4(0.0);
-	float2 p = normalize(renderCoord - p0);
+	float2 p1 = normalize(renderCoord - t0.xy);
+	float2 p = normalize(rCoord - p0);
 	p = gpu_apply_minv(m, p);
 	/* atan2 returns (-pi, pi]; normalize to [0, 2) fractions of pi. */
 	float ang = atan2(p.y, p.x) / 3.14159265358979;
@@ -335,11 +287,10 @@ float4 gpu_sample_mesh(float2 renderCoord, float2 box, int stop_count, int exten
 	t = gpu_extend_t(t, extend);
 	return gpu_eval_stops(stop_count, t);
 }
-float4 gpu_paint(float2 renderCoord, float4 inSrc, float inMat[8], int inPatType)
+float4 gpu_paint(float2 renderCoord, float4 inSrc, float2x3 inMat, int inPatType)
 {
 	float2 box = inSrc.xy; 	// 画布大小,一般用最大值
 	box *= uboGrad.scale;
-	renderCoord = renderCoord / box;
 	float4 acc = float4(0.0);
 	int extend = uboGrad.extend;
 	int stop_count = int(uboGrad.count);
@@ -347,12 +298,7 @@ float4 gpu_paint(float2 renderCoord, float4 inSrc, float inMat[8], int inPatType
 	switch (inPatType) {
 	case SURFACE:
 		float2 p = (renderCoord.xy - inSrc.xy);
-		float2 uv = float2(
-			inMat[0] * p.x + inMat[2] * p.y + inMat[4],
-			inMat[1] * p.x + inMat[3] * p.y + inMat[5]
-			//inMat[0][0] * p.x + inMat[1][0] * p.y + inMat[2][0],
-			//inMat[0][1] * p.x + inMat[1][1] * p.y + inMat[2][1]
-		);
+		float2 uv = mul(inMat, float3(p, 1.0));
 		uv /= inSrc.zw;
 		/*if (uv.x < 0 || uv.y < 0 || uv.x > 1 || uv.y > 1)
 			discard;*/
@@ -376,7 +322,6 @@ float4 gpu_paint(float2 renderCoord, float4 inSrc, float inMat[8], int inPatType
 float4 fragMain(VSOutput input)
 {
 	float4 c = gpu_paint(input.pos.xy, input.Src, input.Mat, input.PatType);
-
 	c *= input.Opacity;
 	return c;
 }

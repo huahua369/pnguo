@@ -1,5 +1,5 @@
-slangc avg.slang -target glsl -profile glsl_450 -force-glsl-scalar-layout -entry main -o spv_c/a_vg.vert.glsl
-slangc avg.slang -target glsl -profile glsl_450 -force-glsl-scalar-layout -entry fragMain -o spv_c/a_vg.frag.glsl 
+slangc -lang slang avg.slang.h -target glsl -profile glsl_450 -force-glsl-scalar-layout -entry main -o spv_c/a_vg.vert.glsl
+slangc -lang slang avg.slang.h -target glsl -profile glsl_450 -force-glsl-scalar-layout -entry fragMain -o spv_c/a_vg.frag.glsl 
 
 slangc base3d.slang -target glsl -profile glsl_450 -force-glsl-scalar-layout -entry main -o spv_c/a_base3d.vert.glsl  
 slangc base3d.slang -target glsl -profile glsl_450 -force-glsl-scalar-layout -entry fragMain -o spv_c/a_base3d.frag.glsl 
@@ -15,6 +15,9 @@ slangc base3d.slang -target glsl -profile glsl_450 -force-glsl-scalar-layout -en
 
 slangc base3d.slang -target glsl -profile glsl_450 -force-glsl-scalar-layout -entry main -D DOUBLESIDEDCOLOR -D ID_INSTANCING=1 -o spv_c/a_base3d_dsc_inst.vert.glsl  
 slangc base3d.slang -target glsl -profile glsl_450 -force-glsl-scalar-layout -entry fragMain -D DOUBLESIDEDCOLOR -D ID_INSTANCING=1 -o spv_c/a_base3d_dsc_inst.frag.glsl 
+
+glslangValidator avg.vert.glsl.h -V -S vert --vn vg_vert -o spv_c/a_vg0.vert.h
+glslangValidator avg.frag.glsl.h -V -S frag --vn vg_frag -o spv_c/a_vg0.frag.h
 
 glslangValidator spv_c/a_vg.vert.glsl -V --vn vg_vert -o spv_c/a_vg.vert.h
 glslangValidator spv_c/a_vg.frag.glsl -V --vn vg_frag -o spv_c/a_vg.frag.h

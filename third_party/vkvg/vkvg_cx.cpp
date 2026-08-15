@@ -10757,7 +10757,7 @@ void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 	auto cwait_last = ctx->cmdFence[cmdidx];
 	ctx->cmdStarted = false;
 
-	gct = test_geoms(gct, ctx, gt);
+	//gct = test_geoms(gct, ctx, gt);
 #if 0
 	dc_clear(ctx);
 	VkRect2D cuclip = {};
@@ -10768,9 +10768,9 @@ void* vgdev_ctx::draw(VkvgContext ctx, void** waitSemaphore)
 	_end_render_pass(ctx);
 #else 
 	vkh_cmd_begin(ctx->cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-	gct->update_va();
+	//gct->update_va();
 	gt->dev = dev;
-	gt->gctx = gct;
+	//gt->gctx = gct;
 	gt->ctx = ctx;
 	draw_dynamic(gt, ctx->cmd, ctx->pSurf->imgMS ? ctx->pSurf->imgMS : ctx->pSurf->img, ctx->pSurf->stencil, true);
 #endif

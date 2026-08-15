@@ -1454,6 +1454,18 @@ vg_state_save_t* ovg_new_state(mem_resource_t* ac0) {
 		auto pp = (ss_act*)ac->new_mem(sizeof(ss_act));
 		pp->ac = ac;
 		p = pp;
+		*p = {};
+		push_constants_t pc = {};
+		pc.source.w = 1;
+		pc.size = { (float)100, (float)100 };
+		pc.fsq_patternType = VG_PATTERN_TYPE_SOLID;
+		pc.opacity = 1.0f;
+		pc.mat = pc.matInv = glm::mat3x2(1.0);
+		p->lineWidth = 1.f;
+		p->miterLimit = 10.f;
+		p->curOperator = VG_OPERATOR_OVER;
+		p->curFillRule = VG_FILL_RULE_NON_ZERO; 
+		p->pushConsts = pc;
 	}
 	return p;
 }

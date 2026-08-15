@@ -489,7 +489,10 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	dcb->new_sub_path(path);	dcb->arc(path, 64, 64, 40, 0, 2 * m_pi);
 	dcb->new_sub_path(path);	dcb->arc_negative(path, 192, 64, 40, 0, -2 * m_pi);
 	dcb->set_fill_rule(dctx, VKVG_FILL_RULE_EVEN_ODD);
-	dcb->set_source_rgba(dctx, 0, 0.7, 0, 1);	dcb->fill_preserve(dctx);//填充
+	dcb->set_source_rgba(dctx, 0, 0.7, 0, 1);
+
+
+	dcb->fill_preserve(dctx);//填充
 	dcb->set_source_rgba(dctx, 0, 0, 0, 1);	dcb->stroke(dctx); //描边
 
 	//dcb->rectangle(path, 20, 150, 200, 100, 10);
@@ -502,13 +505,25 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	dcb->new_sub_path(path); dcb->arc_negative(path, 192, 64, 40, 0, -2 * m_pi);
 	dcb->set_glutess(dctx, true);
 	dcb->set_fill_rule(dctx, VKVG_FILL_RULE_NON_ZERO);
-	dcb->set_source_rgba(dctx, 0, 0, 0.9, 1);	dcb->fill_preserve(dctx);// 填充
+	dcb->set_source_rgba(dctx, 0, 0, 0.9, 1);
+	dcb->fill_preserve(dctx);// 填充
 
 	dcb->set_glutess(dctx, false);
 	dcb->set_source_rgba(dctx, 0, 0, 0, 1);	dcb->stroke(dctx); //描边
 	dcb->restore(dctx);
 	//dcb->translate(dctx, 0, -128);
-
+	dcb->reset_clip(dctx);
+	//dcb->rectangle(path, 128,128, 300, 200);
+	dcb->translate(dctx, 400, 0);
+	{
+		auto pat = dcb->new_pattern_radial(dctx, 150, 100, 25.6, 102.4, 102.4, 128.0, false);
+		dcb->pattern_add_color_stop(pat, 0, 0, 0, 1, 0);// 蓝
+		dcb->pattern_add_color_stop(pat, 0.5, 0, 1, 0, 1);
+		dcb->pattern_add_color_stop(pat, 1, 1, 0, 0, 1);// 红
+		dcb->set_source(dctx, pat);
+	}
+	dcb->arc(path, 128, 128.0, 76.8, 0, 2 * M_PI);
+	dcb->fill_preserve(dctx);// 填充
 	dcb->clear_path(path);
 	//dcb->clip0(dctx);
 	dcb->translate(dctx, 528, 0);
@@ -565,6 +580,7 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	void* sem = 0;
 	dcb->draw(dctx, (VkvgContext)cr, 0, &sem);//批量执行，返回vksem
 	dcb->end_frame(dctx);
+	if (rsem)*rsem = sem;
 #else 
 	vkvg_set_source_color(cr, 0xff0020ff);
 	vkvg_rectangle(cr, 5, 5, 100, 100);
@@ -579,11 +595,17 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	vkvg_rectangle(cr, 90, 90, 60, 60);
 	vkvg_stroke(cr);
 	vkvg_translate(cr, 260, 0);
-	vkvg_set_source_color(cr, 0xffff8000);
-	vkvg_arc(cr, 128.0, 128.0, 76.8, 0, 2 * glm::pi<float>());
+	vkvg_set_source_color(cr, 0xffff8000); 
+	vkvg_reset_clip(cr);
+	auto pat = vkvg_pattern_create_radial(115.2, 102.4, 25.6,
+		102.4, 102.4, 128.0);
+	vkvg_pattern_add_color_stop_rgba(pat, 0, 1, 1, 1, 1);
+	vkvg_pattern_add_color_stop_rgba(pat, 1, 0, 0, 0, 1);
+	vkvg_set_source(cr, pat);
+	vkvg_arc(cr, 120.0, 128.0, 76.8, 0, 2 * glm::pi<float>());
 	//vkvg_rectangle(cr, 0, 0, 256, 256);
 	vkvg_fill(cr);
-
+	vkvg_pattern_destroy(pat);
 	vkvg_flush(cr);
 	vkvg_surface_resolve(surf);//msaa采样转换输出
 #endif
@@ -594,7 +616,6 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 		vkvg_surface_write_to_png(surf, filename);
 	}
 	vkvg_destroy(cr);
-	if (rsem)*rsem = sem;
 	return dctx;
 }
 #endif
@@ -647,11 +668,37 @@ void canvas_gui(viewdev_cx* view, font_family_t* family)
 
 		//btn->str = (char*)u8"🍕按钮 " + std::to_string(5 + i);
 	}
+	uint32_t colors[5] = { 0x905050fc,0x9050fc50,0x90fc5050,0x90ffffff,0x90282828 };
+	//x=默认，y=鼠标进入，z=按下
+	glm::uvec3 gradTop = { 0xff4a4a4a,0x80404040,0xff292929 }, gradBot = { 0xff3a3a3a,0x80303030,0xff1d1d1d };
+	glm::uvec3 gradTop1 = { 0xff8a8a8a,0x80bebebe,0xff303030 }, gradBot1 = { 0xff5a5a5a,0x80303030,0xff1d1d1d };
+	glm::uvec2 blackb = { 0x805c5c5c , 0x801d1d1d };
+
+	for (int i = 0; i < 5; i++) {
+		auto btn = new gradient_btn();
+		//auto btn = new color_btn();
+		btn->rounding = 4;
+		dvv->add_widget(btn);
+		btn->set_size({ 200,36 });
+		btn->back_color = colors[i];
+		btn->borderLight = blackb.x;
+		btn->borderDark = blackb.y;
+		btn->gradTop = gradTop;
+		btn->gradBot = gradBot;
+		btn->style.fontsize = 16;
+		btn->style.color = -1;
+		btn->style.color_shadow = 0xcc000000;
+		btn->str = (char*)u8"🔥按钮gbutton " + std::to_string(i);
+		if (i == 4) {
+			btn->gradTop = gradTop1;
+			btn->gradBot = gradBot1;
+		}
+	}
 }
 
-void examples1(viewdev_cx* view, font_family_t* family)
+void examples1(viewdev_cx* view, app_x* appx)
 {
-
+	font_family_t* family = appx->family;
 #if 1
 	auto dvv = new div_cx();
 	dvv->set_size({ 500,400 });
@@ -999,9 +1046,15 @@ void examples1(viewdev_cx* view, font_family_t* family)
 		dvv->text = std::to_string(i);
 		view->push_m(dvv);
 	}
+	appx->draw2d = [=](app_x* ptr, float delta)
+		{
+			void* psem = 0;
+			draw_vgtest(surf, img, surfsize, 0, &psem);
+			return psem;
+		};
 #endif
 }
-#if 1
+#if 0
 ovg_ctx_t* test_ovg(dev_info_cx* devinfo) {
 	ovg_device_t* ovgdev = new_vkdevctx((VkDevice)devinfo->vkdev, (VkPhysicalDevice)devinfo->phy, (VkInstance)devinfo->inst, devinfo->qFamIdx);
 	// free_vkdevctx(ovgdev);
@@ -1116,21 +1169,15 @@ void testgui() {
 	get_dev_info(appx->dctx, &devinfo);
 
 	//auto gpu = new_gpu();
-	auto octx = test_ovg(&devinfo);
+	//auto octx = test_ovg(&devinfo);
 
 	//dom_cx* dom0 = view->get_dom(form0);
-	//examples1(view, appx->family);
-	canvas_gui(view, appx->family);
+	examples1(view, appx);
+	//canvas_gui(view, appx->family);
 	size_t frame_count = 0;
 	appx->app->set_fps(60);
 	//appx->fpslab = fpslab;
 	{
-		appx->draw2d = [=](app_x* ptr, float delta)
-			{
-				void* psem = 0;
-				//draw_vgtest(surf, img, surfsize, 0, &psem);
-				return psem;
-			};
 	}
 
 	do {
@@ -1150,7 +1197,7 @@ int main() {
 	if (kba)
 		_CrtSetBreakAlloc(kba);
 	system(R"(rd /s /q C:\Users\hua\AppData\Local\Temp\SymbolCache\vgtest.pdb)");
-	//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
+	auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 
 	testgui();
 	return 0;
