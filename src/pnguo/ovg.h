@@ -95,13 +95,15 @@ enum vg_operator_t :uint8_t {
 	VG_OPERATOR_MAX,
 };
 
+// 渲染命令
+#if 1
 struct push_constants_t {
-	glm::vec4          source;
-	glm::vec2          size;
-	uint32_t      fsq_patternType;
-	float         opacity;
 	glm::mat3x2 mat;
 	glm::mat3x2 matInv;
+	glm::vec4 source;
+	glm::vec2 size;
+	uint32_t fsq_patternType;
+	float opacity;
 };
 #define MAX_STOPS 32
 struct vg_gradient_t {
@@ -186,8 +188,6 @@ struct gem_info_t {
 	uint8_t shader = 0;		// shader_type_e
 };
 
-// 渲染命令
-#if 1
 // 普通三角形命令
 struct geom_cmd_t {
 	int stype = 1;
@@ -201,15 +201,9 @@ struct geom_cmd_t {
 	size_t v_offset = 0;				// vbo绑定偏移：0单面，1双面
 };
 
-struct vg_sub_cmd {
-	uint32_t vertexCount;
-	uint32_t firstVertex;
-};
 // 矢量命令
 struct vgcmd_t {
 	int stype = 0;
-	vg_sub_cmd* v = 0;
-	int vc = 0;
 	int full_screen_quad = 0;
 	glm::ivec2 vertex = {};			// 顶点开始、数量
 	glm::ivec2 index = {};			// 索引开始、数量
@@ -221,6 +215,38 @@ union gcmd_t {
 	vgcmd_t vg;
 	geom_cmd_t g;
 };
+struct ovgVertex {
+	glm::vec2	pos;
+	glm::vec2	uv;
+	uint32_t	color;
+};
+struct geomVertex1 {
+	glm::vec3 pos;
+	glm::vec2 uv;
+	uint32_t color;
+};
+struct geomVertex2 {
+	glm::vec3 pos;
+	glm::vec2 uv;
+	uint32_t color;
+	uint32_t color1;
+};
+struct ovg_draw_data {
+	gcmd_t* d;				// 渲染命令列表
+	size_t count;
+	ovgVertex* vg_vertex;	// 矢量顶点
+	size_t v_count;
+	uint32_t* vg_indices;	// 矢量索引
+	size_t i_count;
+	size_t uboCount;		// 渐变ubo结构数量
+	geomVertex1* vertex1;	// 单面顶点
+	size_t v1_count;
+	geomVertex2* vertex2;	// 双面顶点
+	size_t v2_count;
+	uint32_t* geom_indices;	// 索引 
+	size_t g_count;
+};
+
 #endif
 
 enum ImageFlipMode
@@ -277,25 +303,9 @@ struct mem_resource_t;
 struct ovg_path_t;
 // 矢量对象
 struct rvg_t;
+// 录制
+struct ovg_recording_t;
 
-struct ovgVertex {
-	glm::vec2	pos;
-	glm::vec2	uv;
-	uint32_t	color;
-};
-struct geomVertex1 {
-	glm::vec3 pos;
-	glm::vec2 uv;
-	uint32_t color;
-};
-struct geomVertex2 {
-	glm::vec3 pos;
-	glm::vec2 uv;
-	uint32_t color;
-	uint32_t color1;
-};
-// 渲染列表
-struct drawlist_t;
 // 接口
 struct ovg_canvas_cb {
 	mem_resource_t* ac;
@@ -395,22 +405,115 @@ struct ovg_canvas_cb {
 
 };
 
+// 命令模式，没有destroy函数的对象都不需要手动释放
+struct ovg_ctx_cb {
+	mem_resource_t* ac;	// 内存分配器，由new_ctx_cb自己创建 	
+	// 渲染操作，rvg_t可以多次执行fill或stroke/clip
+	rvg_t* (*new_rvg)(mem_resource_t* ac);
+	void (*destroy_rvg)(rvg_t* p);
+	void(*clear)(rvg_t* v);			// 清空画布 
+	// 路径操作
+	ovg_path_t* (*get_path)(rvg_t* ctx);
+	void (*new_path)(rvg_t* ctx);
+	void(*clear_path)(rvg_t* ctx);
+	void(*close_path)(rvg_t* ctx);
+	void(*new_sub_path)(rvg_t* ctx);
+	void(*path_extents)(rvg_t* ctx, float* x1, float* y1, float* x2, float* y2);
+	void(*get_current_point)(rvg_t* ctx, float* x, float* y);
+	size_t(*get_segment_count)(rvg_t* ctx);
+	void(*set_segment_color)(rvg_t* ctx, size_t idx, uint32_t color);
+	// 添加数据到当前路径，参考path_type_e
+	void(*add_path)(rvg_t* ctx, float* data, size_t count);
+	void(*move_to)(rvg_t* ctx, float x, float y);
+	void(*rel_move_to)(rvg_t* ctx, float x, float y);
+	void(*line_to)(rvg_t* ctx, float x, float y);
+	void(*rel_line_to)(rvg_t* ctx, float dx, float dy);
+	void(*arc)(rvg_t* ctx, float xc, float yc, float radius, float a1, float a2);
+	void(*arc_negative)(rvg_t* ctx, float xc, float yc, float radius, float a1, float a2);
+	// 有缩放时，先执行set_path一次再执行curve_to
+	void(*curve_to)(rvg_t* ctx, float x1, float y1, float x2, float y2, float x3, float y3);
+	void(*rel_curve_to)(rvg_t* ctx, float x1, float y1, float x2, float y2, float x3, float y3);
+	void(*quadratic_to)(rvg_t* ctx, float x1, float y1, float x2, float y2);
+	void(*rel_quadratic_to)(rvg_t* ctx, float x1, float y1, float x2, float y2);
+	void(*rectangle)(rvg_t* ctx, float x, float y, float w, float h);
+	void(*rounded_rectangle)(rvg_t* ctx, float x, float y, float w, float h, float radius);
+	void(*rounded_rectangle2)(rvg_t* ctx, float x, float y, float w, float h, float rx, float ry);
+	void(*ellipse)(rvg_t* ctx, float radiusX, float radiusY, float x, float y, float rotationAngle);
+	void(*elliptic_arc_to)(rvg_t* ctx, float x, float y, bool large_arc_flag, bool sweep_flag, float rx, float ry, float phi);
+	void(*rel_elliptic_arc_to)(rvg_t* ctx, float x, float y, bool large_arc_flag, bool sweep_flag, float rx, float ry, float phi);
+	void(*circle)(rvg_t* ctx, float x, float y, float radius);
+	// 配置状态
+	void(*set_opacity)(rvg_t* ctx, float opacity);
+	void(*set_source_color)(rvg_t* ctx, uint32_t c);
+	void(*set_source_rgba)(rvg_t* ctx, float r, float g, float b, float a);
+	void(*set_source_rgb)(rvg_t* ctx, float r, float g, float b);
+	void(*set_line_width)(rvg_t* ctx, float width);
+	void(*set_miter_limit)(rvg_t* ctx, float limit);
+	void(*set_line_cap)(rvg_t* ctx, int cap);
+	void(*set_line_join)(rvg_t* ctx, int join);
+	void(*set_source_surface)(rvg_t* ctx, vg_surface_t* surf, float x, float y);
+	void(*set_source)(rvg_t* ctx, vg_pattern_t* pat);
+	void(*set_operator)(rvg_t* ctx, int op);
+	void(*set_fill_rule)(rvg_t* ctx, int fr);
+	void(*set_dash)(rvg_t* ctx, const float* dashes, uint32_t num_dashes, float offset);		// 虚线
+	void(*set_dash8)(rvg_t* ctx, uint64_t dashes, uint32_t num_dashes, float offset);								// 虚线,用uint8_t v8[8]表示
+	void(*translate)(rvg_t* ctx, float dx, float dy);
+	void(*scale)(rvg_t* ctx, float sx, float sy);
+	void(*rotate)(rvg_t* ctx, float radians);
+	void(*transform)(rvg_t* ctx, const void* matrix);
+	void(*set_matrix)(rvg_t* ctx, const void* matrix);
+	void(*get_matrix)(rvg_t* ctx, void* matrix);
+	void(*identity_matrix)(rvg_t* ctx);
+
+	// 图案：渐变/图片 
+	vg_pattern_t* (*new_pattern_linear)(rvg_t* ctx, float x0, float y0, float x1, float y1);
+	vg_pattern_t* (*new_pattern_radial)(rvg_t* ctx, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
+	vg_pattern_t* (*new_pattern_sweep)(rvg_t* ctx, float cx, float cy, float start_angle, float end_angle);
+	int (*pattern_add_color_stop)(vg_pattern_t* pat, float o, float r, float g, float b, float a);
+	int (*pattern_set_color_stop)(vg_pattern_t* pat, int idx, float o, float r, float g, float b, float a);
+	void(*pattern_set_matrix)(vg_pattern_t* pat, const void* matrix);	// mat3x2
+	void(*pattern_set_extend)(vg_pattern_t* pat, int extend);
+	void(*pattern_set_filter)(vg_pattern_t* pat, int filter);
+
+	void(*save)(rvg_t* v);		// 保存状态，（裁剪状态暂不实现）
+	void(*restore)(rvg_t* v);	// 恢复状态
+	void(*stroke)(rvg_t* v);
+	void(*stroke_preserve)(rvg_t* v);
+	void(*fill)(rvg_t* v);
+	void(*fill_preserve)(rvg_t* v);
+	void(*paint)(rvg_t* v);			// 全屏渲染
+	void(*reset_clip)(rvg_t* v);	// 重置裁剪
+	void(*clip)(rvg_t* v);			// 路径裁剪，清空当前路径
+	void(*clip_preserve)(rvg_t* v);	// 路径裁剪
+	void(*clip_rect)(rvg_t* v, int x, int y, int width, int height);	// 矩形裁剪
+	void(*set_clip_rect)(rvg_t* v, void* rc);	// 矩形裁剪,int[4]
+	void(*get_clip_rect)(rvg_t* v, void* rc);	// 获取矩形裁剪
+
+	// 添加文本，风格，渲染区可选
+	void (*add_text)(rvg_t* dc, text_st_t* p, text_style_t* ts, text_box_rt* box);
+	// 普通图片，支持九宫格、混合颜色
+	void (*add_image)(rvg_t* dc, ovg_image_r* r);
+	// 原始三角形，输入0则不修改
+	void (*set_geom_state)(rvg_t* dc, gem_info_t* info, const void* matrix4x4);
+	// 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据，color_type=0表示float4，1表示uint32_t
+	void (*add_geometry)(rvg_t* dc, vg_surface_t* texture, const float* xy, int xy_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
+	// 添加3D几何数据到缓冲区，xyz顶点坐标，color顶点颜色（双面则要双倍），uv顶点纹理坐标，indices索引数据
+	void (*add_geometry3d)(rvg_t* dc, vg_surface_t* texture, const float* xyz, int xyz_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
+	// todo 录制
+	void (*start_recording)(rvg_t* ctx);
+	ovg_recording_t* (*stop_recording)(rvg_t* ctx);
+	void (*replay)(rvg_t* ctx, ovg_recording_t* rec);
+	void (*replay_command)(rvg_t* ctx, ovg_recording_t* rec, uint32_t cmdIndex);
+	uint32_t(*recording_get_count)(ovg_recording_t* rec);
+	void* (*recording_get_data)(ovg_recording_t* rec);
+	void  (*recording_destroy)(ovg_recording_t* rec);
+
+};
+
 ovg_canvas_cb* new_canvas_cb();
 void free_canvas_cb(ovg_canvas_cb*);
 
-struct ovg_draw_data {
-	gcmd_t* d;				// 渲染命令列表
-	size_t count;
-	ovgVertex* vg_vertex;	// 矢量顶点
-	size_t v_count;
-	uint32_t* vg_indices;	// 矢量索引
-	size_t i_count;
-	size_t uboCount;		// 渐变ubo结构数量
-	geomVertex1* vertex1;	// 单面顶点
-	size_t v1_count;
-	geomVertex2* vertex2;	// 双面顶点
-	size_t v2_count;
-	uint32_t* geom_indices;	// 索引 
-	size_t g_count;
-};
+ovg_ctx_cb* new_ctx_cb();
+void free_ctx_cb(ovg_ctx_cb*);
+
 ovg_draw_data get_draw_list(rvg_t* p);

@@ -32,9 +32,12 @@
 
 #include <array>
 #include <map>
+#include <vector>
+#include <stack>
 #include <memory_resource>
 
 void init_ovg_cb(ovg_canvas_cb* cb);
+void init_ovg_ctx_cb(ovg_ctx_cb* cb);
 
 #ifndef MEMAC_PMR
 template<class _Ty>
@@ -48,6 +51,7 @@ class usp_ac_cx
 public:
 	uspool_t _alloc = {};				// pmr内存分配
 	size_t _Align = 16;
+	void* ptr = 0;
 public:
 	usp_ac_cx() {}
 	~usp_ac_cx() {}
@@ -158,7 +162,48 @@ ovg_canvas_cb* new_canvas_cb()
 	return p;
 }
 void free_canvas_cb(ovg_canvas_cb* p) {
-	if (p)delete p;
+	if (p) {
+		if (p->ac)delete p->ac;
+		delete p;
+	}
+}
+class ovg_ctx_cx :public ovg_ctx_cb
+{
+public:
+
+public:
+	ovg_ctx_cx();
+	~ovg_ctx_cx();
+
+private:
+
+};
+
+ovg_ctx_cx::ovg_ctx_cx()
+{
+	auto ac0 = new usp_ac_cx();
+	ac = (mem_resource_t*)ac0;
+	init_ovg_ctx_cb(this);
+	ac0->ptr = this;
+}
+
+ovg_ctx_cx::~ovg_ctx_cx()
+{
+	auto ac1 = (usp_ac_cx*)ac;
+	if (ac1)
+		delete ac1;
+	ac = 0;
+}
+ovg_ctx_cb* new_ctx_cb()
+{
+	auto p = new ovg_ctx_cx();
+	return p;
+}
+void free_ctx_cb(ovg_ctx_cb* p) {
+	auto p1 = (ovg_ctx_cx*)p;
+	if (p) {
+		delete p1;
+	}
 }
 // vg
 #if 1
@@ -1139,6 +1184,7 @@ struct pat_act :public  vg_pattern_t {
 	usp_ac_cx* ac = 0;
 };
 
+
 vg_pattern_t* ovg_pattern_create_for_surface(usp_ac_cx* ac, void* surf) {
 	if (!surf || !ac) {
 		return 0;
@@ -1360,6 +1406,7 @@ vg_pattern_t* ovg_new_pattern_linear(mem_resource_t* ac0, float x0, float y0, fl
 	pat->extend = vg_extend_t::VG_EXTEND_NONE;
 	pat->data = &pat->g;
 	_vg_pattern_edit_linear(pat, x0, y0, x1, y1);
+	pat->matrix = glm::mat3x2(1.0);
 	pat->references = 1;
 }
 int vg_pattern_edit_radial(pat_act* pat, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse) {
@@ -1413,6 +1460,7 @@ vg_pattern_t* ovg_new_pattern_radial(mem_resource_t* ac0, float cx0, float cy0, 
 	pat->type = vg_pattern_type_t::VG_PATTERN_TYPE_RADIAL;
 	pat->extend = vg_extend_t::VG_EXTEND_NONE;
 	pat->data = &pat->g;
+	pat->matrix = glm::mat3x2(1.0);
 	vg_pattern_edit_radial(pat, cx0, cy0, radius0, cx1, cy1, radius1, is_ellipse);
 	pat->references = 1;
 }
@@ -1426,9 +1474,10 @@ vg_pattern_t* ovg_new_pattern_sweep(mem_resource_t* ac0, float cx, float cy, flo
 		return 0;
 	}
 	pat->ac = ac;
-	pat->type = vg_pattern_type_t::VG_PATTERN_TYPE_MESH;
+	pat->type = vg_pattern_type_t::VG_PATTERN_TYPE_SWEEP;
 	pat->extend = vg_extend_t::VG_EXTEND_NONE;
 	pat->data = &pat->g;
+	pat->matrix = glm::mat3x2(1.0);
 	vg_pattern_edit_sweep(pat, cx, cy, start_angle, end_angle);
 	pat->references = 1;
 }
@@ -1464,7 +1513,7 @@ vg_state_save_t* ovg_new_state(mem_resource_t* ac0) {
 		p->lineWidth = 1.f;
 		p->miterLimit = 10.f;
 		p->curOperator = VG_OPERATOR_OVER;
-		p->curFillRule = VG_FILL_RULE_NON_ZERO; 
+		p->curFillRule = VG_FILL_RULE_NON_ZERO;
 		p->pushConsts = pc;
 	}
 	return p;
@@ -1617,6 +1666,7 @@ struct rvg_t {
 	size_t _curVertOffset = 0;
 	uint32_t curColor = 0;
 	glm::ivec4 curClip = {};
+	std::stack<vg_state_save_t*> _cst;	// 保存栈 
 public:
 	rvg_t();
 	~rvg_t();
@@ -1630,6 +1680,9 @@ public:
 	void clip();
 	void clip0();
 	void clip(const glm::ivec4* rc);
+
+	void save();
+	void restore();
 public:
 	void poly_fill(ovg_path_t* ctx, glm::vec4* bounds, vgcmd_t& c);
 	void glutess_fill_non_zero(ovg_path_t* p);
@@ -1645,6 +1698,11 @@ public:
 	void _add_vertexf(ovg_path_t* ctx, float x, float y);
 	// 复制状态，自动释放
 	void cp_cmdt(vgcmd_t* c, vg_state_save_t* t);
+
+	vg_state_save_t* new_ss(vg_state_save_t* src);
+	vg_state_save_t* new_state();
+	void free_state(vg_state_save_t* p);
+	void swap_state(vg_state_save_t* p, vg_state_save_t* p1);
 };
 
 rvg_t::rvg_t()
@@ -1657,13 +1715,21 @@ rvg_t::~rvg_t()
 {}
 void rvg_t::clear_all()
 {
-	cur_path = 0;
+	ovg_clear_path(cur_path);
 	_curVertOffset = 0;
 	gCount = 0;
 	mac.release();
 	_vertex.clear();
 	_indices.clear();
 	cmdlist.clear();
+	while (_cst.size())
+	{
+		auto c = _cst.top();
+		free_state(c);
+		_cst.pop();
+	}
+	free_state(cur_st);
+	cur_st = new_state();
 }
 void rvg_t::set_path(ovg_path_t* path, vg_state_save_t* st)
 {
@@ -1819,6 +1885,9 @@ void rvg_t::fill_preserve()
 	p->t = cur_st;
 	if (p->t->pattern)
 		gCount++;
+	auto t = p->t;
+	uint32_t color = t->color;
+	p->color = color;
 	vgcmd_t c = {};
 	if (p->t->curFillRule == VG_FILL_RULE_EVEN_ODD) {
 
@@ -1909,6 +1978,75 @@ void rvg_t::clip(const glm::ivec4* rc)
 		cmdlist.push_back({ .vg = c });
 	}
 }
+
+
+vg_state_save_t* rvg_t::new_ss(vg_state_save_t* src)
+{
+	vg_state_save_t* dst = new_state();
+	if (!dst)return dst;
+	if (src)
+	{
+		*dst = *src;
+		if (src->dashes && src->dashCount > 0) {
+			ac->free_mem(dst->dashes, src->dashCount);
+			dst->dashes = (float*)ac->allocate(sizeof(float) * src->dashCount);
+			if (dst->dashes)
+				memcpy(dst->dashes, src->dashes, sizeof(float) * src->dashCount);
+			else
+				dst->dashCount = 0;
+		}
+	}
+	else
+		*dst = {};
+	return dst;
+}
+vg_state_save_t* rvg_t::new_state()
+{
+	auto t = (vg_state_save_t*)ac->allocate(sizeof(vg_state_save_t));
+	*t = {};
+	t->color = -1;
+	//VkRect2D b = {};
+	//b.extent = { ctx->pSurf->width, ctx->pSurf->height };
+	push_constants_t pc = {};
+	pc.source.w = 1;
+	pc.size = { (float)100, (float)100 };
+	pc.fsq_patternType = VG_PATTERN_TYPE_SOLID;
+	pc.opacity = 1.0f;
+	pc.mat = pc.matInv = glm::mat3x2(1.0);
+
+	t->lineWidth = 1.f;
+	t->miterLimit = 10.f;
+	t->curOperator = VG_OPERATOR_OVER;
+	t->curFillRule = VG_FILL_RULE_NON_ZERO;
+	t->aa = false;
+	//t->bounds = b;
+	t->pushConsts = pc;
+	return t;
+}
+void rvg_t::free_state(vg_state_save_t* p)
+{
+	if (p) {
+		if (p->dashes && p->dashCount > 0)
+			ac->free_mem(p->dashes, p->dashCount);
+		ac->free_mem(p, 1);
+	}
+}
+void rvg_t::swap_state(vg_state_save_t* p, vg_state_save_t* p1)
+{
+	std::swap(*p, *p1);
+}
+void rvg_t::save()
+{
+	auto ss = new_ss(cur_st);
+	_cst.push(ss);
+}
+void rvg_t::restore()
+{
+	auto c = _cst.top();
+	swap_state(cur_st, c);
+	free_state(c);
+	_cst.pop();
+}
 void rvg_t::fill()
 {
 	fill_preserve();
@@ -1963,12 +2101,63 @@ void rvg_t::poly_fill(ovg_path_t* ctx, glm::vec4* bounds, vgcmd_t& c)
 	if (!nc)return;
 	ptrPath = 0;
 
-	c.v = (vg_sub_cmd*)mac.allocate(sizeof(vg_sub_cmd) * nc);
-	if (!c.v)return;
 	cp_cmdt(&c, ctx->t);
-	c.vc = nc;
 	ctx->curVertOffset = _vertex.size();
-	auto cv = c.v;
+	c.vertex.x = _vertex.size();
+#if 1
+	while (ptrPath < ctx->pathPtr) {
+		uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
+		if (pathPointCount > 2) {
+			uint32_t firstVertIdx = (uint32_t)_vertex.size();
+
+
+			// ---- 1. 先收集局部坐标 + 算 bounds（避免展开时重复 transform）----
+			std::vector<glm::vec2> polyPoints(pathPointCount);
+			for (uint32_t i = 0; i < pathPointCount; i++) {
+				glm::vec2 localPos = ctx->points[i + firstPtIdx];
+				polyPoints[i] = localPos;
+
+				if (bounds) {
+					glm::vec2 transformedPos = localPos;
+					matrix_transform_point(&c.state->pushConsts.mat,
+						&transformedPos.x, &transformedPos.y);
+					if (transformedPos.x < bounds->x) bounds->x = transformedPos.x;
+					if (transformedPos.x > bounds->z) bounds->z = transformedPos.x;
+					if (transformedPos.y < bounds->y) bounds->y = transformedPos.y;
+					if (transformedPos.y > bounds->w) bounds->w = transformedPos.y;
+				}
+			}
+
+			// ---- 2. 展开为 TRIANGLE_LIST ----
+			// 原 FAN 语义: v0 是共享顶点，三角形为 (v0, v_i, v_{i+1})
+			for (uint32_t i = 1; i < pathPointCount - 1; i++) {
+				// 三角形 (v0, v_i, v_{i+1})
+				v.pos = polyPoints[0];
+				_vertex.push_back(v);
+
+				v.pos = polyPoints[i];
+				_vertex.push_back(v);
+
+				v.pos = polyPoints[i + 1];
+				_vertex.push_back(v);
+			}
+			c.vertex.y += (pathPointCount - 2) * 3;  // ← 关键改动
+
+		}
+		firstPtIdx += pathPointCount;
+
+		// 跳过曲线数据（和原来一样）
+		if (o_path_has_curves(ctx->pathes.data(), ptrPath)) {
+			ptrPath++;
+			uint32_t totPts = 0;
+			while (totPts < pathPointCount)
+				totPts += (ctx->pathes[ptrPath++] & PATH_ELT_MASK);
+		}
+		else {
+			ptrPath++;
+		}
+	}
+#else
 	while (ptrPath < ctx->pathPtr) {
 		uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
 		if (pathPointCount > 2) {
@@ -2006,10 +2195,18 @@ void rvg_t::poly_fill(ovg_path_t* ctx, glm::vec4* bounds, vgcmd_t& c)
 	}
 	if (bounds)
 		c.bounds = *bounds;
+#endif
 }
 
-#ifndef NOT_FILL_NZ_GLUTESS
+#if (__has_include(<glutess.h>))
+#ifdef NOT_FILL_NZ_GLUTESS
+#undef NOT_FILL_NZ_GLUTESS
+#endif
+#else
+#define NOT_FILL_NZ_GLUTESS
+#endif
 
+#ifndef NOT_FILL_NZ_GLUTESS
 #include <glutess.h>
 namespace glutess_p {
 	void a_set_vertex(rvg_t* ctx, uint32_t idx, rvg_t::Vertex v) { ctx->_vertex[idx] = v; }
@@ -2744,6 +2941,7 @@ rvg_t* ovg_new_rvg(mem_resource_t* ac0)
 		return 0;
 	}
 	auto p = ac->new_obj<rvg_t>();
+	p->ac = ac;
 	return p;
 }
 void ovg_destroy_rvg(rvg_t* p) {
@@ -3656,3 +3854,628 @@ ovg_draw_data get_draw_list(rvg_t* p)
 	}
 	return r;
 }
+
+// cmd ctx
+#if 1
+
+rvg_t* vctx_new_rvg(mem_resource_t* ac);
+void  vctx_destroy_rvg(rvg_t* p);
+void vctx_clear(rvg_t* v);			// 清空画布 
+// 路径操作
+ovg_path_t* vctx_get_path(rvg_t* ctx);
+void  vctx_new_path(rvg_t* ctx);
+void vctx_clear_path(rvg_t* ctx);
+void vctx_close_path(rvg_t* ctx);
+void vctx_new_sub_path(rvg_t* ctx);
+void vctx_path_extents(rvg_t* ctx, float* x1, float* y1, float* x2, float* y2);
+void vctx_get_current_point(rvg_t* ctx, float* x, float* y);
+size_t vctx_get_segment_count(rvg_t* ctx);
+void vctx_set_segment_color(rvg_t* ctx, size_t idx, uint32_t color);
+// 添加数据到当前路径，参考path_type_e
+void vctx_add_path(rvg_t* ctx, float* data, size_t count);
+void vctx_move_to(rvg_t* ctx, float x, float y);
+void vctx_rel_move_to(rvg_t* ctx, float x, float y);
+void vctx_line_to(rvg_t* ctx, float x, float y);
+void vctx_rel_line_to(rvg_t* ctx, float dx, float dy);
+void vctx_arc(rvg_t* ctx, float xc, float yc, float radius, float a1, float a2);
+void vctx_arc_negative(rvg_t* ctx, float xc, float yc, float radius, float a1, float a2);
+// 有缩放时，先执行set_path一次再执行curve_to
+void vctx_curve_to(rvg_t* ctx, float x1, float y1, float x2, float y2, float x3, float y3);
+void vctx_rel_curve_to(rvg_t* ctx, float x1, float y1, float x2, float y2, float x3, float y3);
+void vctx_quadratic_to(rvg_t* ctx, float x1, float y1, float x2, float y2);
+void vctx_rel_quadratic_to(rvg_t* ctx, float x1, float y1, float x2, float y2);
+void vctx_rectangle(rvg_t* ctx, float x, float y, float w, float h);
+void vctx_rounded_rectangle(rvg_t* ctx, float x, float y, float w, float h, float radius);
+void vctx_rounded_rectangle2(rvg_t* ctx, float x, float y, float w, float h, float rx, float ry);
+void vctx_ellipse(rvg_t* ctx, float radiusX, float radiusY, float x, float y, float rotationAngle);
+void vctx_elliptic_arc_to(rvg_t* ctx, float x, float y, bool large_arc_flag, bool sweep_flag, float rx, float ry, float phi);
+void vctx_rel_elliptic_arc_to(rvg_t* ctx, float x, float y, bool large_arc_flag, bool sweep_flag, float rx, float ry, float phi);
+void vctx_circle(rvg_t* ctx, float x, float y, float radius);
+// 配置
+void vctx_set_opacity(rvg_t* ctx, float opacity);
+void vctx_set_source_color(rvg_t* ctx, uint32_t c);
+void vctx_set_source_rgba(rvg_t* ctx, float r, float g, float b, float a);
+void vctx_set_source_rgb(rvg_t* ctx, float r, float g, float b);
+void vctx_set_line_width(rvg_t* ctx, float width);
+void vctx_set_miter_limit(rvg_t* ctx, float limit);
+void vctx_set_line_cap(rvg_t* ctx, int cap);
+void vctx_set_line_join(rvg_t* ctx, int join);
+void vctx_set_source_surface(rvg_t* ctx, vg_surface_t* surf, float x, float y);
+void vctx_set_source(rvg_t* ctx, vg_pattern_t* pat);
+void vctx_set_operator(rvg_t* ctx, int op);
+void vctx_set_fill_rule(rvg_t* ctx, int fr);
+void vctx_set_dash(rvg_t* ctx, const float* dashes, uint32_t num_dashes, float offset);		// 虚线
+void vctx_set_dash8(rvg_t* ctx, uint64_t dashes, uint32_t num_dashes, float offset);								// 虚线,用uint8_t v8[8]表示
+void vctx_translate(rvg_t* ctx, float dx, float dy);
+void vctx_scale(rvg_t* ctx, float sx, float sy);
+void vctx_rotate(rvg_t* ctx, float radians);
+void vctx_transform(rvg_t* ctx, const void* matrix);
+void vctx_set_matrix(rvg_t* ctx, const void* matrix);
+void vctx_get_matrix(rvg_t* ctx, void* matrix);
+void vctx_identity_matrix(rvg_t* ctx);
+
+// 图案：渐变/图片 
+vg_pattern_t* vctx_new_pattern_linear(rvg_t* ctx, float x0, float y0, float x1, float y1);
+vg_pattern_t* vctx_new_pattern_radial(rvg_t* ctx, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
+vg_pattern_t* vctx_new_pattern_sweep(rvg_t* ctx, float cx, float cy, float start_angle, float end_angle);
+int  vctx_pattern_add_color_stop(vg_pattern_t* pat, float o, float r, float g, float b, float a);
+int  vctx_pattern_set_color_stop(vg_pattern_t* pat, int idx, float o, float r, float g, float b, float a);
+void vctx_pattern_set_matrix(vg_pattern_t* pat, const void* matrix);	// mat3x2
+void vctx_pattern_set_extend(vg_pattern_t* pat, int extend);
+void vctx_pattern_set_filter(vg_pattern_t* pat, int filter);
+
+void vctx_save(rvg_t* v);
+void vctx_restore(rvg_t* v);
+void vctx_stroke(rvg_t* v);
+void vctx_stroke_preserve(rvg_t* v);
+void vctx_fill(rvg_t* v);
+void vctx_fill_preserve(rvg_t* v);
+void vctx_paint(rvg_t* v);			// 全屏渲染
+void vctx_reset_clip(rvg_t* v);	// 重置裁剪
+void vctx_clip(rvg_t* v);			// 路径裁剪，清空当前路径
+void vctx_clip_preserve(rvg_t* v);	// 路径裁剪
+void vctx_clip_rect(rvg_t* v, int x, int y, int width, int height);	// 矩形裁剪
+void vctx_set_clip_rect(rvg_t* v, void* rc);	// 矩形裁剪,int[4]
+void vctx_get_clip_rect(rvg_t* v, void* rc);	// 获取矩形裁剪
+
+// 添加文本，风格，渲染区可选
+void  vctx_add_text(rvg_t* dc, text_st_t* p, text_style_t* ts, text_box_rt* box);
+// 普通图片，支持九宫格、混合颜色
+void  vctx_add_image(rvg_t* dc, ovg_image_r* r);
+// 原始三角形，输入0则不修改
+void  vctx_set_geom_state(rvg_t* dc, gem_info_t* info, const void* matrix4x4);
+// 添加几何数据到缓冲区，xy顶点坐标，color顶点颜色，uv顶点纹理坐标，indices索引数据，color_type=0表示float4，1表示uint32_t
+void  vctx_add_geometry(rvg_t* dc, vg_surface_t* texture, const float* xy, int xy_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
+// 添加3D几何数据到缓冲区，xyz顶点坐标，color顶点颜色（双面则要双倍），uv顶点纹理坐标，indices索引数据
+void  vctx_add_geometry3d(rvg_t* dc, vg_surface_t* texture, const float* xyz, int xyz_stride, const void* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices, int color_type);
+
+void vctx_start_recording(rvg_t* ctx);
+ovg_recording_t* vctx_stop_recording(rvg_t* ctx);
+void vctx_replay(rvg_t* ctx, ovg_recording_t* rec);
+void vctx_replay_command(rvg_t* ctx, ovg_recording_t* rec, uint32_t cmdIndex);
+uint32_t vctx_recording_get_count(ovg_recording_t* rec);
+void* vctx_recording_get_data(ovg_recording_t* rec);
+void  vctx_recording_destroy(ovg_recording_t* rec);
+
+// TODO 命令模式实现
+#define PRI2CTX(ac) 
+rvg_t* vctx_new_rvg(mem_resource_t* ac) {
+	auto r = ovg_new_rvg(ac);
+	if (r)
+	{
+		r->cur_path = ovg_new_path(ac);
+		r->cur_st = r->new_state();
+		assert(r->cur_path && r->cur_st);
+	}
+	return r;
+}
+void  vctx_destroy_rvg(rvg_t* p) {
+	ovg_destroy_rvg(p);
+}
+void vctx_clear(rvg_t* v) {
+	ovg_clear(v);
+}
+ovg_path_t* vctx_get_path(rvg_t* ctx) {
+	return ctx->cur_path;
+}
+void  vctx_new_path(rvg_t* ctx) {
+	if (ctx)
+		ovg_clear_path(ctx->cur_path);
+}
+void vctx_clear_path(rvg_t* ctx) {
+	vctx_new_path(ctx);
+}
+void vctx_close_path(rvg_t* ctx) {
+	if (ctx)ovg_close_path(ctx->cur_path);
+}
+void vctx_new_sub_path(rvg_t* ctx) {
+	if (ctx)ovg_new_sub_path(ctx->cur_path);
+}
+void vctx_path_extents(rvg_t* ctx, float* x1, float* y1, float* x2, float* y2) {
+	if (ctx)ovg_path_extents(ctx->cur_path, x1, y1, x2, y2);
+}
+void vctx_get_current_point(rvg_t* ctx, float* x, float* y) {
+	if (ctx)ovg_get_current_point(ctx->cur_path, x, y);
+}
+size_t vctx_get_segment_count(rvg_t* ctx) {
+	return ctx ? ovg_get_segment_count(ctx->cur_path) : 0;
+}
+void vctx_set_segment_color(rvg_t* ctx, size_t idx, uint32_t color) {
+	if (ctx)ovg_set_segment_color(ctx->cur_path, idx, color);
+}
+// 添加数据到当前路径，参考path_type_e
+void vctx_add_path(rvg_t* ctx, float* data, size_t count) {
+	if (ctx)ovg_add_path(ctx->cur_path, data, count);
+}
+void vctx_move_to(rvg_t* ctx, float x, float y) {
+	if (ctx)ovg_move_to(ctx->cur_path, x, y);
+}
+void vctx_rel_move_to(rvg_t* ctx, float x, float y) {
+	if (!ctx) return;
+	float cx, cy;
+	ovg_get_current_point(ctx->cur_path, &cx, &cy);
+	ovg_move_to(ctx->cur_path, cx + x, cy + y);
+}
+
+void vctx_line_to(rvg_t* ctx, float x, float y) {
+	if (ctx) ovg_line_to(ctx->cur_path, x, y);
+}
+
+void vctx_rel_line_to(rvg_t* ctx, float dx, float dy) {
+	if (!ctx) return;
+	float cx, cy;
+	ovg_get_current_point(ctx->cur_path, &cx, &cy);
+	ovg_line_to(ctx->cur_path, cx + dx, cy + dy);
+}
+
+void vctx_arc(rvg_t* ctx, float xc, float yc, float radius, float a1, float a2) {
+	if (ctx) ovg_arc(ctx->cur_path, xc, yc, radius, a1, a2);
+}
+
+void vctx_arc_negative(rvg_t* ctx, float xc, float yc, float radius, float a1, float a2) {
+	if (ctx) ovg_arc_negative(ctx->cur_path, xc, yc, radius, a1, a2);
+}
+
+void vctx_curve_to(rvg_t* ctx, float x1, float y1,
+	float x2, float y2,
+	float x3, float y3) {
+	if (ctx) ovg_curve_to(ctx->cur_path, x1, y1, x2, y2, x3, y3);
+}
+
+void vctx_rel_curve_to(rvg_t* ctx, float x1, float y1,
+	float x2, float y2,
+	float x3, float y3) {
+	if (!ctx) return;
+	float cx, cy;
+	ovg_get_current_point(ctx->cur_path, &cx, &cy);
+	ovg_curve_to(ctx->cur_path,
+		cx + x1, cy + y1,
+		cx + x2, cy + y2,
+		cx + x3, cy + y3);
+}
+
+void vctx_quadratic_to(rvg_t* ctx, float x1, float y1, float x2, float y2) {
+	if (ctx) ovg_quadratic_to(ctx->cur_path, x1, y1, x2, y2);
+}
+
+void vctx_rel_quadratic_to(rvg_t* ctx, float x1, float y1, float x2, float y2) {
+	if (!ctx) return;
+	float cx, cy;
+	ovg_get_current_point(ctx->cur_path, &cx, &cy);
+	ovg_quadratic_to(ctx->cur_path,
+		cx + x1, cy + y1,
+		cx + x2, cy + y2);
+}
+
+void vctx_rectangle(rvg_t* ctx, float x, float y, float w, float h) {
+	if (ctx) ovg_rectangle(ctx->cur_path, x, y, w, h);
+}
+
+void vctx_rounded_rectangle(rvg_t* ctx, float x, float y,
+	float w, float h, float radius) {
+	if (ctx) ovg_rounded_rectangle(ctx->cur_path, x, y, w, h, radius);
+}
+
+void vctx_rounded_rectangle2(rvg_t* ctx, float x, float y,
+	float w, float h, float rx, float ry) {
+	if (ctx) ovg_rounded_rectangle2(ctx->cur_path, x, y, w, h, rx, ry);
+}
+
+void vctx_ellipse(rvg_t* ctx, float radiusX, float radiusY,
+	float x, float y, float rotationAngle) {
+	if (ctx) ovg_ellipse(ctx->cur_path, radiusX, radiusY, x, y, rotationAngle);
+}
+
+void vctx_elliptic_arc_to(rvg_t* ctx, float x, float y,
+	bool large_arc_flag, bool sweep_flag,
+	float rx, float ry, float phi) {
+	if (ctx) ovg_elliptic_arc_to(ctx->cur_path, x, y,
+		large_arc_flag, sweep_flag,
+		rx, ry, phi);
+}
+
+void vctx_rel_elliptic_arc_to(rvg_t* ctx, float x, float y,
+	bool large_arc_flag, bool sweep_flag,
+	float rx, float ry, float phi) {
+	if (!ctx) return;
+	float cx, cy;
+	ovg_get_current_point(ctx->cur_path, &cx, &cy);
+	ovg_elliptic_arc_to(ctx->cur_path,
+		cx + x, cy + y,
+		large_arc_flag, sweep_flag,
+		rx, ry, phi);
+}
+
+void vctx_circle(rvg_t* ctx, float x, float y, float radius) {
+	if (ctx) ovg_circle(ctx->cur_path, x, y, radius);
+}
+// 配置 
+void vctx_set_opacity(rvg_t* ctx, float opacity) {
+	if (ctx) ovg_set_opacity(ctx->cur_st, opacity);
+}
+
+void vctx_set_source_color(rvg_t* ctx, uint32_t c) {
+	if (ctx) ovg_set_source_color(ctx->cur_st, c);
+}
+
+void vctx_set_source_rgba(rvg_t* ctx, float r, float g, float b, float a) {
+	if (ctx) ovg_set_source_rgba(ctx->cur_st, r, g, b, a);
+}
+
+void vctx_set_source_rgb(rvg_t* ctx, float r, float g, float b) {
+	if (ctx) ovg_set_source_rgba(ctx->cur_st, r, g, b, 1.0f);
+}
+
+void vctx_set_line_width(rvg_t* ctx, float width) {
+	if (ctx) ovg_set_line_width(ctx->cur_st, width);
+}
+
+void vctx_set_miter_limit(rvg_t* ctx, float limit) {
+	if (ctx) ovg_set_miter_limit(ctx->cur_st, limit);
+}
+
+void vctx_set_line_cap(rvg_t* ctx, int cap) {
+	if (ctx) ovg_set_line_cap(ctx->cur_st, cap);
+}
+
+void vctx_set_line_join(rvg_t* ctx, int join) {
+	if (ctx) ovg_set_line_join(ctx->cur_st, join);
+}
+
+void vctx_set_source_surface(rvg_t* ctx, vg_surface_t* surf, float x, float y) {
+	if (ctx) ovg_set_source_surface(ctx->cur_st, surf, x, y);
+}
+
+void vctx_set_source(rvg_t* ctx, vg_pattern_t* pat) {
+	if (ctx) ovg_set_source(ctx->cur_st, pat);
+}
+
+void vctx_set_operator(rvg_t* ctx, int op) {
+	if (ctx) ovg_set_operator(ctx->cur_st, op);
+}
+
+void vctx_set_fill_rule(rvg_t* ctx, int fr) {
+	if (ctx) ovg_set_fill_rule(ctx->cur_st, fr);
+}
+
+void vctx_set_dash(rvg_t* ctx, const float* dashes, uint32_t num_dashes, float offset) {
+	if (ctx) ovg_set_dash(ctx->cur_st, dashes, num_dashes, offset);
+}
+
+void vctx_set_dash8(rvg_t* ctx, uint64_t dashes, uint32_t num_dashes, float offset) {
+	if (ctx) ovg_set_dash8(ctx->cur_st, dashes, num_dashes, offset);
+}
+
+void vctx_translate(rvg_t* ctx, float dx, float dy) {
+	if (ctx) ovg_translate(ctx->cur_st, dx, dy);
+}
+
+void vctx_scale(rvg_t* ctx, float sx, float sy) {
+	if (ctx) ovg_scale(ctx->cur_st, sx, sy);
+}
+
+void vctx_rotate(rvg_t* ctx, float radians) {
+	if (ctx) ovg_rotate(ctx->cur_st, radians);
+}
+
+void vctx_transform(rvg_t* ctx, const void* matrix) {
+	if (ctx) ovg_transform(ctx->cur_st, matrix);
+}
+
+void vctx_set_matrix(rvg_t* ctx, const void* matrix) {
+	if (ctx) ovg_set_matrix(ctx->cur_st, matrix);
+}
+
+void vctx_get_matrix(rvg_t* ctx, void* matrix) {
+	if (ctx) ovg_get_matrix(ctx->cur_st, matrix);
+}
+
+void vctx_identity_matrix(rvg_t* ctx) {
+	if (ctx) ovg_identity_matrix(ctx->cur_st);
+}
+
+typedef glm::mat3x2 ovg_matrix_t;
+struct pat_act0 :public  vg_pattern_t {
+	vg_gradient_t g = {};
+};
+// 图案：渐变/图片 
+vg_pattern_t* vctx_new_pattern_linear(rvg_t* ctx, float x0, float y0, float x1, float y1) {
+	if (!ctx)return 0;
+	auto pat = (pat_act*)ctx->mac.allocate(sizeof(pat_act0));
+	if (!pat) {
+		return 0;
+	}
+	pat->type = vg_pattern_type_t::VG_PATTERN_TYPE_LINEAR;
+	pat->extend = vg_extend_t::VG_EXTEND_NONE;
+	pat->data = &pat->g;
+	_vg_pattern_edit_linear(pat, x0, y0, x1, y1);
+	pat->matrix = glm::mat3x2(1.0);
+	pat->references = 1;
+	return pat;
+}
+vg_pattern_t* vctx_new_pattern_radial(rvg_t* ctx, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse) {
+	if (!ctx)return 0;
+	auto pat = (pat_act*)ctx->mac.allocate(sizeof(pat_act0));
+	if (!pat) {
+		return 0;
+	}
+	pat->type = vg_pattern_type_t::VG_PATTERN_TYPE_RADIAL;
+	pat->extend = vg_extend_t::VG_EXTEND_NONE;
+	pat->data = &pat->g;
+	pat->matrix = glm::mat3x2(1.0);
+	vg_pattern_edit_radial(pat, cx0, cy0, radius0, cx1, cy1, radius1, is_ellipse);
+	pat->references = 1;
+	return pat;
+}
+vg_pattern_t* vctx_new_pattern_sweep(rvg_t* ctx, float cx, float cy, float start_angle, float end_angle) {
+	if (!ctx)return 0;
+	auto pat = (pat_act*)ctx->mac.allocate(sizeof(pat_act0));
+	if (!pat) {
+		return 0;
+	}
+	pat->type = vg_pattern_type_t::VG_PATTERN_TYPE_SWEEP;
+	pat->extend = vg_extend_t::VG_EXTEND_NONE;
+	pat->data = &pat->g;
+	pat->matrix = glm::mat3x2(1.0);
+	vg_pattern_edit_sweep(pat, cx, cy, start_angle, end_angle);
+	pat->references = 1;
+	return pat;
+}
+int  vctx_pattern_add_color_stop(vg_pattern_t* pat, float o, float r, float g, float b, float a) {
+	if (!pat) return -1;
+	return ovg_pattern_add_color_stop(pat, o, r, g, b, a);
+}
+int  vctx_pattern_set_color_stop(vg_pattern_t* pat, int idx, float o, float r, float g, float b, float a) {
+	if (!pat || idx < 0) return -1;
+	return ovg_pattern_set_color_stop(pat, idx, o, r, g, b, a);
+}
+void vctx_pattern_set_matrix(vg_pattern_t* pat, const void* matrix) {
+	if (pat) ovg_pattern_set_matrix(pat, (const ovg_matrix_t*)matrix);
+}
+void vctx_pattern_set_extend(vg_pattern_t* pat, int extend) {
+	if (pat) ovg_pattern_set_extend(pat, extend);
+}
+void vctx_pattern_set_filter(vg_pattern_t* pat, int filter) {
+	if (pat) ovg_pattern_set_filter(pat, filter);
+}
+
+void vctx_save(rvg_t* v) {
+	if (v)v->save();
+}
+void vctx_restore(rvg_t* v) {
+	if (v)v->restore();
+}
+void vctx_stroke(rvg_t* v) {
+	if (v) ovg_stroke(v);
+}
+void vctx_stroke_preserve(rvg_t* v) {
+	if (v) ovg_stroke_preserve(v);
+}
+
+void vctx_fill(rvg_t* v) {
+	if (v) ovg_fill(v);
+}
+
+void vctx_fill_preserve(rvg_t* v) {
+	if (v) ovg_fill_preserve(v);
+}
+
+void vctx_paint(rvg_t* v) {
+	if (v) ovg_paint(v);
+}
+
+void vctx_reset_clip(rvg_t* v) {
+	if (v) ovg_reset_clip(v);
+}
+
+void vctx_clip(rvg_t* v) {
+	if (v) ovg_clip(v);
+}
+
+void vctx_clip_preserve(rvg_t* v) {
+	if (v) ovg_clip_preserve(v);
+}
+
+void vctx_clip_rect(rvg_t* v, int x, int y, int width, int height) {
+	if (v) ovg_clip_rect(v, x, y, width, height);
+}
+
+void vctx_set_clip_rect(rvg_t* v, void* rc) {
+	if (v && rc) ovg_set_clip_rect(v, rc);
+}
+
+void vctx_get_clip_rect(rvg_t* v, void* rc) {
+	if (v && rc) ovg_get_clip_rect(v, rc);
+}
+
+/* ================= 高层绘制命令 ================= */
+
+// 添加文本，风格，渲染区可选
+void vctx_add_text(rvg_t* dc, text_st_t* p, text_style_t* ts, text_box_rt* box) {
+	if (dc) ovg_add_text(dc, p, ts, box);
+}
+
+// 普通图片，支持九宫格、混合颜色
+void vctx_add_image(rvg_t* dc, ovg_image_r* r) {
+	if (dc) ovg_add_image(dc, r);
+}
+
+// 原始三角形，输入0则不修改
+void vctx_set_geom_state(rvg_t* dc, gem_info_t* info, const void* matrix4x4) {
+	if (dc) ovg_set_geom_state(dc, info, (glm::mat4*)matrix4x4);
+}
+
+// 添加几何数据到缓冲区
+void vctx_add_geometry(rvg_t* dc,
+	vg_surface_t* texture,
+	const float* xy, int xy_stride,
+	const void* color, int color_stride,
+	const float* uv, int uv_stride,
+	int num_vertices,
+	const void* indices, int num_indices,
+	int size_indices, int color_type) {
+	if (dc) {
+		ovg_add_geometry(dc,
+			texture,
+			xy, xy_stride,
+			color, color_stride,
+			uv, uv_stride,
+			num_vertices,
+			indices, num_indices,
+			size_indices, color_type);
+	}
+}
+
+// 添加3D几何数据到缓冲区
+void vctx_add_geometry3d(rvg_t* dc,
+	vg_surface_t* texture,
+	const float* xyz, int xyz_stride,
+	const void* color, int color_stride,
+	const float* uv, int uv_stride,
+	int num_vertices,
+	const void* indices, int num_indices,
+	int size_indices, int color_type) {
+	if (dc) {
+		ovg_add_geometry3d(dc,
+			texture,
+			xyz, xyz_stride,
+			color, color_stride,
+			uv, uv_stride,
+			num_vertices,
+			indices, num_indices,
+			size_indices, color_type);
+	}
+}
+
+
+void vctx_start_recording(rvg_t* ctx) {
+
+}
+ovg_recording_t* vctx_stop_recording(rvg_t* ctx) {
+	return 0;
+}
+void vctx_replay(rvg_t* ctx, ovg_recording_t* rec) {
+
+}
+void vctx_replay_command(rvg_t* ctx, ovg_recording_t* rec, uint32_t cmdIndex) {
+
+}
+uint32_t vctx_recording_get_count(ovg_recording_t* rec) {
+	return 0;
+}
+void* vctx_recording_get_data(ovg_recording_t* rec) {
+	return 0;
+}
+void  vctx_recording_destroy(ovg_recording_t* rec) {
+
+}
+void init_ovg_ctx_cb(ovg_ctx_cb* cb)
+{
+	if (!cb)return;
+	cb->new_rvg = vctx_new_rvg;
+	cb->destroy_rvg = vctx_destroy_rvg;
+	cb->clear = vctx_clear;
+	cb->get_path = vctx_get_path;
+	cb->new_path = vctx_new_path;
+	cb->clear_path = vctx_clear_path;
+	cb->close_path = vctx_close_path;
+	cb->new_sub_path = vctx_new_sub_path;
+	cb->path_extents = vctx_path_extents;
+	cb->get_current_point = vctx_get_current_point;
+	cb->get_segment_count = vctx_get_segment_count;
+	cb->set_segment_color = vctx_set_segment_color;
+	cb->add_path = vctx_add_path;
+	cb->move_to = vctx_move_to;
+	cb->rel_move_to = vctx_rel_move_to;
+	cb->line_to = vctx_line_to;
+	cb->rel_line_to = vctx_rel_line_to;
+	cb->arc = vctx_arc;
+	cb->arc_negative = vctx_arc_negative;
+	cb->curve_to = vctx_curve_to;
+	cb->rel_curve_to = vctx_rel_curve_to;
+	cb->quadratic_to = vctx_quadratic_to;
+	cb->rel_quadratic_to = vctx_rel_quadratic_to;
+	cb->rectangle = vctx_rectangle;
+	cb->rounded_rectangle = vctx_rounded_rectangle;
+	cb->rounded_rectangle2 = vctx_rounded_rectangle2;
+	cb->ellipse = vctx_ellipse;
+	cb->elliptic_arc_to = vctx_elliptic_arc_to;
+	cb->rel_elliptic_arc_to = vctx_rel_elliptic_arc_to;
+	cb->circle = vctx_circle;
+	cb->set_opacity = vctx_set_opacity;
+	cb->set_source_color = vctx_set_source_color;
+	cb->set_source_rgba = vctx_set_source_rgba;
+	cb->set_source_rgb = vctx_set_source_rgb;
+	cb->set_line_width = vctx_set_line_width;
+	cb->set_miter_limit = vctx_set_miter_limit;
+	cb->set_line_cap = vctx_set_line_cap;
+	cb->set_line_join = vctx_set_line_join;
+	cb->set_source_surface = vctx_set_source_surface;
+	cb->set_source = vctx_set_source;
+	cb->set_operator = vctx_set_operator;
+	cb->set_fill_rule = vctx_set_fill_rule;
+	cb->set_dash = vctx_set_dash;
+	cb->set_dash8 = vctx_set_dash8;
+	cb->translate = vctx_translate;
+	cb->scale = vctx_scale;
+	cb->rotate = vctx_rotate;
+	cb->transform = vctx_transform;
+	cb->set_matrix = vctx_set_matrix;
+	cb->get_matrix = vctx_get_matrix;
+	cb->identity_matrix = vctx_identity_matrix;
+	cb->new_pattern_linear = vctx_new_pattern_linear;
+	cb->new_pattern_radial = vctx_new_pattern_radial;
+	cb->new_pattern_sweep = vctx_new_pattern_sweep;
+	cb->pattern_add_color_stop = vctx_pattern_add_color_stop;
+	cb->pattern_set_color_stop = vctx_pattern_set_color_stop;
+	cb->pattern_set_matrix = vctx_pattern_set_matrix;
+	cb->pattern_set_extend = vctx_pattern_set_extend;
+	cb->pattern_set_filter = vctx_pattern_set_filter;
+	cb->save = vctx_save;
+	cb->restore = vctx_restore;
+	cb->stroke = vctx_stroke;
+	cb->stroke_preserve = vctx_stroke_preserve;
+	cb->fill = vctx_fill;
+	cb->fill_preserve = vctx_fill_preserve;
+	cb->paint = vctx_paint;
+	cb->reset_clip = vctx_reset_clip;
+	cb->clip = vctx_clip;
+	cb->clip_preserve = vctx_clip_preserve;
+	cb->clip_rect = vctx_clip_rect;
+	cb->set_clip_rect = vctx_set_clip_rect;
+	cb->get_clip_rect = vctx_get_clip_rect;
+	cb->add_text = vctx_add_text;
+	cb->add_image = vctx_add_image;
+	cb->set_geom_state = vctx_set_geom_state;
+	cb->add_geometry = vctx_add_geometry;
+	cb->add_geometry3d = vctx_add_geometry3d;
+	cb->start_recording = vctx_start_recording;
+	cb->stop_recording = vctx_stop_recording;
+	cb->replay = vctx_replay;
+	cb->replay_command = vctx_replay_command;
+	cb->recording_get_count = vctx_recording_get_count;
+	cb->recording_get_data = vctx_recording_get_data;
+	cb->recording_destroy = vctx_recording_destroy;
+
+}
+#endif // 1

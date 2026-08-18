@@ -9507,8 +9507,8 @@ state_save_t* vgdev_ctx::new_state()
 void vgdev_ctx::free_state(state_save_t* p)
 {
 	if (p) {
-		if (p->dashes && t->dashCount > 0)
-			ac.free_mem(t->dashes, t->dashCount);
+		if (p->dashes && p->dashCount > 0)
+			ac.free_mem(p->dashes, p->dashCount);
 		ac.free_mem(p, 1);
 	}
 }
