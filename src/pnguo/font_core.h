@@ -254,7 +254,7 @@ struct fontns
 };
 
 // 获取系统字体列表
-std::map<std::string, fontns> get_allfont();
+std::map<std::string, fontns> get_allfont(void* fc);
 
 class bitmap_cache_cx
 {
@@ -299,7 +299,7 @@ public:
 	font_imp* imp = 0;
 	bitmap_cache_cx bcc = {};				// 纹理缓存
 	font_t* current = 0;
-
+	void* config = 0;
 	//PangoContext* pcontext = 0;
 	//PangoLayout* layout = 0;
 	//std::set<PangoLayout*> gclt;

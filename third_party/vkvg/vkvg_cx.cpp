@@ -53,6 +53,10 @@ extern "C" {
 #include "vkvg_cx.h"
 #include "gpu_vk.h"
 
+#ifndef USE_VMA_OFF
+#define VMA_IMPLEMENTATION
+#endif
+#include <vk_mem_alloc.h>
 /*
 命令行
 glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_main_frag1_spv -o vkvg_main.frag.h

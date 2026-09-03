@@ -19,10 +19,10 @@
 #ifndef NO_FONT_CX 
 
 #ifndef NO_FONT_ICU
-#include <hb.h>
-#include <hb-ot.h>
-#if __has_include(<hb-raster.h>)
-#include <hb-raster.h>
+#include <harfbuzz/hb.h>
+#include <harfbuzz/hb-ot.h>
+#if __has_include(<harfbuzz/hb-raster.h>)
+#include <harfbuzz/hb-raster.h>
 #endif
 #include <fontconfig/fontconfig.h> 
 #include <unicode/uchar.h>
@@ -199,18 +199,24 @@ std::wstring GetFontFilePath(IDWriteFont* pFont) {
 	return filePath;
 }
 #endif
-std::map<std::string, fontns> get_allfont()
+std::map<std::string, fontns> get_allfont(void* fcv)
 {
 	int r = 0;
 	std::map<std::string, fontns> fyv;
 	int nfamilies = 0;
-	if (FcInit()) {
+	FcConfig* fct = 0;
+	auto fc = (FcConfig*)fcv;
+	if (!fc)
+	{
+		fc = fct = FcInitLoadConfigAndFonts();
+	}
+	if (fc) {
 #ifdef WIN32
 		{
 			//std::string yourFontFilePath = "seguiemj.ttf";
 			std::string yourFontFilePath = "C:\\Windows\\Fonts\\seguiemj.ttf";
 			const FcChar8* file = (const FcChar8*)yourFontFilePath.c_str();
-			FcBool fontAddStatus = FcConfigAppFontAddFile(FcConfigGetCurrent(), file);
+			FcBool fontAddStatus = FcConfigAppFontAddFile(fc, file);
 		}
 #if 0
 		if (0)
@@ -295,7 +301,7 @@ std::map<std::string, fontns> get_allfont()
 #endif
 		FcPattern* pat = ::FcPatternCreate();
 		FcObjectSet* os = ::FcObjectSetBuild(FC_FILE, FC_FULLNAME, FC_FAMILY, FC_STYLE, FC_CHARSET, FC_WIDTH, FC_LANG, (char*)0);
-		FcFontSet* fs = ::FcFontList(0, pat, os);
+		FcFontSet* fs = ::FcFontList(fc, pat, os);
 		for (size_t i = 0; i < fs->nfont; ++i) {
 			FcPattern* font = fs->fonts[i];
 			FcChar8* family = nullptr;
@@ -370,7 +376,7 @@ std::map<std::string, fontns> get_allfont()
 		FcPatternDestroy(pat);
 		FcFontSetDestroy(fs);
 
-		FcFini();
+		FcConfigDestroy(fct);
 	}
 	// 删除空字体
 	auto newfn = fyv;
@@ -5753,7 +5759,9 @@ void font_imp::free_ftp(font_t* p)
 
 font_rctx::font_rctx()
 {
-	fyv = get_allfont();
+	auto fc = FcInitLoadConfigAndFonts();
+	config = fc;
+	fyv = get_allfont(fc);
 	if (fyv.size())
 	{
 		fyvs.resize(fyv.size());
@@ -5768,6 +5776,10 @@ font_rctx::font_rctx()
 
 font_rctx::~font_rctx()
 {
+	auto fc = (FcConfig*)config;
+	if (fc)
+		FcConfigDestroy(fc);
+	config = 0;
 	if (imp)delete imp;
 	imp = 0;
 	fyv.clear();
@@ -8585,11 +8597,12 @@ void rt_update_text(rich_text_t* rt, layout_block_st* pt, box_info_t* pbox, size
 	auto p = &ut;
 	auto& blockstr = p->_block;
 	auto t = &tb->style;
+	auto& box = pbox->tbox;
+
 	rt_bidi(&p->bidi_str, p->bv, tb->str, tb->first, tb->size);
 	auto str16 = (uint16_t*)p->bidi_str.c_str();
 	auto& ov = pt->ov;
 	auto& dst_vstr = pt->dst_vstr;
-	auto& box = pbox->tbox;
 	ut.first = dst_vstr.size();
 	if (!blockstr.ac)
 		blockstr.ac = (hz::usp_ac*)&pt->ac;
@@ -10130,4 +10143,43 @@ SBitDecoder* bitmap_ttinfo::get_dec()
 		_dec = new SBitDecoder();
 	}
 	return _dec;
+}
+class text_run_cx
+{
+public:
+	struct text_block_ht {
+		hb_face_t* font;
+		size_t first;		// 基于strutf8的偏移
+		size_t count;
+		hb_glyph_position_t* hbgpos;
+		size_t pos_len;
+		hb_glyph_info_t* ginfo;
+		size_t info_len;
+	};
+	std::vector<hb_face_t*> familys;
+	std::vector<text_block_ht> data;
+	std::string tempstr8;
+	std::u16string tempstr16;
+	FcConfig* cfg = 0;
+public:
+	text_run_cx();
+	~text_run_cx();
+	void add_font(const char* family, const char* style);
+	void set_text(const char* strutf8, size_t len, bool enable_break, bool enable_bidi);
+private:
+
+};
+
+text_run_cx::text_run_cx()
+{}
+
+text_run_cx::~text_run_cx()
+{}
+
+void text_run_cx::set_text(const char* strutf8, size_t len, bool enable_break, bool enable_bidi)
+{
+	data.clear();
+	tempstr8.clear();
+	tempstr16.clear();
+
 }

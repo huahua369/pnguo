@@ -763,7 +763,7 @@ void examples1(viewdev_cx* view, app_x* appx)
 		btn->set_btn_color_bgr(fmod(i, 5));
 		dvv->add_widget(btn);
 		btn->set_size({ 128,36 });
-		btn->style.fontsize = 16;
+		btn->style.fontsize = 26;
 		btn->style.color = -1;
 		//btn->style.stroke = 1;
 		btn->style.color_stroke = 0x80000000;
@@ -772,7 +772,7 @@ void examples1(viewdev_cx* view, app_x* appx)
 		//btn->style.mcolor_effect = false;
 		auto str = save_color_style(&btn->cs, 2);
 
-		btn->str = (char*)u8"🍕按钮 " + std::to_string(5 + i);
+		btn->str = (char*)u8"🍕按➗钮 " + std::to_string(5 + i);
 	}
 
 	for (int i = 0; i < 4; i++) {

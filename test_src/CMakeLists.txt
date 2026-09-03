@@ -69,6 +69,7 @@ list(APPEND src_mmd
 ) 
 list(APPEND src_vkvg   
     "main_vg.cpp"  
+    ${VKH_SRC}
     "../third_party/tinyspline/parson.c"
     "../third_party/tinyspline/tinyspline.c"
     "../third_party/tinyspline/tinysplinecxx.cpp"  
@@ -171,7 +172,7 @@ list(APPEND lklib
    unofficial::noise::noise-static
    unofficial::noiseutils::noiseutils-static
    # harfbuzz::harfbuzz 
-    harfbuzz::harfbuzz-raster 
+    harfbuzz::harfbuzz 
     #harfbuzz::harfbuzz-gpu
     $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
     #opencv_ml opencv_dnn opencv_core opencv_flann opencv_features2d opencv_photo opencv_highgui
@@ -215,7 +216,8 @@ list(APPEND vkvglib
  Vulkan::Vulkan
  SDL3::SDL3
  PkgConfig::Clipper2  PkgConfig::Clipper2Z 
- harfbuzz::harfbuzz-raster
+ harfbuzz::harfbuzz 
+ PkgConfig::HARFBUZZ_RASTER
  libzip::zip
  ZLIB::ZLIB
  dxcompiler
