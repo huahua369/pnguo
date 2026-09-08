@@ -734,7 +734,7 @@ void app_x::init(bool has3d)
 	fctx->set_cache_size(font_csize.x, font_csize.y);
 	std::vector<std::string> pname;
 	fctx->add2file(R"(D:\Android\android-sdk\platforms\android-26\data\fonts\NotoSansThai-Regular.ttf)", &pname);
-	std::string fams = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Consolas";
+	std::string fams = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Consolas,Calibri";
 	if (pname.size())
 		fams += "," + pname[0];
 	family = new_font_family(fctx, fams.c_str());

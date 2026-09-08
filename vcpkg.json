@@ -25,7 +25,6 @@
     { "name": "libflac" },
     { "name": "mpg123" },
     { "name": "fftw3" },
-    { "name": "icu" },
     {
       "name": "harfbuzz",
       "features": [ "icu" ]

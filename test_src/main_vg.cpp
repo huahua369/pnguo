@@ -844,7 +844,7 @@ void examples1(viewdev_cx* view, app_x* appx)
 			btn->set_size({ 128,36 });
 			btn->style.fontsize = 16;
 			btn->style.color = -1;
-			btn->str = (char*)u8"🍕按钮 ";
+			btn->str = (char*)u8"🍕按钮 كيف داير لخدام";
 			btn->click_cb = [=](void* p, int clicks, const glm::vec2& mpos) {
 
 				};

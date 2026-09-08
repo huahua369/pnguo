@@ -200,8 +200,7 @@ namespace hz {
 	}
 	// print_dc::
 	print_dc::~print_dc()
-	{
-	}
+	{}
 	print_dc* print_dc::new_pdc()
 	{
 		return new print_dc();
@@ -1718,8 +1717,7 @@ namespace hz {
 		return 0;
 	}
 	image_nt::image_nt()
-	{
-	}
+	{}
 	image_nt::~image_nt()
 	{
 		for (auto it : _imgs)
@@ -1998,12 +1996,10 @@ namespace hz {
 
 
 	anjn_lua::anjn_lua(lua_cx* p) :ctx(p)
-	{
-	}
+	{}
 
 	anjn_lua::~anjn_lua()
-	{
-	}
+	{}
 	void anjn_lua::makedata()
 	{
 		auto vc = vkcode_s();
@@ -3129,8 +3125,7 @@ namespace hz {
 	}
 
 	drop_regs::drop_regs()
-	{
-	}
+	{}
 
 	drop_regs::~drop_regs()
 	{
@@ -3668,8 +3663,7 @@ namespace hz {
 		}
 	public:
 		Shared()
-		{
-		}
+		{}
 
 		~Shared()
 		{
@@ -3749,3 +3743,127 @@ namespace hz {
 
 }
 //!hz
+
+
+
+class SimpleDropSource : public IDropSource {
+public:
+	ULONG STDMETHODCALLTYPE AddRef() override { return 2; }
+	ULONG STDMETHODCALLTYPE Release() override { return 1; }
+
+	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppv) override {
+		if (riid == IID_IDropSource || riid == IID_IUnknown) {
+			*ppv = this;
+			return S_OK;
+		}
+		*ppv = nullptr;
+		return E_NOINTERFACE;
+	}
+
+	HRESULT STDMETHODCALLTYPE QueryContinueDrag(
+		BOOL fEscapePressed,
+		DWORD grfKeyState) override
+	{
+		if (fEscapePressed)
+			return DRAGDROP_S_CANCEL;
+		if (!(grfKeyState & MK_LBUTTON))
+			return DRAGDROP_S_DROP;
+		return S_OK;
+	}
+
+	HRESULT STDMETHODCALLTYPE GiveFeedback(DWORD) override {
+		return DRAGDROP_S_USEDEFAULTCURSORS;
+	}
+};
+HGLOBAL CreateHDrop(const std::vector<std::wstring>& files) {
+	size_t size = sizeof(DROPFILES);
+	for (const auto& f : files)
+		size += (f.size() + 1) * sizeof(wchar_t);
+	size += sizeof(wchar_t); // 结尾双 \0
+
+	HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, size);
+	DROPFILES* df = (DROPFILES*)GlobalLock(hMem);
+
+	df->pFiles = sizeof(DROPFILES);
+	df->fWide = TRUE; // ✅ UTF‑16
+
+	wchar_t* p = (wchar_t*)(df + 1);
+	for (const auto& f : files) {
+		wcscpy_s(p, f.size() + 1, f.c_str());
+		p += f.size() + 1;
+	}
+	*p = L'\0';
+
+	GlobalUnlock(hMem);
+	return hMem;
+}
+class FileDataObject : public IDataObject {
+public:
+	HGLOBAL hDrop;
+
+	FileDataObject(const std::vector<std::wstring>& files) {
+		hDrop = CreateHDrop(files);
+	}
+
+	~FileDataObject() {
+		if (hDrop) GlobalFree(hDrop);
+	}
+
+	ULONG STDMETHODCALLTYPE AddRef() override { return 2; }
+	ULONG STDMETHODCALLTYPE Release() override { return 1; }
+
+	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppv) override {
+		if (riid == IID_IDataObject || riid == IID_IUnknown) {
+			*ppv = this;
+			return S_OK;
+		}
+		*ppv = nullptr;
+		return E_NOINTERFACE;
+	}
+	HRESULT STDMETHODCALLTYPE GetData(FORMATETC* pfe, STGMEDIUM* pmed) override {
+		if (pfe->cfFormat != CF_HDROP ||
+			!(pfe->tymed & TYMED_HGLOBAL))
+			return DV_E_FORMATETC;
+
+		pmed->tymed = TYMED_HGLOBAL;
+		pmed->hGlobal = GlobalAlloc(GMEM_MOVEABLE, GlobalSize(hDrop));
+		memcpy(GlobalLock(pmed->hGlobal),
+			GlobalLock(hDrop),
+			GlobalSize(hDrop));
+		GlobalUnlock(pmed->hGlobal);
+		GlobalUnlock(hDrop);
+		pmed->pUnkForRelease = nullptr;
+		return S_OK;
+	}
+
+	HRESULT STDMETHODCALLTYPE QueryGetData(FORMATETC* pfe) override {
+		if (pfe->cfFormat == CF_HDROP &&
+			(pfe->tymed & TYMED_HGLOBAL))
+			return S_OK;
+		return DV_E_FORMATETC;
+	}
+
+	HRESULT STDMETHODCALLTYPE GetCanonicalFormatEtc(FORMATETC* pformatectIn, FORMATETC* pformatetcOut) {
+		(void)pformatectIn; // 避免未使用参数警告
+		if (pformatetcOut)
+			pformatetcOut->ptd = nullptr;
+		return E_NOTIMPL;
+	}
+	// 不需要实现的桩
+	HRESULT STDMETHODCALLTYPE GetDataHere(FORMATETC*, STGMEDIUM*) override { return E_NOTIMPL; }
+	HRESULT STDMETHODCALLTYPE EnumFormatEtc(DWORD, IEnumFORMATETC**) override { return E_NOTIMPL; }
+	HRESULT STDMETHODCALLTYPE SetData(FORMATETC*, STGMEDIUM*, BOOL) override { return E_NOTIMPL; }
+	HRESULT STDMETHODCALLTYPE DAdvise(FORMATETC*, DWORD, IAdviseSink*, DWORD*) override { return E_NOTIMPL; }
+	HRESULT STDMETHODCALLTYPE DUnadvise(DWORD) override { return E_NOTIMPL; }
+	HRESULT STDMETHODCALLTYPE EnumDAdvise(IEnumSTATDATA**) override { return E_NOTIMPL; }
+};
+void StartFileDrag(const std::vector<std::wstring>& files) {
+	auto dataObj = new FileDataObject(files);
+	auto dropSource = new SimpleDropSource();
+
+	DWORD effect;
+	DoDragDrop(dataObj, dropSource, DROPEFFECT_COPY, &effect);
+
+	dataObj->Release();
+	dropSource->Release();
+}
